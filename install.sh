@@ -38,8 +38,8 @@ echo "Downloading amumax from GitHub..."
 curl -Ls https://github.com/MateuszZelent/amumax/releases/latest/download/amumax -o amumax
 
 # Download necessary libraries
-echo "Downloading libcufft.so.11..."
-curl -Ls https://github.com/MateuszZelent/amumax/releases/latest/download/libcufft.so.11 -o libcufft.so.11
+echo "Downloading libcufft.so.12..."
+curl -Ls https://github.com/MateuszZelent/amumax/releases/latest/download/libcufft.so.12 -o libcufft.so.12
 
 echo "Downloading libcurand.so.10..."
 curl -Ls https://github.com/MateuszZelent/amumax/releases/latest/download/libcurand.so.10 -o libcurand.so.10
