@@ -41,8 +41,8 @@ curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/amumax
 echo "Downloading libcufft.so.11..."
 curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/libcufft.so.11 -o libcufft.so.11
 
-echo "Downloading libcurand.so.11..."
-curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/libcurand.so.11 -o libcurand.so.11
+echo "Downloading libcurand.so.10..."
+curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/libcurand.so.10 -o libcurand.so.10
 
 # Make amumax executable
 echo "Setting amumax as executable"

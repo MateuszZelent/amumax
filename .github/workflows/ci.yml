@@ -28,14 +28,14 @@ jobs:
           tar -xJf libcufft.tar.xz
           cp -L libcufft-linux-x86_64-11.3.3.41-archive/lib/libcufft.so.11 ./libcufft.so.11
           
-          # Download and extract libcurand.so.11
-          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-11.0.0.1-archive.tar.xz -o libcurand.tar.xz
+          # Download and extract libcurand.so.10 (libcurand doesn't have version 11)
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.3.9.55-archive.tar.xz -o libcurand.tar.xz
           file libcurand.tar.xz
           tar -xJf libcurand.tar.xz
-          cp -L libcurand-linux-x86_64-11.0.0.1-archive/lib/libcurand.so.11 ./libcurand.so.11
+          cp -L libcurand-linux-x86_64-10.3.9.55-archive/lib/libcurand.so.10 ./libcurand.so.10
           
           # Clean up
-          rm -rf libcufft-linux-x86_64-11.3.3.41-archive libcurand-linux-x86_64-11.0.0.1-archive
+          rm -rf libcufft-linux-x86_64-11.3.3.41-archive libcurand-linux-x86_64-10.3.9.55-archive
           rm libcufft.tar.xz libcurand.tar.xz
 
       - name: Publish to GitHub Release
@@ -45,4 +45,4 @@ jobs:
           files: |
             amumax
             libcufft.so.11
-            libcurand.so.11
+            libcurand.so.10
