@@ -16,7 +16,7 @@ jobs:
 
       - name: Build
         run: |
-          nix build .#release
+          nix build .#default
           cp result/bin/amumax ./amumax
           chmod +x amumax
 
