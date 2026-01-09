@@ -37,21 +37,12 @@ cd $DEST
 echo "Downloading amumax from GitHub..."
 curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/amumax -o amumax
 
-# Download and extract necessary libraries
-echo "Downloading and extracting libcufft.so.10..."
-curl -Ls https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-10.9.0.58-archive.tar.xz -o tmp
-tar -xJf tmp > /dev/null
-cp -L libcufft-linux-x86_64-10.9.0.58-archive/lib/libcufft.so.10 .
+# Download necessary libraries
+echo "Downloading libcufft.so.11..."
+curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/libcufft.so.11 -o libcufft.so.11
 
-echo "Downloading and extracting libcurand.so.10..."
-curl -Ls https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.3.6.39-archive.tar.xz -o tmp
-tar -xJf tmp > /dev/null
-cp -L libcurand-linux-x86_64-10.3.6.39-archive/lib/libcurand.so.10 .
-
-# Clean up
-rm -rf libcufft-linux-x86_64-10.9.0.58-archive
-rm -rf libcurand-linux-x86_64-10.3.6.39-archive
-rm tmp
+echo "Downloading libcurand.so.11..."
+curl -Ls https://github.com/mathieumoalic/amumax/releases/latest/download/libcurand.so.11 -o libcurand.so.11
 
 # Make amumax executable
 echo "Setting amumax as executable"

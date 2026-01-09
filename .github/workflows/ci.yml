@@ -20,8 +20,27 @@ jobs:
           cp result/bin/amumax ./amumax
           chmod +x amumax
 
+      - name: Download CUDA libraries
+        run: |
+          # Download and extract libcufft.so.11
+          curl -Ls https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-11.3.3.41-archive.tar.xz -o libcufft.tar.xz
+          tar -xJf libcufft.tar.xz
+          cp -L libcufft-linux-x86_64-11.3.3.41-archive/lib/libcufft.so.11 ./libcufft.so.11
+          
+          # Download and extract libcurand.so.11
+          curl -Ls https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-11.0.0.1-archive.tar.xz -o libcurand.tar.xz
+          tar -xJf libcurand.tar.xz
+          cp -L libcurand-linux-x86_64-11.0.0.1-archive/lib/libcurand.so.11 ./libcurand.so.11
+          
+          # Clean up
+          rm -rf libcufft-linux-x86_64-11.3.3.41-archive libcurand-linux-x86_64-11.0.0.1-archive
+          rm libcufft.tar.xz libcurand.tar.xz
+
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: amumax
+          files: |
+            amumax
+            libcufft.so.11
+            libcurand.so.11
