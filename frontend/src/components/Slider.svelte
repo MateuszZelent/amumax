@@ -42,7 +42,7 @@
 		max={sliderMax}
 		step="1"
 		bind:value={index}
-		on:input={() => onChangeFunction(value)}
+		on:change={() => onChangeFunction(value)}
 		class="absolute left-0 top-0 h-full w-full cursor-pointer opacity-0"
 		disabled={isDisabled}
 	/>

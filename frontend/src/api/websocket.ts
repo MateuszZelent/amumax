@@ -13,35 +13,76 @@ import { preview2D } from '$lib/preview/preview2D';
 import { plotTable } from '$lib/table-plot/table-plot';
 import { metricsState, type Metrics } from './incoming/metrics';
 
-export let connected = writable(false);
+type MainUpdate = {
+	console?: Console;
+	header?: Header;
+	mesh?: Mesh;
+	parameters?: Parameters;
+	solver?: Solver;
+	tablePlot?: TablePlot;
+	preview?: Preview | null;
+	metrics?: Metrics;
+};
 
-export function initializeWebSocket() {
-	let retryInterval = 1000;
+export let connected = writable(false);
+let previewRenderScheduled = false;
+let tableRenderScheduled = false;
+
+function schedulePreviewRender() {
+	if (previewRenderScheduled) {
+		return;
+	}
+	previewRenderScheduled = true;
+	requestAnimationFrame(() => {
+		previewRenderScheduled = false;
+		if (get(previewState).type === '3D') {
+			preview3D();
+		} else {
+			preview2D();
+		}
+	});
+}
+
+function scheduleTableRender() {
+	if (tableRenderScheduled) {
+		return;
+	}
+	tableRenderScheduled = true;
+	requestAnimationFrame(() => {
+		tableRenderScheduled = false;
+		plotTable();
+	});
+}
+
+function connectWS(
+	wsUrl: string,
+	onOpen: () => void,
+	onClose: () => void,
+	onMessage: (data: ArrayBuffer) => void
+) {
+	const retryInterval = 1000;
 	let ws: WebSocket | null = null;
-	
+
 	function connect() {
-		let wsUrl = './ws';
 		console.debug('Connecting to WebSocket server at', wsUrl);
 		ws = new WebSocket(wsUrl);
 		ws.binaryType = 'arraybuffer';
 
 		ws.onopen = function () {
-			console.debug('WebSocket connection established');
-			connected.set(true);
+			onOpen();
 		};
 
 		ws.onmessage = function (event) {
-			parseMsgpack(event.data);
+			onMessage(event.data as ArrayBuffer);
 			ws?.send('ok');
-			connected.set(true);
 		};
 
 		ws.onclose = function () {
-			connected.set(false);
+			onClose();
 			console.debug(
 				'WebSocket closed. Attempting to reconnect in ' + retryInterval / 1000 + ' seconds...'
 			);
-			ws = null; // Ensure ws is set to null when it is closed
+			ws = null;
 			setTimeout(connect, retryInterval);
 		};
 
@@ -53,54 +94,67 @@ export function initializeWebSocket() {
 		};
 	}
 
-	function tryConnect() {
-		console.debug('Attempting WebSocket connection...');
-		try {
-			connect();
-		} catch (err) {
-			console.error(
-				'WebSocket connection failed:',
-				err,
-				'Retrying in ' + retryInterval / 1000 + ' seconds...'
-			);
-			setTimeout(tryConnect, retryInterval);
-		}
+	try {
+		connect();
+	} catch (err) {
+		console.error(
+			'WebSocket connection failed:',
+			err,
+			'Retrying in ' + retryInterval / 1000 + ' seconds...'
+		);
+		setTimeout(connect, retryInterval);
 	}
+}
 
-	tryConnect();
+export function initializeWebSocket() {
+	connectWS(
+		'./ws',
+		() => connected.set(true),
+		() => connected.set(false),
+		parseMsgpack
+	);
+	connectWS(
+		'./ws/preview',
+		() => undefined,
+		() => undefined,
+		parsePreviewMsgpack
+	);
 }
 
 export function parseMsgpack(data: ArrayBuffer) {
-	const msg = decode(new Uint8Array(data)) as {
-		console: Console;
-		header: Header;
-		mesh: Mesh;
-		parameters: Parameters;
-		solver: Solver;
-		tablePlot: TablePlot;
-		preview: Preview;
-		metrics: Metrics;
-	};
-	consoleState.set(msg.console as Console);
+	const msg = decode(new Uint8Array(data)) as MainUpdate;
 
-	headerState.set(msg.header as Header);
-
-	meshState.set(msg.mesh as Mesh);
-
-	parametersState.set(msg.parameters as Parameters);
-	sortFieldsByName();
-
-	solverState.set(msg.solver as Solver);
-
-	tablePlotState.set(msg.tablePlot as TablePlot);
-	plotTable();
-
-	previewState.set(msg.preview as Preview);
-	if (get(previewState).type === '3D') {
-		preview3D();
-	} else {
-		preview2D();
+	if (msg.console) {
+		consoleState.set(msg.console);
 	}
+	if (msg.header) {
+		headerState.set(msg.header);
+	}
+	if (msg.mesh) {
+		meshState.set(msg.mesh);
+	}
+	if (msg.parameters) {
+		parametersState.set(msg.parameters);
+		sortFieldsByName();
+	}
+	if (msg.solver) {
+		solverState.set(msg.solver);
+	}
+	if (msg.tablePlot) {
+		tablePlotState.set(msg.tablePlot);
+		scheduleTableRender();
+	}
+	if (msg.preview) {
+		previewState.set(msg.preview);
+		schedulePreviewRender();
+	}
+	if (msg.metrics) {
+		metricsState.set(msg.metrics);
+	}
+}
 
-	metricsState.set(msg.metrics);
+export function parsePreviewMsgpack(data: ArrayBuffer) {
+	const msg = decode(new Uint8Array(data)) as Preview;
+	previewState.set(msg);
+	schedulePreviewRender();
 }

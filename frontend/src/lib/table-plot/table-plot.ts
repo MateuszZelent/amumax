@@ -45,7 +45,7 @@ export function init() {
         return;
     }
     // https://apache.github.io/echarts-handbook/en/best-practices/canvas-vs-svg
-    chartInstance = echarts.init(chartDom, undefined, { renderer: 'svg' });
+    chartInstance = echarts.init(chartDom, undefined, { renderer: 'canvas', useDirtyRect: true });
     let t = get(tablePlotState);
 
     // @ts-ignore
@@ -70,7 +70,7 @@ export function init() {
                 borderWidth: 1,
             }
         },
-        animation: true,
+        animation: false,
         grid: {
             containLabel: false,
             left: '10%',
@@ -134,6 +134,10 @@ export function init() {
                 type: 'line',
                 name: 'y',
                 showSymbol: false,
+                sampling: 'lttb',
+                progressive: 2000,
+                progressiveThreshold: 3000,
+                animation: false,
                 data: t.data,
             }
         ]

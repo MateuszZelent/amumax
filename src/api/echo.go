@@ -51,6 +51,7 @@ func Start(host string, port int, basePath string, tunnel string, debug bool) {
 
 	wsManager := newWebSocketManager()
 	api.GET("/ws", wsManager.websocketEntrypoint)
+	api.GET("/ws/preview", wsManager.websocketPreviewEntrypoint)
 	wsManager.startBroadcastLoop()
 	engineState := initEngineStateAPI(api, wsManager)
 	wsManager.engineState = engineState

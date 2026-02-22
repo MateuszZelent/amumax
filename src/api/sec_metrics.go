@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -18,6 +19,9 @@ import (
 
 type MetricsState struct {
 	ws *WebSocketManager
+
+	lastGPUUpdate      time.Time
+	gpuRefreshInterval time.Duration
 
 	PID             int     `msgpack:"pid"`
 	Error           string  `msgpack:"error"`
@@ -38,7 +42,11 @@ type MetricsState struct {
 
 func initMetricsAPI(e *echo.Group, ws *WebSocketManager) *MetricsState {
 	pid := os.Getpid()
-	metricState := &MetricsState{PID: pid, ws: ws}
+	metricState := &MetricsState{
+		PID:                pid,
+		ws:                 ws,
+		gpuRefreshInterval: 5 * time.Second,
+	}
 	metricState.Update()
 	e.POST("/api/metrics/reset-error", metricState.postMetricsReset)
 	return metricState
@@ -51,8 +59,11 @@ func (m *MetricsState) Update() {
 	m.getProgramCPUUsage()
 	m.getTotalCPUUsage()
 	m.getTotalRAMUsage()
-	m.getGPUStats1()
-	m.getGPUStats2()
+	if m.lastGPUUpdate.IsZero() || time.Since(m.lastGPUUpdate) >= m.gpuRefreshInterval {
+		m.getGPUStats1()
+		m.getGPUStats2()
+		m.lastGPUUpdate = time.Now()
+	}
 }
 
 // Function to get GPU stats via `nvidia-smi`

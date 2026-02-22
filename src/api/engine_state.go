@@ -13,6 +13,16 @@ type EngineState struct {
 	Metrics   *MetricsState    `msgpack:"metrics"`
 }
 
+type EngineStateNoPreview struct {
+	Header    *HeaderState     `msgpack:"header"`
+	Console   *ConsoleState    `msgpack:"console"`
+	Solver    *SolverState     `msgpack:"solver"`
+	Mesh      *MeshState       `msgpack:"mesh"`
+	Params    *ParametersState `msgpack:"parameters"`
+	TablePlot *TablePlotState  `msgpack:"tablePlot"`
+	Metrics   *MetricsState    `msgpack:"metrics"`
+}
+
 func initEngineStateAPI(e *echo.Group, ws *WebSocketManager) *EngineState {
 	return &EngineState{
 		Header:    initHeaderAPI(),
@@ -35,4 +45,26 @@ func (es *EngineState) Update() {
 	es.Params.Update()
 	es.TablePlot.Update()
 	es.Metrics.Update()
+}
+
+func (es *EngineState) UpdateWithoutPreview() {
+	es.Header.Update()
+	es.Console.Update()
+	es.Solver.Update()
+	es.Mesh.Update()
+	es.Params.Update()
+	es.TablePlot.Update()
+	es.Metrics.Update()
+}
+
+func (es *EngineState) WithoutPreview() *EngineStateNoPreview {
+	return &EngineStateNoPreview{
+		Header:    es.Header,
+		Console:   es.Console,
+		Solver:    es.Solver,
+		Mesh:      es.Mesh,
+		Params:    es.Params,
+		TablePlot: es.TablePlot,
+		Metrics:   es.Metrics,
+	}
 }

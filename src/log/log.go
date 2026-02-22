@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -20,6 +21,8 @@ type Logs struct {
 	debug   bool
 	path    string
 }
+
+const maxHistBytes = 2 * 1024 * 1024
 
 func (l *Logs) AutoFlushToFile() {
 	for {
@@ -73,6 +76,13 @@ func (l *Logs) writeToFile(msg string) {
 
 func (l *Logs) addAndWrite(msg string) {
 	l.Hist += msg
+	if len(l.Hist) > maxHistBytes {
+		trimOffset := len(l.Hist) - maxHistBytes
+		if idx := strings.IndexByte(l.Hist[trimOffset:], '\n'); idx >= 0 {
+			trimOffset += idx + 1
+		}
+		l.Hist = l.Hist[trimOffset:]
+	}
 	l.writeToFile(msg)
 }
 

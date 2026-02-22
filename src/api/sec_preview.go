@@ -17,18 +17,18 @@ type PreviewState struct {
 	ws                   *WebSocketManager
 	globalQuantities     []string
 	layerMask            [][]float32
-	Quantity             string               `msgpack:"quantity"`
-	Unit                 string               `msgpack:"unit"`
-	Component            string               `msgpack:"component"`
-	Layer                int                  `msgpack:"layer"`
-	Type                 string               `msgpack:"type"`
-	VectorFieldValues    []map[string]float32 `msgpack:"vectorFieldValues"`
-	VectorFieldPositions []map[string]int     `msgpack:"vectorFieldPositions"`
-	ScalarField          [][3]float32         `msgpack:"scalarField"`
-	Min                  float32              `msgpack:"min"`
-	Max                  float32              `msgpack:"max"`
-	Refresh              bool                 `msgpack:"refresh"`
-	NComp                int                  `msgpack:"nComp"`
+	Quantity             string       `msgpack:"quantity"`
+	Unit                 string       `msgpack:"unit"`
+	Component            string       `msgpack:"component"`
+	Layer                int          `msgpack:"layer"`
+	Type                 string       `msgpack:"type"`
+	VectorFieldValues    []Vector3f   `msgpack:"vectorFieldValues"`
+	VectorFieldPositions []Vector3i   `msgpack:"vectorFieldPositions"`
+	ScalarField          [][3]float32 `msgpack:"scalarField"`
+	Min                  float32      `msgpack:"min"`
+	Max                  float32      `msgpack:"max"`
+	Refresh              bool         `msgpack:"refresh"`
+	NComp                int          `msgpack:"nComp"`
 
 	MaxPoints       int   `msgpack:"maxPoints"`
 	DataPointsCount int   `msgpack:"dataPointsCount"`
@@ -36,6 +36,18 @@ type PreviewState struct {
 	YPossibleSizes  []int `msgpack:"yPossibleSizes"`
 	XChosenSize     int   `msgpack:"xChosenSize"`
 	YChosenSize     int   `msgpack:"yChosenSize"`
+}
+
+type Vector3f struct {
+	X float32 `msgpack:"x"`
+	Y float32 `msgpack:"y"`
+	Z float32 `msgpack:"z"`
+}
+
+type Vector3i struct {
+	X int `msgpack:"x"`
+	Y int `msgpack:"y"`
+	Z int `msgpack:"z"`
 }
 
 func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
@@ -168,10 +180,11 @@ func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
 	// Calculate the total number of elements
 	yLen := len(vectorField[0][0])
 	xLen := len(vectorField[0][0][0])
+	maxCount := xLen * yLen
 
 	// Create a slice to hold the array of {x, y, z} objects
-	var valArray []map[string]float32
-	var posArray []map[string]int
+	valArray := make([]Vector3f, 0, maxCount)
+	posArray := make([]Vector3i, 0, maxCount)
 	for posx := 0; posx < xLen; posx++ {
 		for posy := 0; posy < yLen; posy++ {
 			valx := vectorField[0][0][posy][posx]
@@ -180,18 +193,16 @@ func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
 			if (valx == 0 && valy == 0 && valz == 0) || (math.IsNaN(float64(valx))) {
 				continue
 			}
-			posArray = append(posArray,
-				map[string]int{
-					"x": posx,
-					"y": posy,
-					"z": 0,
-				})
-			valArray = append(valArray,
-				map[string]float32{
-					"x": valx,
-					"y": valy,
-					"z": valz,
-				})
+			posArray = append(posArray, Vector3i{
+				X: posx,
+				Y: posy,
+				Z: 0,
+			})
+			valArray = append(valArray, Vector3f{
+				X: valx,
+				Y: valy,
+				Z: valz,
+			})
 		}
 	}
 	s.VectorFieldPositions = posArray
@@ -203,9 +214,10 @@ func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
 func (s *PreviewState) UpdateScalarField(scalarField [][][]float32) {
 	xLen := len(scalarField[0][0])
 	yLen := len(scalarField[0])
-	min, max := scalarField[0][0][0], scalarField[0][0][0]
+	min, max := float32(0), float32(0)
+	hasValue := false
 
-	var valArray [][3]float32
+	valArray := make([][3]float32, 0, xLen*yLen)
 	for posx := 0; posx < xLen; posx++ {
 		for posy := 0; posy < yLen; posy++ {
 			// Some quantities exist where the magnetic materials are not present
@@ -218,17 +230,29 @@ func (s *PreviewState) UpdateScalarField(scalarField [][][]float32) {
 				}
 			}
 			val := scalarField[0][posy][posx]
-			if val < min {
-				min = val
-			}
-			if val > max {
-				max = val
+			if !hasValue {
+				min, max = val, val
+				hasValue = true
+			} else {
+				if val < min {
+					min = val
+				}
+				if val > max {
+					max = val
+				}
 			}
 			valArray = append(valArray, [3]float32{float32(posx), float32(posy), val})
 		}
 	}
 	if len(valArray) == 0 {
 		log.Log.Warn("No data in scalar field")
+		s.Min = 0
+		s.Max = 0
+		s.ScalarField = nil
+		s.VectorFieldValues = nil
+		s.VectorFieldPositions = nil
+		s.DataPointsCount = 0
+		return
 	}
 
 	s.Min = min
