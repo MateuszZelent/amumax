@@ -18,14 +18,14 @@ var shiftbytesCode cu.Function
 
 // Stores the arguments for shiftbytes kernel invocation
 type shiftbytesArgsT struct {
-	argDst   unsafe.Pointer
-	argSrc   unsafe.Pointer
-	argNx    int
-	argNy    int
-	argNz    int
-	argShx   int
+	argDst unsafe.Pointer
+	argSrc unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argShx int
 	argClamp byte
-	argptr   [7]unsafe.Pointer
+	argptr [7]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -41,7 +41,7 @@ func init() {
 	shiftbytesArgs.argptr[4] = unsafe.Pointer(&shiftbytesArgs.argNz)
 	shiftbytesArgs.argptr[5] = unsafe.Pointer(&shiftbytesArgs.argShx)
 	shiftbytesArgs.argptr[6] = unsafe.Pointer(&shiftbytesArgs.argClamp)
-}
+	}
 
 // Wrapper for shiftbytes CUDA kernel, asynchronous.
 func kShiftbytesAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz int, shx int, clamp byte, cfg *config) {
@@ -64,7 +64,7 @@ func kShiftbytesAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz
 	shiftbytesArgs.argNz = Nz
 	shiftbytesArgs.argShx = shx
 	shiftbytesArgs.argClamp = clamp
-
+	
 	args := shiftbytesArgs.argptr[:]
 	cu.LaunchKernel(shiftbytesCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -76,7 +76,7 @@ func kShiftbytesAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz
 
 // maps compute capability on PTX code for shiftbytes kernel.
 var shiftbytesMap = map[int]string{
-	0:  "",
+	0: "",
 	52: shiftbytesPtx52,
 }
 
@@ -160,4 +160,4 @@ BB0_4:
 
 
 `
-)
+	)

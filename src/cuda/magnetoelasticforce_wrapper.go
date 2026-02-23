@@ -18,24 +18,24 @@ var getmagnetoelasticforceCode cu.Function
 
 // Stores the arguments for getmagnetoelasticforce kernel invocation
 type getmagnetoelasticforceArgsT struct {
-	argFx    unsafe.Pointer
-	argFy    unsafe.Pointer
-	argFz    unsafe.Pointer
-	argMx    unsafe.Pointer
-	argMy    unsafe.Pointer
-	argMz    unsafe.Pointer
-	argB1    unsafe.Pointer
+	argFx unsafe.Pointer
+	argFy unsafe.Pointer
+	argFz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argB1 unsafe.Pointer
 	argB1Mul float32
-	argB2    unsafe.Pointer
+	argB2 unsafe.Pointer
 	argB2Mul float32
-	argRcsx  float32
-	argRcsy  float32
-	argRcsz  float32
-	argNx    int
-	argNy    int
-	argNz    int
-	argPBC   byte
-	argptr   [17]unsafe.Pointer
+	argRcsx float32
+	argRcsy float32
+	argRcsz float32
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argptr [17]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -61,10 +61,10 @@ func init() {
 	getmagnetoelasticforceArgs.argptr[14] = unsafe.Pointer(&getmagnetoelasticforceArgs.argNy)
 	getmagnetoelasticforceArgs.argptr[15] = unsafe.Pointer(&getmagnetoelasticforceArgs.argNz)
 	getmagnetoelasticforceArgs.argptr[16] = unsafe.Pointer(&getmagnetoelasticforceArgs.argPBC)
-}
+	}
 
 // Wrapper for getmagnetoelasticforce CUDA kernel, asynchronous.
-func kGetmagnetoelasticforceAsync(fx unsafe.Pointer, fy unsafe.Pointer, fz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, B1_ unsafe.Pointer, B1Mul float32, B2_ unsafe.Pointer, B2Mul float32, rcsx float32, rcsy float32, rcsz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
+func kGetmagnetoelasticforceAsync(fx unsafe.Pointer, fy unsafe.Pointer, fz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, B1_ unsafe.Pointer, B1_mul float32, B2_ unsafe.Pointer, B2_mul float32, rcsx float32, rcsy float32, rcsz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("getmagnetoelasticforce")
@@ -84,9 +84,9 @@ func kGetmagnetoelasticforceAsync(fx unsafe.Pointer, fy unsafe.Pointer, fz unsaf
 	getmagnetoelasticforceArgs.argMy = my
 	getmagnetoelasticforceArgs.argMz = mz
 	getmagnetoelasticforceArgs.argB1 = B1_
-	getmagnetoelasticforceArgs.argB1Mul = B1Mul
+	getmagnetoelasticforceArgs.argB1Mul = B1_mul
 	getmagnetoelasticforceArgs.argB2 = B2_
-	getmagnetoelasticforceArgs.argB2Mul = B2Mul
+	getmagnetoelasticforceArgs.argB2Mul = B2_mul
 	getmagnetoelasticforceArgs.argRcsx = rcsx
 	getmagnetoelasticforceArgs.argRcsy = rcsy
 	getmagnetoelasticforceArgs.argRcsz = rcsz
@@ -94,7 +94,7 @@ func kGetmagnetoelasticforceAsync(fx unsafe.Pointer, fy unsafe.Pointer, fz unsaf
 	getmagnetoelasticforceArgs.argNy = Ny
 	getmagnetoelasticforceArgs.argNz = Nz
 	getmagnetoelasticforceArgs.argPBC = PBC
-
+	
 	args := getmagnetoelasticforceArgs.argptr[:]
 	cu.LaunchKernel(getmagnetoelasticforceCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -106,7 +106,7 @@ func kGetmagnetoelasticforceAsync(fx unsafe.Pointer, fy unsafe.Pointer, fz unsaf
 
 // maps compute capability on PTX code for getmagnetoelasticforce kernel.
 var getmagnetoelasticforceMap = map[int]string{
-	0:  "",
+	0: "",
 	52: getmagnetoelasticforcePtx52,
 }
 
@@ -1019,4 +1019,4 @@ BB0_108:
 
 
 `
-)
+	)

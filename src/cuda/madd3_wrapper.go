@@ -18,15 +18,15 @@ var madd3Code cu.Function
 
 // Stores the arguments for madd3 kernel invocation
 type madd3ArgsT struct {
-	argDst  unsafe.Pointer
+	argDst unsafe.Pointer
 	argSrc1 unsafe.Pointer
 	argFac1 float32
 	argSrc2 unsafe.Pointer
 	argFac2 float32
 	argSrc3 unsafe.Pointer
 	argFac3 float32
-	argN    int
-	argptr  [8]unsafe.Pointer
+	argN int
+	argptr [8]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -43,7 +43,7 @@ func init() {
 	madd3Args.argptr[5] = unsafe.Pointer(&madd3Args.argSrc3)
 	madd3Args.argptr[6] = unsafe.Pointer(&madd3Args.argFac3)
 	madd3Args.argptr[7] = unsafe.Pointer(&madd3Args.argN)
-}
+	}
 
 // Wrapper for madd3 CUDA kernel, asynchronous.
 func kMadd3Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 unsafe.Pointer, fac2 float32, src3 unsafe.Pointer, fac3 float32, N int, cfg *config) {
@@ -67,7 +67,7 @@ func kMadd3Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 	madd3Args.argSrc3 = src3
 	madd3Args.argFac3 = fac3
 	madd3Args.argN = N
-
+	
 	args := madd3Args.argptr[:]
 	cu.LaunchKernel(madd3Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -79,7 +79,7 @@ func kMadd3Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 
 // maps compute capability on PTX code for madd3 kernel.
 var madd3Map = map[int]string{
-	0:  "",
+	0: "",
 	52: madd3Ptx52,
 }
 
@@ -150,4 +150,4 @@ BB0_2:
 
 
 `
-)
+	)

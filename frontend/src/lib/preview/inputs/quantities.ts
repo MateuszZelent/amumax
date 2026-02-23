@@ -9,6 +9,7 @@ export const quantities: { [category: string]: string[] } = {
 		'B_exch',
 		'B_ext',
 		'B_mel',
+		'B_oersted',
 		'B_therm'
 	],
 
@@ -46,7 +47,7 @@ export const quantities: { [category: string]: string[] } = {
 
 	Strain: ['exx', 'exy', 'exz', 'eyy', 'eyz', 'ezz'],
 
-	Current: ['J', 'Pol'],
+	Current: ['J', 'J_oersted', 'I_oersted', 'Pol'],
 
 	Slonczewski: ['EpsilonPrime', 'FixedLayer', 'FreeLayerThickness', 'Lambda'],
 

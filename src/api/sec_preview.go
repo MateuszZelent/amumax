@@ -70,7 +70,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		XChosenSize:          engine.Mesh.Nx,
 		YChosenSize:          engine.Mesh.Ny,
 		ws:                   ws,
-		globalQuantities:     []string{"B_demag", "B_ext", "B_eff", "Edens_demag", "Edens_ext", "Edens_eff", "geom"},
+		globalQuantities:     []string{"B_demag", "B_ext", "B_eff", "B_oersted", "Edens_demag", "Edens_ext", "Edens_eff", "geom"},
 	}
 	previewState.addPossibleDownscaleSizes()
 	e.POST("/api/preview/component", previewState.postPreviewComponent)

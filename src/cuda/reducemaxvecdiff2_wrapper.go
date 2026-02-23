@@ -18,16 +18,16 @@ var reducemaxvecdiff2Code cu.Function
 
 // Stores the arguments for reducemaxvecdiff2 kernel invocation
 type reducemaxvecdiff2ArgsT struct {
-	argX1      unsafe.Pointer
-	argY1      unsafe.Pointer
-	argZ1      unsafe.Pointer
-	argX2      unsafe.Pointer
-	argY2      unsafe.Pointer
-	argZ2      unsafe.Pointer
-	argDst     unsafe.Pointer
+	argX1 unsafe.Pointer
+	argY1 unsafe.Pointer
+	argZ1 unsafe.Pointer
+	argX2 unsafe.Pointer
+	argY2 unsafe.Pointer
+	argZ2 unsafe.Pointer
+	argDst unsafe.Pointer
 	argInitVal float32
-	argN       int
-	argptr     [9]unsafe.Pointer
+	argN int
+	argptr [9]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -45,7 +45,7 @@ func init() {
 	reducemaxvecdiff2Args.argptr[6] = unsafe.Pointer(&reducemaxvecdiff2Args.argDst)
 	reducemaxvecdiff2Args.argptr[7] = unsafe.Pointer(&reducemaxvecdiff2Args.argInitVal)
 	reducemaxvecdiff2Args.argptr[8] = unsafe.Pointer(&reducemaxvecdiff2Args.argN)
-}
+	}
 
 // Wrapper for reducemaxvecdiff2 CUDA kernel, asynchronous.
 func kReducemaxvecdiff2Async(x1 unsafe.Pointer, y1 unsafe.Pointer, z1 unsafe.Pointer, x2 unsafe.Pointer, y2 unsafe.Pointer, z2 unsafe.Pointer, dst unsafe.Pointer, initVal float32, n int, cfg *config) {
@@ -70,7 +70,7 @@ func kReducemaxvecdiff2Async(x1 unsafe.Pointer, y1 unsafe.Pointer, z1 unsafe.Poi
 	reducemaxvecdiff2Args.argDst = dst
 	reducemaxvecdiff2Args.argInitVal = initVal
 	reducemaxvecdiff2Args.argN = n
-
+	
 	args := reducemaxvecdiff2Args.argptr[:]
 	cu.LaunchKernel(reducemaxvecdiff2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -82,7 +82,7 @@ func kReducemaxvecdiff2Async(x1 unsafe.Pointer, y1 unsafe.Pointer, z1 unsafe.Poi
 
 // maps compute capability on PTX code for reducemaxvecdiff2 kernel.
 var reducemaxvecdiff2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: reducemaxvecdiff2Ptx52,
 }
 
@@ -237,4 +237,4 @@ BB0_11:
 
 
 `
-)
+	)

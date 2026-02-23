@@ -18,16 +18,16 @@ var settopologicalchargeCode cu.Function
 
 // Stores the arguments for settopologicalcharge kernel invocation
 type settopologicalchargeArgsT struct {
-	argS     unsafe.Pointer
-	argMx    unsafe.Pointer
-	argMy    unsafe.Pointer
-	argMz    unsafe.Pointer
+	argS unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
 	argIcxcy float32
-	argNx    int
-	argNy    int
-	argNz    int
-	argPBC   byte
-	argptr   [9]unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argptr [9]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -45,7 +45,7 @@ func init() {
 	settopologicalchargeArgs.argptr[6] = unsafe.Pointer(&settopologicalchargeArgs.argNy)
 	settopologicalchargeArgs.argptr[7] = unsafe.Pointer(&settopologicalchargeArgs.argNz)
 	settopologicalchargeArgs.argptr[8] = unsafe.Pointer(&settopologicalchargeArgs.argPBC)
-}
+	}
 
 // Wrapper for settopologicalcharge CUDA kernel, asynchronous.
 func kSettopologicalchargeAsync(s unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, icxcy float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
@@ -70,7 +70,7 @@ func kSettopologicalchargeAsync(s unsafe.Pointer, mx unsafe.Pointer, my unsafe.P
 	settopologicalchargeArgs.argNy = Ny
 	settopologicalchargeArgs.argNz = Nz
 	settopologicalchargeArgs.argPBC = PBC
-
+	
 	args := settopologicalchargeArgs.argptr[:]
 	cu.LaunchKernel(settopologicalchargeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -82,7 +82,7 @@ func kSettopologicalchargeAsync(s unsafe.Pointer, mx unsafe.Pointer, my unsafe.P
 
 // maps compute capability on PTX code for settopologicalcharge kernel.
 var settopologicalchargeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: settopologicalchargePtx52,
 }
 
@@ -696,4 +696,4 @@ BB0_72:
 
 
 `
-)
+	)

@@ -19,11 +19,11 @@ var setThetaCode cu.Function
 // Stores the arguments for setTheta kernel invocation
 type setThetaArgsT struct {
 	argTheta unsafe.Pointer
-	argMz    unsafe.Pointer
-	argNx    int
-	argNy    int
-	argNz    int
-	argptr   [5]unsafe.Pointer
+	argMz unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argptr [5]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -37,7 +37,7 @@ func init() {
 	setThetaArgs.argptr[2] = unsafe.Pointer(&setThetaArgs.argNx)
 	setThetaArgs.argptr[3] = unsafe.Pointer(&setThetaArgs.argNy)
 	setThetaArgs.argptr[4] = unsafe.Pointer(&setThetaArgs.argNz)
-}
+	}
 
 // Wrapper for setTheta CUDA kernel, asynchronous.
 func kSetThetaAsync(theta unsafe.Pointer, mz unsafe.Pointer, Nx int, Ny int, Nz int, cfg *config) {
@@ -58,7 +58,7 @@ func kSetThetaAsync(theta unsafe.Pointer, mz unsafe.Pointer, Nx int, Ny int, Nz 
 	setThetaArgs.argNx = Nx
 	setThetaArgs.argNy = Ny
 	setThetaArgs.argNz = Nz
-
+	
 	args := setThetaArgs.argptr[:]
 	cu.LaunchKernel(setThetaCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -70,7 +70,7 @@ func kSetThetaAsync(theta unsafe.Pointer, mz unsafe.Pointer, Nx int, Ny int, Nz 
 
 // maps compute capability on PTX code for setTheta kernel.
 var setThetaMap = map[int]string{
-	0:  "",
+	0: "",
 	52: setThetaPtx52,
 }
 
@@ -164,4 +164,4 @@ BB0_2:
 
 
 `
-)
+	)

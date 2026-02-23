@@ -18,36 +18,36 @@ var addslonczewskitorque2Code cu.Function
 
 // Stores the arguments for addslonczewskitorque2 kernel invocation
 type addslonczewskitorque2ArgsT struct {
-	argTx                unsafe.Pointer
-	argTy                unsafe.Pointer
-	argTz                unsafe.Pointer
-	argMx                unsafe.Pointer
-	argMy                unsafe.Pointer
-	argMz                unsafe.Pointer
-	argMs                unsafe.Pointer
-	argMsMul             float32
-	argJz                unsafe.Pointer
-	argJzMul             float32
-	argPx                unsafe.Pointer
-	argPxMul             float32
-	argPy                unsafe.Pointer
-	argPyMul             float32
-	argPz                unsafe.Pointer
-	argPzMul             float32
-	argAlpha             unsafe.Pointer
-	argAlphaMul          float32
-	argPol               unsafe.Pointer
-	argPolMul            float32
-	argLambda            unsafe.Pointer
-	argLambdaMul         float32
-	argEpsPrime          unsafe.Pointer
-	argEpsPrimeMul       float32
-	argThickness         unsafe.Pointer
-	argThicknessMul      float32
-	argMeshThickness     float32
+	argTx unsafe.Pointer
+	argTy unsafe.Pointer
+	argTz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
+	argMsMul float32
+	argJz unsafe.Pointer
+	argJzMul float32
+	argPx unsafe.Pointer
+	argPxMul float32
+	argPy unsafe.Pointer
+	argPyMul float32
+	argPz unsafe.Pointer
+	argPzMul float32
+	argAlpha unsafe.Pointer
+	argAlphaMul float32
+	argPol unsafe.Pointer
+	argPolMul float32
+	argLambda unsafe.Pointer
+	argLambdaMul float32
+	argEpsPrime unsafe.Pointer
+	argEpsPrimeMul float32
+	argThickness unsafe.Pointer
+	argThicknessMul float32
+	argMeshThickness float32
 	argFreeLayerPosition float32
-	argN                 int
-	argptr               [29]unsafe.Pointer
+	argN int
+	argptr [29]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -85,10 +85,10 @@ func init() {
 	addslonczewskitorque2Args.argptr[26] = unsafe.Pointer(&addslonczewskitorque2Args.argMeshThickness)
 	addslonczewskitorque2Args.argptr[27] = unsafe.Pointer(&addslonczewskitorque2Args.argFreeLayerPosition)
 	addslonczewskitorque2Args.argptr[28] = unsafe.Pointer(&addslonczewskitorque2Args.argN)
-}
+	}
 
 // Wrapper for addslonczewskitorque2 CUDA kernel, asynchronous.
-func kAddslonczewskitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, jz_ unsafe.Pointer, jzMul float32, px_ unsafe.Pointer, pxMul float32, py_ unsafe.Pointer, pyMul float32, pz_ unsafe.Pointer, pzMul float32, alpha_ unsafe.Pointer, alphaMul float32, pol_ unsafe.Pointer, polMul float32, lambda_ unsafe.Pointer, lambdaMul float32, epsPrime_ unsafe.Pointer, epsPrimeMul float32, thickness_ unsafe.Pointer, thicknessMul float32, meshThickness float32, freeLayerPosition float32, N int, cfg *config) {
+func kAddslonczewskitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, jz_ unsafe.Pointer, jz_mul float32, px_ unsafe.Pointer, px_mul float32, py_ unsafe.Pointer, py_mul float32, pz_ unsafe.Pointer, pz_mul float32, alpha_ unsafe.Pointer, alpha_mul float32, pol_ unsafe.Pointer, pol_mul float32, lambda_ unsafe.Pointer, lambda_mul float32, epsPrime_ unsafe.Pointer, epsPrime_mul float32, thickness_ unsafe.Pointer, thickness_mul float32, meshThickness float32, freeLayerPosition float32, N int, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("addslonczewskitorque2")
@@ -108,29 +108,29 @@ func kAddslonczewskitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe
 	addslonczewskitorque2Args.argMy = my
 	addslonczewskitorque2Args.argMz = mz
 	addslonczewskitorque2Args.argMs = Ms_
-	addslonczewskitorque2Args.argMsMul = MsMul
+	addslonczewskitorque2Args.argMsMul = Ms_mul
 	addslonczewskitorque2Args.argJz = jz_
-	addslonczewskitorque2Args.argJzMul = jzMul
+	addslonczewskitorque2Args.argJzMul = jz_mul
 	addslonczewskitorque2Args.argPx = px_
-	addslonczewskitorque2Args.argPxMul = pxMul
+	addslonczewskitorque2Args.argPxMul = px_mul
 	addslonczewskitorque2Args.argPy = py_
-	addslonczewskitorque2Args.argPyMul = pyMul
+	addslonczewskitorque2Args.argPyMul = py_mul
 	addslonczewskitorque2Args.argPz = pz_
-	addslonczewskitorque2Args.argPzMul = pzMul
+	addslonczewskitorque2Args.argPzMul = pz_mul
 	addslonczewskitorque2Args.argAlpha = alpha_
-	addslonczewskitorque2Args.argAlphaMul = alphaMul
+	addslonczewskitorque2Args.argAlphaMul = alpha_mul
 	addslonczewskitorque2Args.argPol = pol_
-	addslonczewskitorque2Args.argPolMul = polMul
+	addslonczewskitorque2Args.argPolMul = pol_mul
 	addslonczewskitorque2Args.argLambda = lambda_
-	addslonczewskitorque2Args.argLambdaMul = lambdaMul
+	addslonczewskitorque2Args.argLambdaMul = lambda_mul
 	addslonczewskitorque2Args.argEpsPrime = epsPrime_
-	addslonczewskitorque2Args.argEpsPrimeMul = epsPrimeMul
+	addslonczewskitorque2Args.argEpsPrimeMul = epsPrime_mul
 	addslonczewskitorque2Args.argThickness = thickness_
-	addslonczewskitorque2Args.argThicknessMul = thicknessMul
+	addslonczewskitorque2Args.argThicknessMul = thickness_mul
 	addslonczewskitorque2Args.argMeshThickness = meshThickness
 	addslonczewskitorque2Args.argFreeLayerPosition = freeLayerPosition
 	addslonczewskitorque2Args.argN = N
-
+	
 	args := addslonczewskitorque2Args.argptr[:]
 	cu.LaunchKernel(addslonczewskitorque2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -142,7 +142,7 @@ func kAddslonczewskitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe
 
 // maps compute capability on PTX code for addslonczewskitorque2 kernel.
 var addslonczewskitorque2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: addslonczewskitorque2Ptx52,
 }
 
@@ -424,4 +424,4 @@ BB0_25:
 
 
 `
-)
+	)

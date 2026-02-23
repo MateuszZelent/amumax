@@ -18,18 +18,18 @@ var resizeCode cu.Function
 
 // Stores the arguments for resize kernel invocation
 type resizeArgsT struct {
-	argDst    unsafe.Pointer
-	argDx     int
-	argDy     int
-	argDz     int
-	argSrc    unsafe.Pointer
-	argSx     int
-	argSy     int
-	argSz     int
-	argLayer  int
+	argDst unsafe.Pointer
+	argDx int
+	argDy int
+	argDz int
+	argSrc unsafe.Pointer
+	argSx int
+	argSy int
+	argSz int
+	argLayer int
 	argScalex int
 	argScaley int
-	argptr    [11]unsafe.Pointer
+	argptr [11]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -49,7 +49,7 @@ func init() {
 	resizeArgs.argptr[8] = unsafe.Pointer(&resizeArgs.argLayer)
 	resizeArgs.argptr[9] = unsafe.Pointer(&resizeArgs.argScalex)
 	resizeArgs.argptr[10] = unsafe.Pointer(&resizeArgs.argScaley)
-}
+	}
 
 // Wrapper for resize CUDA kernel, asynchronous.
 func kResizeAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, Sx int, Sy int, Sz int, layer int, scalex int, scaley int, cfg *config) {
@@ -76,7 +76,7 @@ func kResizeAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer
 	resizeArgs.argLayer = layer
 	resizeArgs.argScalex = scalex
 	resizeArgs.argScaley = scaley
-
+	
 	args := resizeArgs.argptr[:]
 	cu.LaunchKernel(resizeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -88,7 +88,7 @@ func kResizeAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer
 
 // maps compute capability on PTX code for resize kernel.
 var resizeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: resizePtx52,
 }
 
@@ -324,4 +324,4 @@ BB0_29:
 
 
 `
-)
+	)

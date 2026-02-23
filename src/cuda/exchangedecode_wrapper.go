@@ -18,17 +18,17 @@ var exchangedecodeCode cu.Function
 
 // Stores the arguments for exchangedecode kernel invocation
 type exchangedecodeArgsT struct {
-	argDst     unsafe.Pointer
-	argALUT2d  unsafe.Pointer
+	argDst unsafe.Pointer
+	argALUT2d unsafe.Pointer
 	argRegions unsafe.Pointer
-	argWx      float32
-	argWy      float32
-	argWz      float32
-	argNx      int
-	argNy      int
-	argNz      int
-	argPBC     byte
-	argptr     [10]unsafe.Pointer
+	argWx float32
+	argWy float32
+	argWz float32
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argptr [10]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -47,7 +47,7 @@ func init() {
 	exchangedecodeArgs.argptr[7] = unsafe.Pointer(&exchangedecodeArgs.argNy)
 	exchangedecodeArgs.argptr[8] = unsafe.Pointer(&exchangedecodeArgs.argNz)
 	exchangedecodeArgs.argptr[9] = unsafe.Pointer(&exchangedecodeArgs.argPBC)
-}
+	}
 
 // Wrapper for exchangedecode CUDA kernel, asynchronous.
 func kExchangedecodeAsync(dst unsafe.Pointer, aLUT2d unsafe.Pointer, regions unsafe.Pointer, wx float32, wy float32, wz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
@@ -73,7 +73,7 @@ func kExchangedecodeAsync(dst unsafe.Pointer, aLUT2d unsafe.Pointer, regions uns
 	exchangedecodeArgs.argNy = Ny
 	exchangedecodeArgs.argNz = Nz
 	exchangedecodeArgs.argPBC = PBC
-
+	
 	args := exchangedecodeArgs.argptr[:]
 	cu.LaunchKernel(exchangedecodeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -85,7 +85,7 @@ func kExchangedecodeAsync(dst unsafe.Pointer, aLUT2d unsafe.Pointer, regions uns
 
 // maps compute capability on PTX code for exchangedecode kernel.
 var exchangedecodeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: exchangedecodePtx52,
 }
 
@@ -361,4 +361,4 @@ BB0_22:
 
 
 `
-)
+	)

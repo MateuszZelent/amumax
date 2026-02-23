@@ -18,17 +18,17 @@ var minimizeCode cu.Function
 
 // Stores the arguments for minimize kernel invocation
 type minimizeArgsT struct {
-	argMx  unsafe.Pointer
-	argMy  unsafe.Pointer
-	argMz  unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
 	argM0x unsafe.Pointer
 	argM0y unsafe.Pointer
 	argM0z unsafe.Pointer
-	argTx  unsafe.Pointer
-	argTy  unsafe.Pointer
-	argTz  unsafe.Pointer
-	argDt  float32
-	argN   int
+	argTx unsafe.Pointer
+	argTy unsafe.Pointer
+	argTz unsafe.Pointer
+	argDt float32
+	argN int
 	argptr [11]unsafe.Pointer
 	sync.Mutex
 }
@@ -49,7 +49,7 @@ func init() {
 	minimizeArgs.argptr[8] = unsafe.Pointer(&minimizeArgs.argTz)
 	minimizeArgs.argptr[9] = unsafe.Pointer(&minimizeArgs.argDt)
 	minimizeArgs.argptr[10] = unsafe.Pointer(&minimizeArgs.argN)
-}
+	}
 
 // Wrapper for minimize CUDA kernel, asynchronous.
 func kMinimizeAsync(mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, m0x unsafe.Pointer, m0y unsafe.Pointer, m0z unsafe.Pointer, tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, dt float32, N int, cfg *config) {
@@ -76,7 +76,7 @@ func kMinimizeAsync(mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, m0x
 	minimizeArgs.argTz = tz
 	minimizeArgs.argDt = dt
 	minimizeArgs.argN = N
-
+	
 	args := minimizeArgs.argptr[:]
 	cu.LaunchKernel(minimizeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -88,7 +88,7 @@ func kMinimizeAsync(mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, m0x
 
 // maps compute capability on PTX code for minimize kernel.
 var minimizeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: minimizePtx52,
 }
 
@@ -195,4 +195,4 @@ BB0_2:
 
 
 `
-)
+	)

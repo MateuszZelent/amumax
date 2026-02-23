@@ -18,7 +18,7 @@ var madd5Code cu.Function
 
 // Stores the arguments for madd5 kernel invocation
 type madd5ArgsT struct {
-	argDst  unsafe.Pointer
+	argDst unsafe.Pointer
 	argSrc1 unsafe.Pointer
 	argFac1 float32
 	argSrc2 unsafe.Pointer
@@ -29,8 +29,8 @@ type madd5ArgsT struct {
 	argFac4 float32
 	argSrc5 unsafe.Pointer
 	argFac5 float32
-	argN    int
-	argptr  [12]unsafe.Pointer
+	argN int
+	argptr [12]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -51,7 +51,7 @@ func init() {
 	madd5Args.argptr[9] = unsafe.Pointer(&madd5Args.argSrc5)
 	madd5Args.argptr[10] = unsafe.Pointer(&madd5Args.argFac5)
 	madd5Args.argptr[11] = unsafe.Pointer(&madd5Args.argN)
-}
+	}
 
 // Wrapper for madd5 CUDA kernel, asynchronous.
 func kMadd5Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 unsafe.Pointer, fac2 float32, src3 unsafe.Pointer, fac3 float32, src4 unsafe.Pointer, fac4 float32, src5 unsafe.Pointer, fac5 float32, N int, cfg *config) {
@@ -79,7 +79,7 @@ func kMadd5Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 	madd5Args.argSrc5 = src5
 	madd5Args.argFac5 = fac5
 	madd5Args.argN = N
-
+	
 	args := madd5Args.argptr[:]
 	cu.LaunchKernel(madd5Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -91,7 +91,7 @@ func kMadd5Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 
 // maps compute capability on PTX code for madd5 kernel.
 var madd5Map = map[int]string{
-	0:  "",
+	0: "",
 	52: madd5Ptx52,
 }
 
@@ -178,4 +178,4 @@ BB0_2:
 
 
 `
-)
+	)

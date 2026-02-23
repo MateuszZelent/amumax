@@ -18,15 +18,15 @@ var regionaddvCode cu.Function
 
 // Stores the arguments for regionaddv kernel invocation
 type regionaddvArgsT struct {
-	argDstx    unsafe.Pointer
-	argDsty    unsafe.Pointer
-	argDstz    unsafe.Pointer
-	argLUTx    unsafe.Pointer
-	argLUTy    unsafe.Pointer
-	argLUTz    unsafe.Pointer
+	argDstx unsafe.Pointer
+	argDsty unsafe.Pointer
+	argDstz unsafe.Pointer
+	argLUTx unsafe.Pointer
+	argLUTy unsafe.Pointer
+	argLUTz unsafe.Pointer
 	argRegions unsafe.Pointer
-	argN       int
-	argptr     [8]unsafe.Pointer
+	argN int
+	argptr [8]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -43,7 +43,7 @@ func init() {
 	regionaddvArgs.argptr[5] = unsafe.Pointer(&regionaddvArgs.argLUTz)
 	regionaddvArgs.argptr[6] = unsafe.Pointer(&regionaddvArgs.argRegions)
 	regionaddvArgs.argptr[7] = unsafe.Pointer(&regionaddvArgs.argN)
-}
+	}
 
 // Wrapper for regionaddv CUDA kernel, asynchronous.
 func kRegionaddvAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Pointer, LUTx unsafe.Pointer, LUTy unsafe.Pointer, LUTz unsafe.Pointer, regions unsafe.Pointer, N int, cfg *config) {
@@ -67,7 +67,7 @@ func kRegionaddvAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Poin
 	regionaddvArgs.argLUTz = LUTz
 	regionaddvArgs.argRegions = regions
 	regionaddvArgs.argN = N
-
+	
 	args := regionaddvArgs.argptr[:]
 	cu.LaunchKernel(regionaddvCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -79,7 +79,7 @@ func kRegionaddvAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Poin
 
 // maps compute capability on PTX code for regionaddv kernel.
 var regionaddvMap = map[int]string{
-	0:  "",
+	0: "",
 	52: regionaddvPtx52,
 }
 
@@ -167,4 +167,4 @@ BB0_2:
 
 
 `
-)
+	)

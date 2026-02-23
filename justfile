@@ -1,13 +1,15 @@
+repo_dir := justfile_directory()
+
 run-dev:
-	sudo podman run -it --rm -p 35367:35367 -v $PWD:/src \
+	sudo podman run -it --rm -p 35367:35367 -v {{repo_dir}}:/src \
 	--device=nvidia.com/gpu=all \
 	matmoa/amumax:build bash
 
 image:
-	sudo podman build -t matmoa/amumax:build .
+	sudo podman build -t matmoa/amumax:build {{repo_dir}}
 
 build-cuda: 
-	sudo podman run --rm -v $PWD:/src matmoa/amumax:build sh src/cuda/build_cuda.sh
+	sudo podman run --rm -v {{repo_dir}}:/src matmoa/amumax:build sh src/cuda/build_cuda.sh
 
 copy-pcss:
 	scp -r ./build/amumax pcss:grant_398/scratch/bin/amumax_versions/amumax$(date -I)
@@ -23,7 +25,7 @@ build-frontend:
 	# 	docker.io/node:18.20.4-alpine3.20 -c 'npm install && npm run build && rm -rf ../src/api/static && mv dist ../src/api/static'
 
 build:
-	sudo podman run --rm -v $PWD:/src matmoa/amumax:build
+	sudo podman run --rm -v {{repo_dir}}:/src matmoa/amumax:build
 
 update-flake-gh-hash VERSION:
 	#!/usr/bin/env sh

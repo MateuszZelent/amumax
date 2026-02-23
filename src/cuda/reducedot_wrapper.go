@@ -18,12 +18,12 @@ var reducedotCode cu.Function
 
 // Stores the arguments for reducedot kernel invocation
 type reducedotArgsT struct {
-	argX1      unsafe.Pointer
-	argX2      unsafe.Pointer
-	argDst     unsafe.Pointer
+	argX1 unsafe.Pointer
+	argX2 unsafe.Pointer
+	argDst unsafe.Pointer
 	argInitVal float32
-	argN       int
-	argptr     [5]unsafe.Pointer
+	argN int
+	argptr [5]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -37,7 +37,7 @@ func init() {
 	reducedotArgs.argptr[2] = unsafe.Pointer(&reducedotArgs.argDst)
 	reducedotArgs.argptr[3] = unsafe.Pointer(&reducedotArgs.argInitVal)
 	reducedotArgs.argptr[4] = unsafe.Pointer(&reducedotArgs.argN)
-}
+	}
 
 // Wrapper for reducedot CUDA kernel, asynchronous.
 func kReducedotAsync(x1 unsafe.Pointer, x2 unsafe.Pointer, dst unsafe.Pointer, initVal float32, n int, cfg *config) {
@@ -58,7 +58,7 @@ func kReducedotAsync(x1 unsafe.Pointer, x2 unsafe.Pointer, dst unsafe.Pointer, i
 	reducedotArgs.argDst = dst
 	reducedotArgs.argInitVal = initVal
 	reducedotArgs.argN = n
-
+	
 	args := reducedotArgs.argptr[:]
 	cu.LaunchKernel(reducedotCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -70,7 +70,7 @@ func kReducedotAsync(x1 unsafe.Pointer, x2 unsafe.Pointer, dst unsafe.Pointer, i
 
 // maps compute capability on PTX code for reducedot kernel.
 var reducedotMap = map[int]string{
-	0:  "",
+	0: "",
 	52: reducedotPtx52,
 }
 
@@ -196,4 +196,4 @@ BB0_10:
 
 
 `
-)
+	)

@@ -18,14 +18,14 @@ var kernmulRSymm2DxyCode cu.Function
 
 // Stores the arguments for kernmulRSymm2Dxy kernel invocation
 type kernmulRSymm2DxyArgsT struct {
-	argFftMx  unsafe.Pointer
-	argFftMy  unsafe.Pointer
+	argFftMx unsafe.Pointer
+	argFftMy unsafe.Pointer
 	argFftKxx unsafe.Pointer
 	argFftKyy unsafe.Pointer
 	argFftKxy unsafe.Pointer
-	argNx     int
-	argNy     int
-	argptr    [7]unsafe.Pointer
+	argNx int
+	argNy int
+	argptr [7]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -41,7 +41,7 @@ func init() {
 	kernmulRSymm2DxyArgs.argptr[4] = unsafe.Pointer(&kernmulRSymm2DxyArgs.argFftKxy)
 	kernmulRSymm2DxyArgs.argptr[5] = unsafe.Pointer(&kernmulRSymm2DxyArgs.argNx)
 	kernmulRSymm2DxyArgs.argptr[6] = unsafe.Pointer(&kernmulRSymm2DxyArgs.argNy)
-}
+	}
 
 // Wrapper for kernmulRSymm2Dxy CUDA kernel, asynchronous.
 func kKernmulRSymm2DxyAsync(fftMx unsafe.Pointer, fftMy unsafe.Pointer, fftKxx unsafe.Pointer, fftKyy unsafe.Pointer, fftKxy unsafe.Pointer, Nx int, Ny int, cfg *config) {
@@ -64,7 +64,7 @@ func kKernmulRSymm2DxyAsync(fftMx unsafe.Pointer, fftMy unsafe.Pointer, fftKxx u
 	kernmulRSymm2DxyArgs.argFftKxy = fftKxy
 	kernmulRSymm2DxyArgs.argNx = Nx
 	kernmulRSymm2DxyArgs.argNy = Ny
-
+	
 	args := kernmulRSymm2DxyArgs.argptr[:]
 	cu.LaunchKernel(kernmulRSymm2DxyCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -76,7 +76,7 @@ func kKernmulRSymm2DxyAsync(fftMx unsafe.Pointer, fftMy unsafe.Pointer, fftKxx u
 
 // maps compute capability on PTX code for kernmulRSymm2Dxy kernel.
 var kernmulRSymm2DxyMap = map[int]string{
-	0:  "",
+	0: "",
 	52: kernmulRSymm2DxyPtx52,
 }
 
@@ -174,4 +174,4 @@ BB0_2:
 
 
 `
-)
+	)

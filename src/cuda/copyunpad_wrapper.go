@@ -19,13 +19,13 @@ var copyunpadCode cu.Function
 // Stores the arguments for copyunpad kernel invocation
 type copyunpadArgsT struct {
 	argDst unsafe.Pointer
-	argDx  int
-	argDy  int
-	argDz  int
+	argDx int
+	argDy int
+	argDz int
 	argSrc unsafe.Pointer
-	argSx  int
-	argSy  int
-	argSz  int
+	argSx int
+	argSy int
+	argSz int
 	argptr [8]unsafe.Pointer
 	sync.Mutex
 }
@@ -43,7 +43,7 @@ func init() {
 	copyunpadArgs.argptr[5] = unsafe.Pointer(&copyunpadArgs.argSx)
 	copyunpadArgs.argptr[6] = unsafe.Pointer(&copyunpadArgs.argSy)
 	copyunpadArgs.argptr[7] = unsafe.Pointer(&copyunpadArgs.argSz)
-}
+	}
 
 // Wrapper for copyunpad CUDA kernel, asynchronous.
 func kCopyunpadAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, Sx int, Sy int, Sz int, cfg *config) {
@@ -67,7 +67,7 @@ func kCopyunpadAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Poin
 	copyunpadArgs.argSx = Sx
 	copyunpadArgs.argSy = Sy
 	copyunpadArgs.argSz = Sz
-
+	
 	args := copyunpadArgs.argptr[:]
 	cu.LaunchKernel(copyunpadCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -79,7 +79,7 @@ func kCopyunpadAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Poin
 
 // maps compute capability on PTX code for copyunpad kernel.
 var copyunpadMap = map[int]string{
-	0:  "",
+	0: "",
 	52: copyunpadPtx52,
 }
 
@@ -156,4 +156,4 @@ BB0_2:
 
 
 `
-)
+	)

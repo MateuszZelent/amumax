@@ -18,11 +18,11 @@ var regiondecodeCode cu.Function
 
 // Stores the arguments for regiondecode kernel invocation
 type regiondecodeArgsT struct {
-	argDst     unsafe.Pointer
-	argLUT     unsafe.Pointer
+	argDst unsafe.Pointer
+	argLUT unsafe.Pointer
 	argRegions unsafe.Pointer
-	argN       int
-	argptr     [4]unsafe.Pointer
+	argN int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	regiondecodeArgs.argptr[1] = unsafe.Pointer(&regiondecodeArgs.argLUT)
 	regiondecodeArgs.argptr[2] = unsafe.Pointer(&regiondecodeArgs.argRegions)
 	regiondecodeArgs.argptr[3] = unsafe.Pointer(&regiondecodeArgs.argN)
-}
+	}
 
 // Wrapper for regiondecode CUDA kernel, asynchronous.
 func kRegiondecodeAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.Pointer, N int, cfg *config) {
@@ -55,7 +55,7 @@ func kRegiondecodeAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.P
 	regiondecodeArgs.argLUT = LUT
 	regiondecodeArgs.argRegions = regions
 	regiondecodeArgs.argN = N
-
+	
 	args := regiondecodeArgs.argptr[:]
 	cu.LaunchKernel(regiondecodeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kRegiondecodeAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.P
 
 // maps compute capability on PTX code for regiondecode kernel.
 var regiondecodeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: regiondecodePtx52,
 }
 
@@ -129,4 +129,4 @@ BB0_2:
 
 
 `
-)
+	)

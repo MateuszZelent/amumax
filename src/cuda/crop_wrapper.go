@@ -18,18 +18,18 @@ var cropCode cu.Function
 
 // Stores the arguments for crop kernel invocation
 type cropArgsT struct {
-	argDst  unsafe.Pointer
-	argDx   int
-	argDy   int
-	argDz   int
-	argSrc  unsafe.Pointer
-	argSx   int
-	argSy   int
-	argSz   int
+	argDst unsafe.Pointer
+	argDx int
+	argDy int
+	argDz int
+	argSrc unsafe.Pointer
+	argSx int
+	argSy int
+	argSz int
 	argOffx int
 	argOffy int
 	argOffz int
-	argptr  [11]unsafe.Pointer
+	argptr [11]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -49,7 +49,7 @@ func init() {
 	cropArgs.argptr[8] = unsafe.Pointer(&cropArgs.argOffx)
 	cropArgs.argptr[9] = unsafe.Pointer(&cropArgs.argOffy)
 	cropArgs.argptr[10] = unsafe.Pointer(&cropArgs.argOffz)
-}
+	}
 
 // Wrapper for crop CUDA kernel, asynchronous.
 func kCropAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, Sx int, Sy int, Sz int, Offx int, Offy int, Offz int, cfg *config) {
@@ -76,7 +76,7 @@ func kCropAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, 
 	cropArgs.argOffx = Offx
 	cropArgs.argOffy = Offy
 	cropArgs.argOffz = Offz
-
+	
 	args := cropArgs.argptr[:]
 	cu.LaunchKernel(cropCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -88,7 +88,7 @@ func kCropAsync(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, 
 
 // maps compute capability on PTX code for crop kernel.
 var cropMap = map[int]string{
-	0:  "",
+	0: "",
 	52: cropPtx52,
 }
 
@@ -174,4 +174,4 @@ BB0_2:
 
 
 `
-)
+	)

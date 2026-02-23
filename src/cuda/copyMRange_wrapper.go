@@ -18,22 +18,22 @@ var copyMRangeCode cu.Function
 
 // Stores the arguments for copyMRange kernel invocation
 type copyMRangeArgsT struct {
-	argDst  unsafe.Pointer
-	argSrc  unsafe.Pointer
-	argNx   int
-	argNy   int
-	argNz   int
-	argDx0  int
-	argDy0  int
-	argDz0  int
-	argSx0  int
-	argSy0  int
-	argSz0  int
-	argW    int
-	argH    int
-	argD    int
+	argDst unsafe.Pointer
+	argSrc unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argDx0 int
+	argDy0 int
+	argDz0 int
+	argSx0 int
+	argSy0 int
+	argSz0 int
+	argW int
+	argH int
+	argD int
 	argWrap int
-	argptr  [15]unsafe.Pointer
+	argptr [15]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -57,7 +57,7 @@ func init() {
 	copyMRangeArgs.argptr[12] = unsafe.Pointer(&copyMRangeArgs.argH)
 	copyMRangeArgs.argptr[13] = unsafe.Pointer(&copyMRangeArgs.argD)
 	copyMRangeArgs.argptr[14] = unsafe.Pointer(&copyMRangeArgs.argWrap)
-}
+	}
 
 // Wrapper for copyMRange CUDA kernel, asynchronous.
 func kCopyMRangeAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz int, dx0 int, dy0 int, dz0 int, sx0 int, sy0 int, sz0 int, W int, H int, D int, wrap int, cfg *config) {
@@ -88,7 +88,7 @@ func kCopyMRangeAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz
 	copyMRangeArgs.argH = H
 	copyMRangeArgs.argD = D
 	copyMRangeArgs.argWrap = wrap
-
+	
 	args := copyMRangeArgs.argptr[:]
 	cu.LaunchKernel(copyMRangeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -100,14 +100,14 @@ func kCopyMRangeAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz
 
 // maps compute capability on PTX code for copyMRange kernel.
 var copyMRangeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: copyMRangePtx52,
 }
 
 // copyMRange PTX code for various compute capabilities.
 const (
 	copyMRangePtx52 = `
-.version 8.4
+.version 7.0
 .target sm_52
 .address_size 64
 
@@ -155,21 +155,21 @@ const (
 	mov.u32 	%r35, %ntid.x;
 	mov.u32 	%r36, %ctaid.x;
 	mov.u32 	%r37, %tid.x;
-	mad.lo.s32 	%r1, %r36, %r35, %r37;
+	mad.lo.s32 	%r1, %r35, %r36, %r37;
 	mov.u32 	%r38, %ntid.y;
 	mov.u32 	%r39, %ctaid.y;
 	mov.u32 	%r40, %tid.y;
-	mad.lo.s32 	%r2, %r39, %r38, %r40;
+	mad.lo.s32 	%r2, %r38, %r39, %r40;
 	mov.u32 	%r41, %ntid.z;
 	mov.u32 	%r42, %ctaid.z;
 	mov.u32 	%r43, %tid.z;
-	mad.lo.s32 	%r3, %r42, %r41, %r43;
-	setp.ge.s32 	%p1, %r1, %r32;
-	setp.ge.s32 	%p2, %r2, %r33;
+	mad.lo.s32 	%r3, %r41, %r42, %r43;
+	setp.ge.s32	%p1, %r2, %r33;
+	setp.ge.s32	%p2, %r1, %r32;
 	or.pred  	%p3, %p1, %p2;
-	setp.ge.s32 	%p4, %r3, %r34;
+	setp.ge.s32	%p4, %r3, %r34;
 	or.pred  	%p5, %p3, %p4;
-	@%p5 bra 	$L__BB0_6;
+	@%p5 bra 	BB0_6;
 
 	add.s32 	%r60, %r1, %r28;
 	add.s32 	%r61, %r2, %r29;
@@ -177,8 +177,8 @@ const (
 	add.s32 	%r63, %r1, %r25;
 	add.s32 	%r64, %r2, %r26;
 	add.s32 	%r65, %r3, %r27;
-	setp.eq.s32 	%p6, %r31, 0;
-	@%p6 bra 	$L__BB0_3;
+	setp.eq.s32	%p6, %r31, 0;
+	@%p6 bra 	BB0_3;
 
 	rem.s32 	%r44, %r60, %r22;
 	add.s32 	%r45, %r44, %r22;
@@ -199,19 +199,19 @@ const (
 	add.s32 	%r55, %r54, %r24;
 	rem.s32 	%r65, %r55, %r24;
 
-$L__BB0_5:
+BB0_5:
 	mul.wide.s32 	%rd3, %r62, %r23;
-	cvt.s64.s32 	%rd4, %r61;
+	cvt.s64.s32	%rd4, %r61;
 	add.s64 	%rd5, %rd3, %rd4;
-	cvt.s64.s32 	%rd6, %r22;
+	cvt.s64.s32	%rd6, %r22;
 	mul.lo.s64 	%rd7, %rd5, %rd6;
-	cvt.s64.s32 	%rd8, %r60;
+	cvt.s64.s32	%rd8, %r60;
 	add.s64 	%rd9, %rd7, %rd8;
 	mul.wide.s32 	%rd10, %r65, %r23;
-	cvt.s64.s32 	%rd11, %r64;
+	cvt.s64.s32	%rd11, %r64;
 	add.s64 	%rd12, %rd10, %rd11;
 	mul.lo.s64 	%rd13, %rd12, %rd6;
-	cvt.s64.s32 	%rd14, %r63;
+	cvt.s64.s32	%rd14, %r63;
 	add.s64 	%rd15, %rd13, %rd14;
 	cvta.to.global.u64 	%rd16, %rd2;
 	shl.b64 	%rd17, %rd9, 2;
@@ -221,35 +221,36 @@ $L__BB0_5:
 	shl.b64 	%rd20, %rd15, 2;
 	add.s64 	%rd21, %rd19, %rd20;
 	st.global.f32 	[%rd21], %f1;
+	bra.uni 	BB0_6;
 
-$L__BB0_6:
-	ret;
-
-$L__BB0_3:
+BB0_3:
 	or.b32  	%r56, %r61, %r60;
 	or.b32  	%r57, %r56, %r62;
-	setp.lt.s32 	%p7, %r57, 0;
-	setp.ge.s32 	%p8, %r60, %r22;
-	or.pred  	%p9, %p8, %p7;
-	setp.ge.s32 	%p10, %r61, %r23;
-	or.pred  	%p11, %p10, %p9;
-	setp.ge.s32 	%p12, %r62, %r24;
-	or.pred  	%p13, %p12, %p11;
-	@%p13 bra 	$L__BB0_6;
+	setp.lt.s32	%p7, %r57, 0;
+	setp.ge.s32	%p8, %r60, %r22;
+	or.pred  	%p9, %p7, %p8;
+	setp.ge.s32	%p10, %r61, %r23;
+	or.pred  	%p11, %p9, %p10;
+	setp.ge.s32	%p12, %r62, %r24;
+	or.pred  	%p13, %p11, %p12;
+	@%p13 bra 	BB0_6;
 
 	or.b32  	%r58, %r64, %r63;
 	or.b32  	%r59, %r58, %r65;
-	setp.lt.s32 	%p14, %r59, 0;
-	setp.ge.s32 	%p15, %r63, %r22;
-	or.pred  	%p16, %p15, %p14;
-	setp.ge.s32 	%p17, %r64, %r23;
-	or.pred  	%p18, %p17, %p16;
-	setp.ge.s32 	%p19, %r65, %r24;
-	or.pred  	%p20, %p19, %p18;
-	@%p20 bra 	$L__BB0_6;
-	bra.uni 	$L__BB0_5;
+	setp.lt.s32	%p14, %r59, 0;
+	setp.ge.s32	%p15, %r63, %r22;
+	or.pred  	%p16, %p14, %p15;
+	setp.ge.s32	%p17, %r64, %r23;
+	or.pred  	%p18, %p16, %p17;
+	setp.ge.s32	%p19, %r65, %r24;
+	or.pred  	%p20, %p18, %p19;
+	@%p20 bra 	BB0_6;
+	bra.uni 	BB0_5;
 
+BB0_6:
+	ret;
 }
 
+
 `
-)
+	)

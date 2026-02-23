@@ -18,11 +18,11 @@ var kernmulRSymm2DzCode cu.Function
 
 // Stores the arguments for kernmulRSymm2Dz kernel invocation
 type kernmulRSymm2DzArgsT struct {
-	argFftMz  unsafe.Pointer
+	argFftMz unsafe.Pointer
 	argFftKzz unsafe.Pointer
-	argNx     int
-	argNy     int
-	argptr    [4]unsafe.Pointer
+	argNx int
+	argNy int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	kernmulRSymm2DzArgs.argptr[1] = unsafe.Pointer(&kernmulRSymm2DzArgs.argFftKzz)
 	kernmulRSymm2DzArgs.argptr[2] = unsafe.Pointer(&kernmulRSymm2DzArgs.argNx)
 	kernmulRSymm2DzArgs.argptr[3] = unsafe.Pointer(&kernmulRSymm2DzArgs.argNy)
-}
+	}
 
 // Wrapper for kernmulRSymm2Dz CUDA kernel, asynchronous.
 func kKernmulRSymm2DzAsync(fftMz unsafe.Pointer, fftKzz unsafe.Pointer, Nx int, Ny int, cfg *config) {
@@ -55,7 +55,7 @@ func kKernmulRSymm2DzAsync(fftMz unsafe.Pointer, fftKzz unsafe.Pointer, Nx int, 
 	kernmulRSymm2DzArgs.argFftKzz = fftKzz
 	kernmulRSymm2DzArgs.argNx = Nx
 	kernmulRSymm2DzArgs.argNy = Ny
-
+	
 	args := kernmulRSymm2DzArgs.argptr[:]
 	cu.LaunchKernel(kernmulRSymm2DzCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kKernmulRSymm2DzAsync(fftMz unsafe.Pointer, fftKzz unsafe.Pointer, Nx int, 
 
 // maps compute capability on PTX code for kernmulRSymm2Dz kernel.
 var kernmulRSymm2DzMap = map[int]string{
-	0:  "",
+	0: "",
 	52: kernmulRSymm2DzPtx52,
 }
 
@@ -139,4 +139,4 @@ BB0_2:
 
 
 `
-)
+	)

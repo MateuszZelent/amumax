@@ -19,9 +19,9 @@ var mulCode cu.Function
 // Stores the arguments for mul kernel invocation
 type mulArgsT struct {
 	argDst unsafe.Pointer
-	argA   unsafe.Pointer
-	argB   unsafe.Pointer
-	argN   int
+	argA unsafe.Pointer
+	argB unsafe.Pointer
+	argN int
 	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
@@ -35,7 +35,7 @@ func init() {
 	mulArgs.argptr[1] = unsafe.Pointer(&mulArgs.argA)
 	mulArgs.argptr[2] = unsafe.Pointer(&mulArgs.argB)
 	mulArgs.argptr[3] = unsafe.Pointer(&mulArgs.argN)
-}
+	}
 
 // Wrapper for mul CUDA kernel, asynchronous.
 func kMulAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, N int, cfg *config) {
@@ -55,7 +55,7 @@ func kMulAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, N int, cf
 	mulArgs.argA = a
 	mulArgs.argB = b
 	mulArgs.argN = N
-
+	
 	args := mulArgs.argptr[:]
 	cu.LaunchKernel(mulCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kMulAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, N int, cf
 
 // maps compute capability on PTX code for mul kernel.
 var mulMap = map[int]string{
-	0:  "",
+	0: "",
 	52: mulPtx52,
 }
 
@@ -125,4 +125,4 @@ BB0_2:
 
 
 `
-)
+	)

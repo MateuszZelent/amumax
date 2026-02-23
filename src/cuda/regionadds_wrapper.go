@@ -18,11 +18,11 @@ var regionaddsCode cu.Function
 
 // Stores the arguments for regionadds kernel invocation
 type regionaddsArgsT struct {
-	argDst     unsafe.Pointer
-	argLUT     unsafe.Pointer
+	argDst unsafe.Pointer
+	argLUT unsafe.Pointer
 	argRegions unsafe.Pointer
-	argN       int
-	argptr     [4]unsafe.Pointer
+	argN int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	regionaddsArgs.argptr[1] = unsafe.Pointer(&regionaddsArgs.argLUT)
 	regionaddsArgs.argptr[2] = unsafe.Pointer(&regionaddsArgs.argRegions)
 	regionaddsArgs.argptr[3] = unsafe.Pointer(&regionaddsArgs.argN)
-}
+	}
 
 // Wrapper for regionadds CUDA kernel, asynchronous.
 func kRegionaddsAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.Pointer, N int, cfg *config) {
@@ -55,7 +55,7 @@ func kRegionaddsAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.Poi
 	regionaddsArgs.argLUT = LUT
 	regionaddsArgs.argRegions = regions
 	regionaddsArgs.argN = N
-
+	
 	args := regionaddsArgs.argptr[:]
 	cu.LaunchKernel(regionaddsCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kRegionaddsAsync(dst unsafe.Pointer, LUT unsafe.Pointer, regions unsafe.Poi
 
 // maps compute capability on PTX code for regionadds kernel.
 var regionaddsMap = map[int]string{
-	0:  "",
+	0: "",
 	52: regionaddsPtx52,
 }
 
@@ -131,4 +131,4 @@ BB0_2:
 
 
 `
-)
+	)

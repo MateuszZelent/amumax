@@ -18,6 +18,7 @@ type excitation struct {
 	name       string
 	perRegion  regionwiseVector // Region-based excitation
 	extraTerms []mulmask        // add extra mask*multiplier terms
+	rev        uint64           // revision counter, incremented on mutation
 }
 
 // space-dependent mask plus time dependent multiplier
@@ -78,6 +79,7 @@ func (e *excitation) RemoveExtraTerms() {
 		m.mask.Free()
 	}
 	e.extraTerms = nil
+	e.rev++
 }
 
 // Add an extra mask*multiplier term to the excitation.
@@ -106,19 +108,26 @@ func (e *excitation) AddGo(mask *data.Slice, mul func() float64) {
 		mask = assureGPU(mask)
 	}
 	e.extraTerms = append(e.extraTerms, mulmask{mul, mask})
+	e.rev++
 }
 
 func (e *excitation) SetRegion(region int, f script.VectorFunction) {
 	e.perRegion.SetRegion(region, f)
+	e.rev++
 }
-func (e *excitation) SetValue(v any)    { e.perRegion.SetValue(v) }
-func (e *excitation) Set(v data.Vector) { e.perRegion.setRegions(0, NREGION, slice(v)) }
+func (e *excitation) SetValue(v any)    { e.perRegion.SetValue(v); e.rev++ }
+func (e *excitation) Set(v data.Vector) { e.perRegion.setRegions(0, NREGION, slice(v)); e.rev++ }
 
 func (e *excitation) SetRegionFn(region int, f func() [3]float64) {
 	e.perRegion.setFunc(region, region+1, func() []float64 {
 		return slice(f())
 	})
+	e.rev++
 }
+
+// Revision returns the current mutation counter. It is incremented
+// every time the excitation's value, region, or extra terms change.
+func (e *excitation) Revision() uint64 { return e.rev }
 
 func (e *excitation) average() []float64      { return qAverageUniverse(e) }
 func (e *excitation) Average() data.Vector    { return unslice(qAverageUniverse(e)) }

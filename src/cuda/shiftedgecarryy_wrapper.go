@@ -18,17 +18,17 @@ var shiftedgecarryYCode cu.Function
 
 // Stores the arguments for shiftedgecarryY kernel invocation
 type shiftedgecarryYArgsT struct {
-	argDst         unsafe.Pointer
-	argSrc         unsafe.Pointer
-	argOthercomp   unsafe.Pointer
+	argDst unsafe.Pointer
+	argSrc unsafe.Pointer
+	argOthercomp unsafe.Pointer
 	argAnothercomp unsafe.Pointer
-	argNx          int
-	argNy          int
-	argNz          int
-	argShy         int
-	argClampD      float32
-	argClampU      float32
-	argptr         [10]unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argShy int
+	argClampD float32
+	argClampU float32
+	argptr [10]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -47,7 +47,7 @@ func init() {
 	shiftedgecarryYArgs.argptr[7] = unsafe.Pointer(&shiftedgecarryYArgs.argShy)
 	shiftedgecarryYArgs.argptr[8] = unsafe.Pointer(&shiftedgecarryYArgs.argClampD)
 	shiftedgecarryYArgs.argptr[9] = unsafe.Pointer(&shiftedgecarryYArgs.argClampU)
-}
+	}
 
 // Wrapper for shiftedgecarryY CUDA kernel, asynchronous.
 func kShiftedgecarryYAsync(dst unsafe.Pointer, src unsafe.Pointer, othercomp unsafe.Pointer, anothercomp unsafe.Pointer, Nx int, Ny int, Nz int, shy int, clampD float32, clampU float32, cfg *config) {
@@ -73,7 +73,7 @@ func kShiftedgecarryYAsync(dst unsafe.Pointer, src unsafe.Pointer, othercomp uns
 	shiftedgecarryYArgs.argShy = shy
 	shiftedgecarryYArgs.argClampD = clampD
 	shiftedgecarryYArgs.argClampU = clampU
-
+	
 	args := shiftedgecarryYArgs.argptr[:]
 	cu.LaunchKernel(shiftedgecarryYCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -85,7 +85,7 @@ func kShiftedgecarryYAsync(dst unsafe.Pointer, src unsafe.Pointer, othercomp uns
 
 // maps compute capability on PTX code for shiftedgecarryY kernel.
 var shiftedgecarryYMap = map[int]string{
-	0:  "",
+	0: "",
 	52: shiftedgecarryYPtx52,
 }
 
@@ -221,4 +221,4 @@ BB0_11:
 
 
 `
-)
+	)

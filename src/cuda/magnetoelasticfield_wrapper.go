@@ -18,32 +18,32 @@ var addmagnetoelasticfieldCode cu.Function
 
 // Stores the arguments for addmagnetoelasticfield kernel invocation
 type addmagnetoelasticfieldArgsT struct {
-	argBx     unsafe.Pointer
-	argBy     unsafe.Pointer
-	argBz     unsafe.Pointer
-	argMx     unsafe.Pointer
-	argMy     unsafe.Pointer
-	argMz     unsafe.Pointer
-	argExx    unsafe.Pointer
+	argBx unsafe.Pointer
+	argBy unsafe.Pointer
+	argBz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argExx unsafe.Pointer
 	argExxMul float32
-	argEyy    unsafe.Pointer
+	argEyy unsafe.Pointer
 	argEyyMul float32
-	argEzz    unsafe.Pointer
+	argEzz unsafe.Pointer
 	argEzzMul float32
-	argExy    unsafe.Pointer
+	argExy unsafe.Pointer
 	argExyMul float32
-	argExz    unsafe.Pointer
+	argExz unsafe.Pointer
 	argExzMul float32
-	argEyz    unsafe.Pointer
+	argEyz unsafe.Pointer
 	argEyzMul float32
-	argB1     unsafe.Pointer
-	argB1Mul  float32
-	argB2     unsafe.Pointer
-	argB2Mul  float32
-	argMs     unsafe.Pointer
-	argMsMul  float32
-	argN      int
-	argptr    [25]unsafe.Pointer
+	argB1 unsafe.Pointer
+	argB1Mul float32
+	argB2 unsafe.Pointer
+	argB2Mul float32
+	argMs unsafe.Pointer
+	argMsMul float32
+	argN int
+	argptr [25]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -77,10 +77,10 @@ func init() {
 	addmagnetoelasticfieldArgs.argptr[22] = unsafe.Pointer(&addmagnetoelasticfieldArgs.argMs)
 	addmagnetoelasticfieldArgs.argptr[23] = unsafe.Pointer(&addmagnetoelasticfieldArgs.argMsMul)
 	addmagnetoelasticfieldArgs.argptr[24] = unsafe.Pointer(&addmagnetoelasticfieldArgs.argN)
-}
+	}
 
 // Wrapper for addmagnetoelasticfield CUDA kernel, asynchronous.
-func kAddmagnetoelasticfieldAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, exx_ unsafe.Pointer, exxMul float32, eyy_ unsafe.Pointer, eyyMul float32, ezz_ unsafe.Pointer, ezzMul float32, exy_ unsafe.Pointer, exyMul float32, exz_ unsafe.Pointer, exzMul float32, eyz_ unsafe.Pointer, eyzMul float32, B1_ unsafe.Pointer, B1Mul float32, B2_ unsafe.Pointer, B2Mul float32, Ms_ unsafe.Pointer, MsMul float32, N int, cfg *config) {
+func kAddmagnetoelasticfieldAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, exx_ unsafe.Pointer, exx_mul float32, eyy_ unsafe.Pointer, eyy_mul float32, ezz_ unsafe.Pointer, ezz_mul float32, exy_ unsafe.Pointer, exy_mul float32, exz_ unsafe.Pointer, exz_mul float32, eyz_ unsafe.Pointer, eyz_mul float32, B1_ unsafe.Pointer, B1_mul float32, B2_ unsafe.Pointer, B2_mul float32, Ms_ unsafe.Pointer, Ms_mul float32, N int, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("addmagnetoelasticfield")
@@ -100,25 +100,25 @@ func kAddmagnetoelasticfieldAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsaf
 	addmagnetoelasticfieldArgs.argMy = my
 	addmagnetoelasticfieldArgs.argMz = mz
 	addmagnetoelasticfieldArgs.argExx = exx_
-	addmagnetoelasticfieldArgs.argExxMul = exxMul
+	addmagnetoelasticfieldArgs.argExxMul = exx_mul
 	addmagnetoelasticfieldArgs.argEyy = eyy_
-	addmagnetoelasticfieldArgs.argEyyMul = eyyMul
+	addmagnetoelasticfieldArgs.argEyyMul = eyy_mul
 	addmagnetoelasticfieldArgs.argEzz = ezz_
-	addmagnetoelasticfieldArgs.argEzzMul = ezzMul
+	addmagnetoelasticfieldArgs.argEzzMul = ezz_mul
 	addmagnetoelasticfieldArgs.argExy = exy_
-	addmagnetoelasticfieldArgs.argExyMul = exyMul
+	addmagnetoelasticfieldArgs.argExyMul = exy_mul
 	addmagnetoelasticfieldArgs.argExz = exz_
-	addmagnetoelasticfieldArgs.argExzMul = exzMul
+	addmagnetoelasticfieldArgs.argExzMul = exz_mul
 	addmagnetoelasticfieldArgs.argEyz = eyz_
-	addmagnetoelasticfieldArgs.argEyzMul = eyzMul
+	addmagnetoelasticfieldArgs.argEyzMul = eyz_mul
 	addmagnetoelasticfieldArgs.argB1 = B1_
-	addmagnetoelasticfieldArgs.argB1Mul = B1Mul
+	addmagnetoelasticfieldArgs.argB1Mul = B1_mul
 	addmagnetoelasticfieldArgs.argB2 = B2_
-	addmagnetoelasticfieldArgs.argB2Mul = B2Mul
+	addmagnetoelasticfieldArgs.argB2Mul = B2_mul
 	addmagnetoelasticfieldArgs.argMs = Ms_
-	addmagnetoelasticfieldArgs.argMsMul = MsMul
+	addmagnetoelasticfieldArgs.argMsMul = Ms_mul
 	addmagnetoelasticfieldArgs.argN = N
-
+	
 	args := addmagnetoelasticfieldArgs.argptr[:]
 	cu.LaunchKernel(addmagnetoelasticfieldCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -130,7 +130,7 @@ func kAddmagnetoelasticfieldAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsaf
 
 // maps compute capability on PTX code for addmagnetoelasticfield kernel.
 var addmagnetoelasticfieldMap = map[int]string{
-	0:  "",
+	0: "",
 	52: addmagnetoelasticfieldPtx52,
 }
 
@@ -359,4 +359,4 @@ BB0_22:
 
 
 `
-)
+	)

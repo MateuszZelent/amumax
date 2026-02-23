@@ -19,11 +19,11 @@ var setPhiCode cu.Function
 // Stores the arguments for setPhi kernel invocation
 type setPhiArgsT struct {
 	argPhi unsafe.Pointer
-	argMx  unsafe.Pointer
-	argMy  unsafe.Pointer
-	argNx  int
-	argNy  int
-	argNz  int
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
 	argptr [6]unsafe.Pointer
 	sync.Mutex
 }
@@ -39,7 +39,7 @@ func init() {
 	setPhiArgs.argptr[3] = unsafe.Pointer(&setPhiArgs.argNx)
 	setPhiArgs.argptr[4] = unsafe.Pointer(&setPhiArgs.argNy)
 	setPhiArgs.argptr[5] = unsafe.Pointer(&setPhiArgs.argNz)
-}
+	}
 
 // Wrapper for setPhi CUDA kernel, asynchronous.
 func kSetPhiAsync(phi unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, Nx int, Ny int, Nz int, cfg *config) {
@@ -61,7 +61,7 @@ func kSetPhiAsync(phi unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, Nx i
 	setPhiArgs.argNx = Nx
 	setPhiArgs.argNy = Ny
 	setPhiArgs.argNz = Nz
-
+	
 	args := setPhiArgs.argptr[:]
 	cu.LaunchKernel(setPhiCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -73,7 +73,7 @@ func kSetPhiAsync(phi unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, Nx i
 
 // maps compute capability on PTX code for setPhi kernel.
 var setPhiMap = map[int]string{
-	0:  "",
+	0: "",
 	52: setPhiPtx52,
 }
 
@@ -213,4 +213,4 @@ BB0_7:
 
 
 `
-)
+	)

@@ -18,34 +18,34 @@ var addzhanglitorque2Code cu.Function
 
 // Stores the arguments for addzhanglitorque2 kernel invocation
 type addzhanglitorque2ArgsT struct {
-	argTx       unsafe.Pointer
-	argTy       unsafe.Pointer
-	argTz       unsafe.Pointer
-	argMx       unsafe.Pointer
-	argMy       unsafe.Pointer
-	argMz       unsafe.Pointer
-	argMs       unsafe.Pointer
-	argMsMul    float32
-	argJx       unsafe.Pointer
-	argJxMul    float32
-	argJy       unsafe.Pointer
-	argJyMul    float32
-	argJz       unsafe.Pointer
-	argJzMul    float32
-	argAlpha    unsafe.Pointer
+	argTx unsafe.Pointer
+	argTy unsafe.Pointer
+	argTz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
+	argMsMul float32
+	argJx unsafe.Pointer
+	argJxMul float32
+	argJy unsafe.Pointer
+	argJyMul float32
+	argJz unsafe.Pointer
+	argJzMul float32
+	argAlpha unsafe.Pointer
 	argAlphaMul float32
-	argXi       unsafe.Pointer
-	argXiMul    float32
-	argPol      unsafe.Pointer
-	argPolMul   float32
-	argCx       float32
-	argCy       float32
-	argCz       float32
-	argNx       int
-	argNy       int
-	argNz       int
-	argPBC      byte
-	argptr      [27]unsafe.Pointer
+	argXi unsafe.Pointer
+	argXiMul float32
+	argPol unsafe.Pointer
+	argPolMul float32
+	argCx float32
+	argCy float32
+	argCz float32
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argptr [27]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -81,10 +81,10 @@ func init() {
 	addzhanglitorque2Args.argptr[24] = unsafe.Pointer(&addzhanglitorque2Args.argNy)
 	addzhanglitorque2Args.argptr[25] = unsafe.Pointer(&addzhanglitorque2Args.argNz)
 	addzhanglitorque2Args.argptr[26] = unsafe.Pointer(&addzhanglitorque2Args.argPBC)
-}
+	}
 
 // Wrapper for addzhanglitorque2 CUDA kernel, asynchronous.
-func kAddzhanglitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, jx_ unsafe.Pointer, jxMul float32, jy_ unsafe.Pointer, jyMul float32, jz_ unsafe.Pointer, jzMul float32, alpha_ unsafe.Pointer, alphaMul float32, xi_ unsafe.Pointer, xiMul float32, pol_ unsafe.Pointer, polMul float32, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
+func kAddzhanglitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, jx_ unsafe.Pointer, jx_mul float32, jy_ unsafe.Pointer, jy_mul float32, jz_ unsafe.Pointer, jz_mul float32, alpha_ unsafe.Pointer, alpha_mul float32, xi_ unsafe.Pointer, xi_mul float32, pol_ unsafe.Pointer, pol_mul float32, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("addzhanglitorque2")
@@ -104,19 +104,19 @@ func kAddzhanglitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Poi
 	addzhanglitorque2Args.argMy = my
 	addzhanglitorque2Args.argMz = mz
 	addzhanglitorque2Args.argMs = Ms_
-	addzhanglitorque2Args.argMsMul = MsMul
+	addzhanglitorque2Args.argMsMul = Ms_mul
 	addzhanglitorque2Args.argJx = jx_
-	addzhanglitorque2Args.argJxMul = jxMul
+	addzhanglitorque2Args.argJxMul = jx_mul
 	addzhanglitorque2Args.argJy = jy_
-	addzhanglitorque2Args.argJyMul = jyMul
+	addzhanglitorque2Args.argJyMul = jy_mul
 	addzhanglitorque2Args.argJz = jz_
-	addzhanglitorque2Args.argJzMul = jzMul
+	addzhanglitorque2Args.argJzMul = jz_mul
 	addzhanglitorque2Args.argAlpha = alpha_
-	addzhanglitorque2Args.argAlphaMul = alphaMul
+	addzhanglitorque2Args.argAlphaMul = alpha_mul
 	addzhanglitorque2Args.argXi = xi_
-	addzhanglitorque2Args.argXiMul = xiMul
+	addzhanglitorque2Args.argXiMul = xi_mul
 	addzhanglitorque2Args.argPol = pol_
-	addzhanglitorque2Args.argPolMul = polMul
+	addzhanglitorque2Args.argPolMul = pol_mul
 	addzhanglitorque2Args.argCx = cx
 	addzhanglitorque2Args.argCy = cy
 	addzhanglitorque2Args.argCz = cz
@@ -124,7 +124,7 @@ func kAddzhanglitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Poi
 	addzhanglitorque2Args.argNy = Ny
 	addzhanglitorque2Args.argNz = Nz
 	addzhanglitorque2Args.argPBC = PBC
-
+	
 	args := addzhanglitorque2Args.argptr[:]
 	cu.LaunchKernel(addzhanglitorque2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -136,7 +136,7 @@ func kAddzhanglitorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Poi
 
 // maps compute capability on PTX code for addzhanglitorque2 kernel.
 var addzhanglitorque2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: addzhanglitorque2Ptx52,
 }
 
@@ -738,4 +738,4 @@ BB0_78:
 
 
 `
-)
+	)

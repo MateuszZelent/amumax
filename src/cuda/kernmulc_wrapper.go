@@ -20,9 +20,9 @@ var kernmulCCode cu.Function
 type kernmulCArgsT struct {
 	argFftM unsafe.Pointer
 	argFftK unsafe.Pointer
-	argNx   int
-	argNy   int
-	argptr  [4]unsafe.Pointer
+	argNx int
+	argNy int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	kernmulCArgs.argptr[1] = unsafe.Pointer(&kernmulCArgs.argFftK)
 	kernmulCArgs.argptr[2] = unsafe.Pointer(&kernmulCArgs.argNx)
 	kernmulCArgs.argptr[3] = unsafe.Pointer(&kernmulCArgs.argNy)
-}
+	}
 
 // Wrapper for kernmulC CUDA kernel, asynchronous.
 func kKernmulCAsync(fftM unsafe.Pointer, fftK unsafe.Pointer, Nx int, Ny int, cfg *config) {
@@ -55,7 +55,7 @@ func kKernmulCAsync(fftM unsafe.Pointer, fftK unsafe.Pointer, Nx int, Ny int, cf
 	kernmulCArgs.argFftK = fftK
 	kernmulCArgs.argNx = Nx
 	kernmulCArgs.argNy = Ny
-
+	
 	args := kernmulCArgs.argptr[:]
 	cu.LaunchKernel(kernmulCCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kKernmulCAsync(fftM unsafe.Pointer, fftK unsafe.Pointer, Nx int, Ny int, cf
 
 // maps compute capability on PTX code for kernmulC kernel.
 var kernmulCMap = map[int]string{
-	0:  "",
+	0: "",
 	52: kernmulCPtx52,
 }
 
@@ -135,4 +135,4 @@ BB0_2:
 
 
 `
-)
+	)

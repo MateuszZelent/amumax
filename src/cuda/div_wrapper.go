@@ -19,9 +19,9 @@ var pointwiseDivCode cu.Function
 // Stores the arguments for pointwise_div kernel invocation
 type pointwiseDivArgsT struct {
 	argDst unsafe.Pointer
-	argA   unsafe.Pointer
-	argB   unsafe.Pointer
-	argN   int
+	argA unsafe.Pointer
+	argB unsafe.Pointer
+	argN int
 	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
@@ -35,7 +35,7 @@ func init() {
 	pointwiseDivArgs.argptr[1] = unsafe.Pointer(&pointwiseDivArgs.argA)
 	pointwiseDivArgs.argptr[2] = unsafe.Pointer(&pointwiseDivArgs.argB)
 	pointwiseDivArgs.argptr[3] = unsafe.Pointer(&pointwiseDivArgs.argN)
-}
+	}
 
 // Wrapper for pointwise_div CUDA kernel, asynchronous.
 func kPointwiseDivAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, N int, cfg *config) {
@@ -55,7 +55,7 @@ func kPointwiseDivAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, 
 	pointwiseDivArgs.argA = a
 	pointwiseDivArgs.argB = b
 	pointwiseDivArgs.argN = N
-
+	
 	args := pointwiseDivArgs.argptr[:]
 	cu.LaunchKernel(pointwiseDivCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kPointwiseDivAsync(dst unsafe.Pointer, a unsafe.Pointer, b unsafe.Pointer, 
 
 // maps compute capability on PTX code for pointwise_div kernel.
 var pointwiseDivMap = map[int]string{
-	0:  "",
+	0: "",
 	52: pointwiseDivPtx52,
 }
 
@@ -135,4 +135,4 @@ BB0_4:
 
 
 `
-)
+	)

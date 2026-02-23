@@ -18,7 +18,7 @@ var madd7Code cu.Function
 
 // Stores the arguments for madd7 kernel invocation
 type madd7ArgsT struct {
-	argDst  unsafe.Pointer
+	argDst unsafe.Pointer
 	argSrc1 unsafe.Pointer
 	argFac1 float32
 	argSrc2 unsafe.Pointer
@@ -33,8 +33,8 @@ type madd7ArgsT struct {
 	argFac6 float32
 	argSrc7 unsafe.Pointer
 	argFac7 float32
-	argN    int
-	argptr  [16]unsafe.Pointer
+	argN int
+	argptr [16]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -59,7 +59,7 @@ func init() {
 	madd7Args.argptr[13] = unsafe.Pointer(&madd7Args.argSrc7)
 	madd7Args.argptr[14] = unsafe.Pointer(&madd7Args.argFac7)
 	madd7Args.argptr[15] = unsafe.Pointer(&madd7Args.argN)
-}
+	}
 
 // Wrapper for madd7 CUDA kernel, asynchronous.
 func kMadd7Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 unsafe.Pointer, fac2 float32, src3 unsafe.Pointer, fac3 float32, src4 unsafe.Pointer, fac4 float32, src5 unsafe.Pointer, fac5 float32, src6 unsafe.Pointer, fac6 float32, src7 unsafe.Pointer, fac7 float32, N int, cfg *config) {
@@ -91,7 +91,7 @@ func kMadd7Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 	madd7Args.argSrc7 = src7
 	madd7Args.argFac7 = fac7
 	madd7Args.argN = N
-
+	
 	args := madd7Args.argptr[:]
 	cu.LaunchKernel(madd7Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -103,7 +103,7 @@ func kMadd7Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 
 // maps compute capability on PTX code for madd7 kernel.
 var madd7Map = map[int]string{
-	0:  "",
+	0: "",
 	52: madd7Ptx52,
 }
 
@@ -206,4 +206,4 @@ BB0_2:
 
 
 `
-)
+	)

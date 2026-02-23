@@ -18,26 +18,26 @@ var adduniaxialanisotropy2Code cu.Function
 
 // Stores the arguments for adduniaxialanisotropy2 kernel invocation
 type adduniaxialanisotropy2ArgsT struct {
-	argBx    unsafe.Pointer
-	argBy    unsafe.Pointer
-	argBz    unsafe.Pointer
-	argMx    unsafe.Pointer
-	argMy    unsafe.Pointer
-	argMz    unsafe.Pointer
-	argMs    unsafe.Pointer
+	argBx unsafe.Pointer
+	argBy unsafe.Pointer
+	argBz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
 	argMsMul float32
-	argK1    unsafe.Pointer
+	argK1 unsafe.Pointer
 	argK1Mul float32
-	argK2    unsafe.Pointer
+	argK2 unsafe.Pointer
 	argK2Mul float32
-	argUx    unsafe.Pointer
+	argUx unsafe.Pointer
 	argUxMul float32
-	argUy    unsafe.Pointer
+	argUy unsafe.Pointer
 	argUyMul float32
-	argUz    unsafe.Pointer
+	argUz unsafe.Pointer
 	argUzMul float32
-	argN     int
-	argptr   [19]unsafe.Pointer
+	argN int
+	argptr [19]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -65,10 +65,10 @@ func init() {
 	adduniaxialanisotropy2Args.argptr[16] = unsafe.Pointer(&adduniaxialanisotropy2Args.argUz)
 	adduniaxialanisotropy2Args.argptr[17] = unsafe.Pointer(&adduniaxialanisotropy2Args.argUzMul)
 	adduniaxialanisotropy2Args.argptr[18] = unsafe.Pointer(&adduniaxialanisotropy2Args.argN)
-}
+	}
 
 // Wrapper for adduniaxialanisotropy2 CUDA kernel, asynchronous.
-func kAdduniaxialanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, K1_ unsafe.Pointer, K1Mul float32, K2_ unsafe.Pointer, K2Mul float32, ux_ unsafe.Pointer, uxMul float32, uy_ unsafe.Pointer, uyMul float32, uz_ unsafe.Pointer, uzMul float32, N int, cfg *config) {
+func kAdduniaxialanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, K1_ unsafe.Pointer, K1_mul float32, K2_ unsafe.Pointer, K2_mul float32, ux_ unsafe.Pointer, ux_mul float32, uy_ unsafe.Pointer, uy_mul float32, uz_ unsafe.Pointer, uz_mul float32, N int, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("adduniaxialanisotropy2")
@@ -88,19 +88,19 @@ func kAdduniaxialanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsaf
 	adduniaxialanisotropy2Args.argMy = my
 	adduniaxialanisotropy2Args.argMz = mz
 	adduniaxialanisotropy2Args.argMs = Ms_
-	adduniaxialanisotropy2Args.argMsMul = MsMul
+	adduniaxialanisotropy2Args.argMsMul = Ms_mul
 	adduniaxialanisotropy2Args.argK1 = K1_
-	adduniaxialanisotropy2Args.argK1Mul = K1Mul
+	adduniaxialanisotropy2Args.argK1Mul = K1_mul
 	adduniaxialanisotropy2Args.argK2 = K2_
-	adduniaxialanisotropy2Args.argK2Mul = K2Mul
+	adduniaxialanisotropy2Args.argK2Mul = K2_mul
 	adduniaxialanisotropy2Args.argUx = ux_
-	adduniaxialanisotropy2Args.argUxMul = uxMul
+	adduniaxialanisotropy2Args.argUxMul = ux_mul
 	adduniaxialanisotropy2Args.argUy = uy_
-	adduniaxialanisotropy2Args.argUyMul = uyMul
+	adduniaxialanisotropy2Args.argUyMul = uy_mul
 	adduniaxialanisotropy2Args.argUz = uz_
-	adduniaxialanisotropy2Args.argUzMul = uzMul
+	adduniaxialanisotropy2Args.argUzMul = uz_mul
 	adduniaxialanisotropy2Args.argN = N
-
+	
 	args := adduniaxialanisotropy2Args.argptr[:]
 	cu.LaunchKernel(adduniaxialanisotropy2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -112,7 +112,7 @@ func kAdduniaxialanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsaf
 
 // maps compute capability on PTX code for adduniaxialanisotropy2 kernel.
 var adduniaxialanisotropy2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: adduniaxialanisotropy2Ptx52,
 }
 
@@ -312,4 +312,4 @@ BB0_18:
 
 
 `
-)
+	)

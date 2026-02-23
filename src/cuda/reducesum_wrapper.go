@@ -18,11 +18,11 @@ var reducesumCode cu.Function
 
 // Stores the arguments for reducesum kernel invocation
 type reducesumArgsT struct {
-	argSrc     unsafe.Pointer
-	argDst     unsafe.Pointer
+	argSrc unsafe.Pointer
+	argDst unsafe.Pointer
 	argInitVal float32
-	argN       int
-	argptr     [4]unsafe.Pointer
+	argN int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	reducesumArgs.argptr[1] = unsafe.Pointer(&reducesumArgs.argDst)
 	reducesumArgs.argptr[2] = unsafe.Pointer(&reducesumArgs.argInitVal)
 	reducesumArgs.argptr[3] = unsafe.Pointer(&reducesumArgs.argN)
-}
+	}
 
 // Wrapper for reducesum CUDA kernel, asynchronous.
 func kReducesumAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32, n int, cfg *config) {
@@ -55,7 +55,7 @@ func kReducesumAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32, n 
 	reducesumArgs.argDst = dst
 	reducesumArgs.argInitVal = initVal
 	reducesumArgs.argN = n
-
+	
 	args := reducesumArgs.argptr[:]
 	cu.LaunchKernel(reducesumCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kReducesumAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32, n 
 
 // maps compute capability on PTX code for reducesum kernel.
 var reducesumMap = map[int]string{
-	0:  "",
+	0: "",
 	52: reducesumPtx52,
 }
 
@@ -188,4 +188,4 @@ BB0_10:
 
 
 `
-)
+	)

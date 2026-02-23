@@ -18,16 +18,16 @@ var llnoprecessCode cu.Function
 
 // Stores the arguments for llnoprecess kernel invocation
 type llnoprecessArgsT struct {
-	argTx  unsafe.Pointer
-	argTy  unsafe.Pointer
-	argTz  unsafe.Pointer
-	argMx  unsafe.Pointer
-	argMy  unsafe.Pointer
-	argMz  unsafe.Pointer
-	argHx  unsafe.Pointer
-	argHy  unsafe.Pointer
-	argHz  unsafe.Pointer
-	argN   int
+	argTx unsafe.Pointer
+	argTy unsafe.Pointer
+	argTz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argHx unsafe.Pointer
+	argHy unsafe.Pointer
+	argHz unsafe.Pointer
+	argN int
 	argptr [10]unsafe.Pointer
 	sync.Mutex
 }
@@ -47,7 +47,7 @@ func init() {
 	llnoprecessArgs.argptr[7] = unsafe.Pointer(&llnoprecessArgs.argHy)
 	llnoprecessArgs.argptr[8] = unsafe.Pointer(&llnoprecessArgs.argHz)
 	llnoprecessArgs.argptr[9] = unsafe.Pointer(&llnoprecessArgs.argN)
-}
+	}
 
 // Wrapper for llnoprecess CUDA kernel, asynchronous.
 func kLlnoprecessAsync(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, hx unsafe.Pointer, hy unsafe.Pointer, hz unsafe.Pointer, N int, cfg *config) {
@@ -73,7 +73,7 @@ func kLlnoprecessAsync(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, 
 	llnoprecessArgs.argHy = hy
 	llnoprecessArgs.argHz = hz
 	llnoprecessArgs.argN = N
-
+	
 	args := llnoprecessArgs.argptr[:]
 	cu.LaunchKernel(llnoprecessCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -85,7 +85,7 @@ func kLlnoprecessAsync(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, 
 
 // maps compute capability on PTX code for llnoprecess kernel.
 var llnoprecessMap = map[int]string{
-	0:  "",
+	0: "",
 	52: llnoprecessPtx52,
 }
 
@@ -193,4 +193,4 @@ BB0_2:
 
 
 `
-)
+	)

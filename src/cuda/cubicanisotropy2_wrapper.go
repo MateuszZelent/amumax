@@ -18,34 +18,34 @@ var addcubicanisotropy2Code cu.Function
 
 // Stores the arguments for addcubicanisotropy2 kernel invocation
 type addcubicanisotropy2ArgsT struct {
-	argBx     unsafe.Pointer
-	argBy     unsafe.Pointer
-	argBz     unsafe.Pointer
-	argMx     unsafe.Pointer
-	argMy     unsafe.Pointer
-	argMz     unsafe.Pointer
-	argMs     unsafe.Pointer
-	argMsMul  float32
-	argK1     unsafe.Pointer
-	argK1Mul  float32
-	argK2     unsafe.Pointer
-	argK2Mul  float32
-	argK3     unsafe.Pointer
-	argK3Mul  float32
-	argC1x    unsafe.Pointer
+	argBx unsafe.Pointer
+	argBy unsafe.Pointer
+	argBz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
+	argMsMul float32
+	argK1 unsafe.Pointer
+	argK1Mul float32
+	argK2 unsafe.Pointer
+	argK2Mul float32
+	argK3 unsafe.Pointer
+	argK3Mul float32
+	argC1x unsafe.Pointer
 	argC1xMul float32
-	argC1y    unsafe.Pointer
+	argC1y unsafe.Pointer
 	argC1yMul float32
-	argC1z    unsafe.Pointer
+	argC1z unsafe.Pointer
 	argC1zMul float32
-	argC2x    unsafe.Pointer
+	argC2x unsafe.Pointer
 	argC2xMul float32
-	argC2y    unsafe.Pointer
+	argC2y unsafe.Pointer
 	argC2yMul float32
-	argC2z    unsafe.Pointer
+	argC2z unsafe.Pointer
 	argC2zMul float32
-	argN      int
-	argptr    [27]unsafe.Pointer
+	argN int
+	argptr [27]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -81,10 +81,10 @@ func init() {
 	addcubicanisotropy2Args.argptr[24] = unsafe.Pointer(&addcubicanisotropy2Args.argC2z)
 	addcubicanisotropy2Args.argptr[25] = unsafe.Pointer(&addcubicanisotropy2Args.argC2zMul)
 	addcubicanisotropy2Args.argptr[26] = unsafe.Pointer(&addcubicanisotropy2Args.argN)
-}
+	}
 
 // Wrapper for addcubicanisotropy2 CUDA kernel, asynchronous.
-func kAddcubicanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, k1_ unsafe.Pointer, k1Mul float32, k2_ unsafe.Pointer, k2Mul float32, k3_ unsafe.Pointer, k3Mul float32, c1x_ unsafe.Pointer, c1xMul float32, c1y_ unsafe.Pointer, c1yMul float32, c1z_ unsafe.Pointer, c1zMul float32, c2x_ unsafe.Pointer, c2xMul float32, c2y_ unsafe.Pointer, c2yMul float32, c2z_ unsafe.Pointer, c2zMul float32, N int, cfg *config) {
+func kAddcubicanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, k1_ unsafe.Pointer, k1_mul float32, k2_ unsafe.Pointer, k2_mul float32, k3_ unsafe.Pointer, k3_mul float32, c1x_ unsafe.Pointer, c1x_mul float32, c1y_ unsafe.Pointer, c1y_mul float32, c1z_ unsafe.Pointer, c1z_mul float32, c2x_ unsafe.Pointer, c2x_mul float32, c2y_ unsafe.Pointer, c2y_mul float32, c2z_ unsafe.Pointer, c2z_mul float32, N int, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("addcubicanisotropy2")
@@ -104,27 +104,27 @@ func kAddcubicanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.P
 	addcubicanisotropy2Args.argMy = my
 	addcubicanisotropy2Args.argMz = mz
 	addcubicanisotropy2Args.argMs = Ms_
-	addcubicanisotropy2Args.argMsMul = MsMul
+	addcubicanisotropy2Args.argMsMul = Ms_mul
 	addcubicanisotropy2Args.argK1 = k1_
-	addcubicanisotropy2Args.argK1Mul = k1Mul
+	addcubicanisotropy2Args.argK1Mul = k1_mul
 	addcubicanisotropy2Args.argK2 = k2_
-	addcubicanisotropy2Args.argK2Mul = k2Mul
+	addcubicanisotropy2Args.argK2Mul = k2_mul
 	addcubicanisotropy2Args.argK3 = k3_
-	addcubicanisotropy2Args.argK3Mul = k3Mul
+	addcubicanisotropy2Args.argK3Mul = k3_mul
 	addcubicanisotropy2Args.argC1x = c1x_
-	addcubicanisotropy2Args.argC1xMul = c1xMul
+	addcubicanisotropy2Args.argC1xMul = c1x_mul
 	addcubicanisotropy2Args.argC1y = c1y_
-	addcubicanisotropy2Args.argC1yMul = c1yMul
+	addcubicanisotropy2Args.argC1yMul = c1y_mul
 	addcubicanisotropy2Args.argC1z = c1z_
-	addcubicanisotropy2Args.argC1zMul = c1zMul
+	addcubicanisotropy2Args.argC1zMul = c1z_mul
 	addcubicanisotropy2Args.argC2x = c2x_
-	addcubicanisotropy2Args.argC2xMul = c2xMul
+	addcubicanisotropy2Args.argC2xMul = c2x_mul
 	addcubicanisotropy2Args.argC2y = c2y_
-	addcubicanisotropy2Args.argC2yMul = c2yMul
+	addcubicanisotropy2Args.argC2yMul = c2y_mul
 	addcubicanisotropy2Args.argC2z = c2z_
-	addcubicanisotropy2Args.argC2zMul = c2zMul
+	addcubicanisotropy2Args.argC2zMul = c2z_mul
 	addcubicanisotropy2Args.argN = N
-
+	
 	args := addcubicanisotropy2Args.argptr[:]
 	cu.LaunchKernel(addcubicanisotropy2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -136,7 +136,7 @@ func kAddcubicanisotropy2Async(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.P
 
 // maps compute capability on PTX code for addcubicanisotropy2 kernel.
 var addcubicanisotropy2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: addcubicanisotropy2Ptx52,
 }
 
@@ -490,4 +490,4 @@ BB0_28:
 
 
 `
-)
+	)

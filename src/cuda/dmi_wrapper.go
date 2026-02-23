@@ -18,26 +18,26 @@ var adddmiCode cu.Function
 
 // Stores the arguments for adddmi kernel invocation
 type adddmiArgsT struct {
-	argHx      unsafe.Pointer
-	argHy      unsafe.Pointer
-	argHz      unsafe.Pointer
-	argMx      unsafe.Pointer
-	argMy      unsafe.Pointer
-	argMz      unsafe.Pointer
-	argMs      unsafe.Pointer
-	argMsMul   float32
-	argALUT2d  unsafe.Pointer
-	argDLUT2d  unsafe.Pointer
+	argHx unsafe.Pointer
+	argHy unsafe.Pointer
+	argHz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
+	argMsMul float32
+	argALUT2d unsafe.Pointer
+	argDLUT2d unsafe.Pointer
 	argRegions unsafe.Pointer
-	argCx      float32
-	argCy      float32
-	argCz      float32
-	argNx      int
-	argNy      int
-	argNz      int
-	argPBC     byte
-	argOpenBC  byte
-	argptr     [19]unsafe.Pointer
+	argCx float32
+	argCy float32
+	argCz float32
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argOpenBC byte
+	argptr [19]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -65,10 +65,10 @@ func init() {
 	adddmiArgs.argptr[16] = unsafe.Pointer(&adddmiArgs.argNz)
 	adddmiArgs.argptr[17] = unsafe.Pointer(&adddmiArgs.argPBC)
 	adddmiArgs.argptr[18] = unsafe.Pointer(&adddmiArgs.argOpenBC)
-}
+	}
 
 // Wrapper for adddmi CUDA kernel, asynchronous.
-func kAdddmiAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, aLUT2d unsafe.Pointer, dLUT2d unsafe.Pointer, regions unsafe.Pointer, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, OpenBC byte, cfg *config) {
+func kAdddmiAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, aLUT2d unsafe.Pointer, dLUT2d unsafe.Pointer, regions unsafe.Pointer, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, OpenBC byte, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("adddmi")
@@ -88,7 +88,7 @@ func kAdddmiAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx un
 	adddmiArgs.argMy = my
 	adddmiArgs.argMz = mz
 	adddmiArgs.argMs = Ms_
-	adddmiArgs.argMsMul = MsMul
+	adddmiArgs.argMsMul = Ms_mul
 	adddmiArgs.argALUT2d = aLUT2d
 	adddmiArgs.argDLUT2d = dLUT2d
 	adddmiArgs.argRegions = regions
@@ -100,7 +100,7 @@ func kAdddmiAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx un
 	adddmiArgs.argNz = Nz
 	adddmiArgs.argPBC = PBC
 	adddmiArgs.argOpenBC = OpenBC
-
+	
 	args := adddmiArgs.argptr[:]
 	cu.LaunchKernel(adddmiCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -112,7 +112,7 @@ func kAdddmiAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx un
 
 // maps compute capability on PTX code for adddmi kernel.
 var adddmiMap = map[int]string{
-	0:  "",
+	0: "",
 	52: adddmiPtx52,
 }
 
@@ -724,4 +724,4 @@ BB0_59:
 
 
 `
-)
+	)

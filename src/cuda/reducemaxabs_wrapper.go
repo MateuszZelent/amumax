@@ -18,11 +18,11 @@ var reducemaxabsCode cu.Function
 
 // Stores the arguments for reducemaxabs kernel invocation
 type reducemaxabsArgsT struct {
-	argSrc     unsafe.Pointer
-	argDst     unsafe.Pointer
+	argSrc unsafe.Pointer
+	argDst unsafe.Pointer
 	argInitVal float32
-	argN       int
-	argptr     [4]unsafe.Pointer
+	argN int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	reducemaxabsArgs.argptr[1] = unsafe.Pointer(&reducemaxabsArgs.argDst)
 	reducemaxabsArgs.argptr[2] = unsafe.Pointer(&reducemaxabsArgs.argInitVal)
 	reducemaxabsArgs.argptr[3] = unsafe.Pointer(&reducemaxabsArgs.argN)
-}
+	}
 
 // Wrapper for reducemaxabs CUDA kernel, asynchronous.
 func kReducemaxabsAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32, n int, cfg *config) {
@@ -55,7 +55,7 @@ func kReducemaxabsAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32,
 	reducemaxabsArgs.argDst = dst
 	reducemaxabsArgs.argInitVal = initVal
 	reducemaxabsArgs.argN = n
-
+	
 	args := reducemaxabsArgs.argptr[:]
 	cu.LaunchKernel(reducemaxabsCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kReducemaxabsAsync(src unsafe.Pointer, dst unsafe.Pointer, initVal float32,
 
 // maps compute capability on PTX code for reducemaxabs kernel.
 var reducemaxabsMap = map[int]string{
-	0:  "",
+	0: "",
 	52: reducemaxabsPtx52,
 }
 
@@ -191,4 +191,4 @@ BB0_10:
 
 
 `
-)
+	)

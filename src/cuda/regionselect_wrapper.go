@@ -18,12 +18,12 @@ var regionselectCode cu.Function
 
 // Stores the arguments for regionselect kernel invocation
 type regionselectArgsT struct {
-	argDst     unsafe.Pointer
-	argSrc     unsafe.Pointer
+	argDst unsafe.Pointer
+	argSrc unsafe.Pointer
 	argRegions unsafe.Pointer
-	argRegion  byte
-	argN       int
-	argptr     [5]unsafe.Pointer
+	argRegion byte
+	argN int
+	argptr [5]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -37,7 +37,7 @@ func init() {
 	regionselectArgs.argptr[2] = unsafe.Pointer(&regionselectArgs.argRegions)
 	regionselectArgs.argptr[3] = unsafe.Pointer(&regionselectArgs.argRegion)
 	regionselectArgs.argptr[4] = unsafe.Pointer(&regionselectArgs.argN)
-}
+	}
 
 // Wrapper for regionselect CUDA kernel, asynchronous.
 func kRegionselectAsync(dst unsafe.Pointer, src unsafe.Pointer, regions unsafe.Pointer, region byte, N int, cfg *config) {
@@ -58,7 +58,7 @@ func kRegionselectAsync(dst unsafe.Pointer, src unsafe.Pointer, regions unsafe.P
 	regionselectArgs.argRegions = regions
 	regionselectArgs.argRegion = region
 	regionselectArgs.argN = N
-
+	
 	args := regionselectArgs.argptr[:]
 	cu.LaunchKernel(regionselectCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -70,7 +70,7 @@ func kRegionselectAsync(dst unsafe.Pointer, src unsafe.Pointer, regions unsafe.P
 
 // maps compute capability on PTX code for regionselect kernel.
 var regionselectMap = map[int]string{
-	0:  "",
+	0: "",
 	52: regionselectPtx52,
 }
 
@@ -138,4 +138,4 @@ BB0_4:
 
 
 `
-)
+	)

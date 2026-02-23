@@ -18,26 +18,26 @@ var adddmibulkCode cu.Function
 
 // Stores the arguments for adddmibulk kernel invocation
 type adddmibulkArgsT struct {
-	argHx      unsafe.Pointer
-	argHy      unsafe.Pointer
-	argHz      unsafe.Pointer
-	argMx      unsafe.Pointer
-	argMy      unsafe.Pointer
-	argMz      unsafe.Pointer
-	argMs      unsafe.Pointer
-	argMsMul   float32
-	argALUT2d  unsafe.Pointer
-	argDLUT2d  unsafe.Pointer
+	argHx unsafe.Pointer
+	argHy unsafe.Pointer
+	argHz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argMs unsafe.Pointer
+	argMsMul float32
+	argALUT2d unsafe.Pointer
+	argDLUT2d unsafe.Pointer
 	argRegions unsafe.Pointer
-	argCx      float32
-	argCy      float32
-	argCz      float32
-	argNx      int
-	argNy      int
-	argNz      int
-	argPBC     byte
-	argOpenBC  byte
-	argptr     [19]unsafe.Pointer
+	argCx float32
+	argCy float32
+	argCz float32
+	argNx int
+	argNy int
+	argNz int
+	argPBC byte
+	argOpenBC byte
+	argptr [19]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -65,10 +65,10 @@ func init() {
 	adddmibulkArgs.argptr[16] = unsafe.Pointer(&adddmibulkArgs.argNz)
 	adddmibulkArgs.argptr[17] = unsafe.Pointer(&adddmibulkArgs.argPBC)
 	adddmibulkArgs.argptr[18] = unsafe.Pointer(&adddmibulkArgs.argOpenBC)
-}
+	}
 
 // Wrapper for adddmibulk CUDA kernel, asynchronous.
-func kAdddmibulkAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, MsMul float32, aLUT2d unsafe.Pointer, DLUT2d unsafe.Pointer, regions unsafe.Pointer, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, OpenBC byte, cfg *config) {
+func kAdddmibulkAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, aLUT2d unsafe.Pointer, DLUT2d unsafe.Pointer, regions unsafe.Pointer, cx float32, cy float32, cz float32, Nx int, Ny int, Nz int, PBC byte, OpenBC byte, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("adddmibulk")
@@ -88,7 +88,7 @@ func kAdddmibulkAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, m
 	adddmibulkArgs.argMy = my
 	adddmibulkArgs.argMz = mz
 	adddmibulkArgs.argMs = Ms_
-	adddmibulkArgs.argMsMul = MsMul
+	adddmibulkArgs.argMsMul = Ms_mul
 	adddmibulkArgs.argALUT2d = aLUT2d
 	adddmibulkArgs.argDLUT2d = DLUT2d
 	adddmibulkArgs.argRegions = regions
@@ -100,7 +100,7 @@ func kAdddmibulkAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, m
 	adddmibulkArgs.argNz = Nz
 	adddmibulkArgs.argPBC = PBC
 	adddmibulkArgs.argOpenBC = OpenBC
-
+	
 	args := adddmibulkArgs.argptr[:]
 	cu.LaunchKernel(adddmibulkCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -112,7 +112,7 @@ func kAdddmibulkAsync(Hx unsafe.Pointer, Hy unsafe.Pointer, Hz unsafe.Pointer, m
 
 // maps compute capability on PTX code for adddmibulk kernel.
 var adddmibulkMap = map[int]string{
-	0:  "",
+	0: "",
 	52: adddmibulkPtx52,
 }
 
@@ -767,4 +767,4 @@ BB0_62:
 
 
 `
-)
+	)

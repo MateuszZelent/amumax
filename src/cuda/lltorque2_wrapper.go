@@ -18,19 +18,19 @@ var lltorque2Code cu.Function
 
 // Stores the arguments for lltorque2 kernel invocation
 type lltorque2ArgsT struct {
-	argTx       unsafe.Pointer
-	argTy       unsafe.Pointer
-	argTz       unsafe.Pointer
-	argMx       unsafe.Pointer
-	argMy       unsafe.Pointer
-	argMz       unsafe.Pointer
-	argHx       unsafe.Pointer
-	argHy       unsafe.Pointer
-	argHz       unsafe.Pointer
-	argAlpha    unsafe.Pointer
+	argTx unsafe.Pointer
+	argTy unsafe.Pointer
+	argTz unsafe.Pointer
+	argMx unsafe.Pointer
+	argMy unsafe.Pointer
+	argMz unsafe.Pointer
+	argHx unsafe.Pointer
+	argHy unsafe.Pointer
+	argHz unsafe.Pointer
+	argAlpha unsafe.Pointer
 	argAlphaMul float32
-	argN        int
-	argptr      [12]unsafe.Pointer
+	argN int
+	argptr [12]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -51,10 +51,10 @@ func init() {
 	lltorque2Args.argptr[9] = unsafe.Pointer(&lltorque2Args.argAlpha)
 	lltorque2Args.argptr[10] = unsafe.Pointer(&lltorque2Args.argAlphaMul)
 	lltorque2Args.argptr[11] = unsafe.Pointer(&lltorque2Args.argN)
-}
+	}
 
 // Wrapper for lltorque2 CUDA kernel, asynchronous.
-func kLltorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, hx unsafe.Pointer, hy unsafe.Pointer, hz unsafe.Pointer, alpha_ unsafe.Pointer, alphaMul float32, N int, cfg *config) {
+func kLltorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, hx unsafe.Pointer, hy unsafe.Pointer, hz unsafe.Pointer, alpha_ unsafe.Pointer, alpha_mul float32, N int, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("lltorque2")
@@ -77,9 +77,9 @@ func kLltorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx
 	lltorque2Args.argHy = hy
 	lltorque2Args.argHz = hz
 	lltorque2Args.argAlpha = alpha_
-	lltorque2Args.argAlphaMul = alphaMul
+	lltorque2Args.argAlphaMul = alpha_mul
 	lltorque2Args.argN = N
-
+	
 	args := lltorque2Args.argptr[:]
 	cu.LaunchKernel(lltorque2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -91,7 +91,7 @@ func kLltorque2Async(tx unsafe.Pointer, ty unsafe.Pointer, tz unsafe.Pointer, mx
 
 // maps compute capability on PTX code for lltorque2 kernel.
 var lltorque2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: lltorque2Ptx52,
 }
 
@@ -218,4 +218,4 @@ BB0_4:
 
 
 `
-)
+	)

@@ -18,13 +18,13 @@ var reducemaxvecnorm2Code cu.Function
 
 // Stores the arguments for reducemaxvecnorm2 kernel invocation
 type reducemaxvecnorm2ArgsT struct {
-	argX       unsafe.Pointer
-	argY       unsafe.Pointer
-	argZ       unsafe.Pointer
-	argDst     unsafe.Pointer
+	argX unsafe.Pointer
+	argY unsafe.Pointer
+	argZ unsafe.Pointer
+	argDst unsafe.Pointer
 	argInitVal float32
-	argN       int
-	argptr     [6]unsafe.Pointer
+	argN int
+	argptr [6]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -39,7 +39,7 @@ func init() {
 	reducemaxvecnorm2Args.argptr[3] = unsafe.Pointer(&reducemaxvecnorm2Args.argDst)
 	reducemaxvecnorm2Args.argptr[4] = unsafe.Pointer(&reducemaxvecnorm2Args.argInitVal)
 	reducemaxvecnorm2Args.argptr[5] = unsafe.Pointer(&reducemaxvecnorm2Args.argN)
-}
+	}
 
 // Wrapper for reducemaxvecnorm2 CUDA kernel, asynchronous.
 func kReducemaxvecnorm2Async(x unsafe.Pointer, y unsafe.Pointer, z unsafe.Pointer, dst unsafe.Pointer, initVal float32, n int, cfg *config) {
@@ -61,7 +61,7 @@ func kReducemaxvecnorm2Async(x unsafe.Pointer, y unsafe.Pointer, z unsafe.Pointe
 	reducemaxvecnorm2Args.argDst = dst
 	reducemaxvecnorm2Args.argInitVal = initVal
 	reducemaxvecnorm2Args.argN = n
-
+	
 	args := reducemaxvecnorm2Args.argptr[:]
 	cu.LaunchKernel(reducemaxvecnorm2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -73,7 +73,7 @@ func kReducemaxvecnorm2Async(x unsafe.Pointer, y unsafe.Pointer, z unsafe.Pointe
 
 // maps compute capability on PTX code for reducemaxvecnorm2 kernel.
 var reducemaxvecnorm2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: reducemaxvecnorm2Ptx52,
 }
 
@@ -209,4 +209,4 @@ BB0_10:
 
 
 `
-)
+	)

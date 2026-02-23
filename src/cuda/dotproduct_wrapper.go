@@ -18,16 +18,16 @@ var dotproductCode cu.Function
 
 // Stores the arguments for dotproduct kernel invocation
 type dotproductArgsT struct {
-	argDst       unsafe.Pointer
+	argDst unsafe.Pointer
 	argPrefactor float32
-	argAx        unsafe.Pointer
-	argAy        unsafe.Pointer
-	argAz        unsafe.Pointer
-	argBx        unsafe.Pointer
-	argBy        unsafe.Pointer
-	argBz        unsafe.Pointer
-	argN         int
-	argptr       [9]unsafe.Pointer
+	argAx unsafe.Pointer
+	argAy unsafe.Pointer
+	argAz unsafe.Pointer
+	argBx unsafe.Pointer
+	argBy unsafe.Pointer
+	argBz unsafe.Pointer
+	argN int
+	argptr [9]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -45,7 +45,7 @@ func init() {
 	dotproductArgs.argptr[6] = unsafe.Pointer(&dotproductArgs.argBy)
 	dotproductArgs.argptr[7] = unsafe.Pointer(&dotproductArgs.argBz)
 	dotproductArgs.argptr[8] = unsafe.Pointer(&dotproductArgs.argN)
-}
+	}
 
 // Wrapper for dotproduct CUDA kernel, asynchronous.
 func kDotproductAsync(dst unsafe.Pointer, prefactor float32, ax unsafe.Pointer, ay unsafe.Pointer, az unsafe.Pointer, bx unsafe.Pointer, by unsafe.Pointer, bz unsafe.Pointer, N int, cfg *config) {
@@ -70,7 +70,7 @@ func kDotproductAsync(dst unsafe.Pointer, prefactor float32, ax unsafe.Pointer, 
 	dotproductArgs.argBy = by
 	dotproductArgs.argBz = bz
 	dotproductArgs.argN = N
-
+	
 	args := dotproductArgs.argptr[:]
 	cu.LaunchKernel(dotproductCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -82,7 +82,7 @@ func kDotproductAsync(dst unsafe.Pointer, prefactor float32, ax unsafe.Pointer, 
 
 // maps compute capability on PTX code for dotproduct kernel.
 var dotproductMap = map[int]string{
-	0:  "",
+	0: "",
 	52: dotproductPtx52,
 }
 
@@ -166,4 +166,4 @@ BB0_2:
 
 
 `
-)
+	)

@@ -18,18 +18,18 @@ var copypadmul2Code cu.Function
 
 // Stores the arguments for copypadmul2 kernel invocation
 type copypadmul2ArgsT struct {
-	argDst   unsafe.Pointer
-	argDx    int
-	argDy    int
-	argDz    int
-	argSrc   unsafe.Pointer
-	argSx    int
-	argSy    int
-	argSz    int
-	argMs    unsafe.Pointer
+	argDst unsafe.Pointer
+	argDx int
+	argDy int
+	argDz int
+	argSrc unsafe.Pointer
+	argSx int
+	argSy int
+	argSz int
+	argMs unsafe.Pointer
 	argMsMul float32
-	argVol   unsafe.Pointer
-	argptr   [11]unsafe.Pointer
+	argVol unsafe.Pointer
+	argptr [11]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -49,10 +49,10 @@ func init() {
 	copypadmul2Args.argptr[8] = unsafe.Pointer(&copypadmul2Args.argMs)
 	copypadmul2Args.argptr[9] = unsafe.Pointer(&copypadmul2Args.argMsMul)
 	copypadmul2Args.argptr[10] = unsafe.Pointer(&copypadmul2Args.argVol)
-}
+	}
 
 // Wrapper for copypadmul2 CUDA kernel, asynchronous.
-func kCopypadmul2Async(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, Sx int, Sy int, Sz int, Ms_ unsafe.Pointer, MsMul float32, vol unsafe.Pointer, cfg *config) {
+func kCopypadmul2Async(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Pointer, Sx int, Sy int, Sz int, Ms_ unsafe.Pointer, Ms_mul float32, vol unsafe.Pointer, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("copypadmul2")
@@ -74,9 +74,9 @@ func kCopypadmul2Async(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Po
 	copypadmul2Args.argSy = Sy
 	copypadmul2Args.argSz = Sz
 	copypadmul2Args.argMs = Ms_
-	copypadmul2Args.argMsMul = MsMul
+	copypadmul2Args.argMsMul = Ms_mul
 	copypadmul2Args.argVol = vol
-
+	
 	args := copypadmul2Args.argptr[:]
 	cu.LaunchKernel(copypadmul2Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -88,7 +88,7 @@ func kCopypadmul2Async(dst unsafe.Pointer, Dx int, Dy int, Dz int, src unsafe.Po
 
 // maps compute capability on PTX code for copypadmul2 kernel.
 var copypadmul2Map = map[int]string{
-	0:  "",
+	0: "",
 	52: copypadmul2Ptx52,
 }
 
@@ -197,4 +197,4 @@ BB0_6:
 
 
 `
-)
+	)

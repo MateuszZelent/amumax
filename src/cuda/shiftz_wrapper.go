@@ -18,15 +18,15 @@ var shiftzCode cu.Function
 
 // Stores the arguments for shiftz kernel invocation
 type shiftzArgsT struct {
-	argDst    unsafe.Pointer
-	argSrc    unsafe.Pointer
-	argNx     int
-	argNy     int
-	argNz     int
-	argShz    int
+	argDst unsafe.Pointer
+	argSrc unsafe.Pointer
+	argNx int
+	argNy int
+	argNz int
+	argShz int
 	argClampL float32
 	argClampR float32
-	argptr    [8]unsafe.Pointer
+	argptr [8]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -43,7 +43,7 @@ func init() {
 	shiftzArgs.argptr[5] = unsafe.Pointer(&shiftzArgs.argShz)
 	shiftzArgs.argptr[6] = unsafe.Pointer(&shiftzArgs.argClampL)
 	shiftzArgs.argptr[7] = unsafe.Pointer(&shiftzArgs.argClampR)
-}
+	}
 
 // Wrapper for shiftz CUDA kernel, asynchronous.
 func kShiftzAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz int, shz int, clampL float32, clampR float32, cfg *config) {
@@ -67,7 +67,7 @@ func kShiftzAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz int
 	shiftzArgs.argShz = shz
 	shiftzArgs.argClampL = clampL
 	shiftzArgs.argClampR = clampR
-
+	
 	args := shiftzArgs.argptr[:]
 	cu.LaunchKernel(shiftzCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -79,7 +79,7 @@ func kShiftzAsync(dst unsafe.Pointer, src unsafe.Pointer, Nx int, Ny int, Nz int
 
 // maps compute capability on PTX code for shiftz kernel.
 var shiftzMap = map[int]string{
-	0:  "",
+	0: "",
 	52: shiftzPtx52,
 }
 
@@ -167,4 +167,4 @@ BB0_5:
 
 
 `
-)
+	)

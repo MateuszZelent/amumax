@@ -18,11 +18,11 @@ var normalizeCode cu.Function
 
 // Stores the arguments for normalize kernel invocation
 type normalizeArgsT struct {
-	argVx  unsafe.Pointer
-	argVy  unsafe.Pointer
-	argVz  unsafe.Pointer
+	argVx unsafe.Pointer
+	argVy unsafe.Pointer
+	argVz unsafe.Pointer
 	argVol unsafe.Pointer
-	argN   int
+	argN int
 	argptr [5]unsafe.Pointer
 	sync.Mutex
 }
@@ -37,7 +37,7 @@ func init() {
 	normalizeArgs.argptr[2] = unsafe.Pointer(&normalizeArgs.argVz)
 	normalizeArgs.argptr[3] = unsafe.Pointer(&normalizeArgs.argVol)
 	normalizeArgs.argptr[4] = unsafe.Pointer(&normalizeArgs.argN)
-}
+	}
 
 // Wrapper for normalize CUDA kernel, asynchronous.
 func kNormalizeAsync(vx unsafe.Pointer, vy unsafe.Pointer, vz unsafe.Pointer, vol unsafe.Pointer, N int, cfg *config) {
@@ -58,7 +58,7 @@ func kNormalizeAsync(vx unsafe.Pointer, vy unsafe.Pointer, vz unsafe.Pointer, vo
 	normalizeArgs.argVz = vz
 	normalizeArgs.argVol = vol
 	normalizeArgs.argN = N
-
+	
 	args := normalizeArgs.argptr[:]
 	cu.LaunchKernel(normalizeCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -70,7 +70,7 @@ func kNormalizeAsync(vx unsafe.Pointer, vy unsafe.Pointer, vz unsafe.Pointer, vo
 
 // maps compute capability on PTX code for normalize kernel.
 var normalizeMap = map[int]string{
-	0:  "",
+	0: "",
 	52: normalizePtx52,
 }
 
@@ -159,4 +159,4 @@ BB0_6:
 
 
 `
-)
+	)

@@ -18,7 +18,7 @@ var madd4Code cu.Function
 
 // Stores the arguments for madd4 kernel invocation
 type madd4ArgsT struct {
-	argDst  unsafe.Pointer
+	argDst unsafe.Pointer
 	argSrc1 unsafe.Pointer
 	argFac1 float32
 	argSrc2 unsafe.Pointer
@@ -27,8 +27,8 @@ type madd4ArgsT struct {
 	argFac3 float32
 	argSrc4 unsafe.Pointer
 	argFac4 float32
-	argN    int
-	argptr  [10]unsafe.Pointer
+	argN int
+	argptr [10]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -47,7 +47,7 @@ func init() {
 	madd4Args.argptr[7] = unsafe.Pointer(&madd4Args.argSrc4)
 	madd4Args.argptr[8] = unsafe.Pointer(&madd4Args.argFac4)
 	madd4Args.argptr[9] = unsafe.Pointer(&madd4Args.argN)
-}
+	}
 
 // Wrapper for madd4 CUDA kernel, asynchronous.
 func kMadd4Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 unsafe.Pointer, fac2 float32, src3 unsafe.Pointer, fac3 float32, src4 unsafe.Pointer, fac4 float32, N int, cfg *config) {
@@ -73,7 +73,7 @@ func kMadd4Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 	madd4Args.argSrc4 = src4
 	madd4Args.argFac4 = fac4
 	madd4Args.argN = N
-
+	
 	args := madd4Args.argptr[:]
 	cu.LaunchKernel(madd4Code, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -85,7 +85,7 @@ func kMadd4Async(dst unsafe.Pointer, src1 unsafe.Pointer, fac1 float32, src2 uns
 
 // maps compute capability on PTX code for madd4 kernel.
 var madd4Map = map[int]string{
-	0:  "",
+	0: "",
 	52: madd4Ptx52,
 }
 
@@ -164,4 +164,4 @@ BB0_2:
 
 
 `
-)
+	)

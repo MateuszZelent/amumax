@@ -21,14 +21,14 @@ type crossproductArgsT struct {
 	argDstx unsafe.Pointer
 	argDsty unsafe.Pointer
 	argDstz unsafe.Pointer
-	argAx   unsafe.Pointer
-	argAy   unsafe.Pointer
-	argAz   unsafe.Pointer
-	argBx   unsafe.Pointer
-	argBy   unsafe.Pointer
-	argBz   unsafe.Pointer
-	argN    int
-	argptr  [10]unsafe.Pointer
+	argAx unsafe.Pointer
+	argAy unsafe.Pointer
+	argAz unsafe.Pointer
+	argBx unsafe.Pointer
+	argBy unsafe.Pointer
+	argBz unsafe.Pointer
+	argN int
+	argptr [10]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -47,7 +47,7 @@ func init() {
 	crossproductArgs.argptr[7] = unsafe.Pointer(&crossproductArgs.argBy)
 	crossproductArgs.argptr[8] = unsafe.Pointer(&crossproductArgs.argBz)
 	crossproductArgs.argptr[9] = unsafe.Pointer(&crossproductArgs.argN)
-}
+	}
 
 // Wrapper for crossproduct CUDA kernel, asynchronous.
 func kCrossproductAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Pointer, ax unsafe.Pointer, ay unsafe.Pointer, az unsafe.Pointer, bx unsafe.Pointer, by unsafe.Pointer, bz unsafe.Pointer, N int, cfg *config) {
@@ -73,7 +73,7 @@ func kCrossproductAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Po
 	crossproductArgs.argBy = by
 	crossproductArgs.argBz = bz
 	crossproductArgs.argN = N
-
+	
 	args := crossproductArgs.argptr[:]
 	cu.LaunchKernel(crossproductCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -85,7 +85,7 @@ func kCrossproductAsync(dstx unsafe.Pointer, dsty unsafe.Pointer, dstz unsafe.Po
 
 // maps compute capability on PTX code for crossproduct kernel.
 var crossproductMap = map[int]string{
-	0:  "",
+	0: "",
 	52: crossproductPtx52,
 }
 
@@ -181,4 +181,4 @@ BB0_2:
 
 
 `
-)
+	)

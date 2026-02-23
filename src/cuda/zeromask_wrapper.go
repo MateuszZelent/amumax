@@ -18,11 +18,11 @@ var zeromaskCode cu.Function
 
 // Stores the arguments for zeromask kernel invocation
 type zeromaskArgsT struct {
-	argDst     unsafe.Pointer
+	argDst unsafe.Pointer
 	argMaskLUT unsafe.Pointer
 	argRegions unsafe.Pointer
-	argN       int
-	argptr     [4]unsafe.Pointer
+	argN int
+	argptr [4]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -35,7 +35,7 @@ func init() {
 	zeromaskArgs.argptr[1] = unsafe.Pointer(&zeromaskArgs.argMaskLUT)
 	zeromaskArgs.argptr[2] = unsafe.Pointer(&zeromaskArgs.argRegions)
 	zeromaskArgs.argptr[3] = unsafe.Pointer(&zeromaskArgs.argN)
-}
+	}
 
 // Wrapper for zeromask CUDA kernel, asynchronous.
 func kZeromaskAsync(dst unsafe.Pointer, maskLUT unsafe.Pointer, regions unsafe.Pointer, N int, cfg *config) {
@@ -55,7 +55,7 @@ func kZeromaskAsync(dst unsafe.Pointer, maskLUT unsafe.Pointer, regions unsafe.P
 	zeromaskArgs.argMaskLUT = maskLUT
 	zeromaskArgs.argRegions = regions
 	zeromaskArgs.argN = N
-
+	
 	args := zeromaskArgs.argptr[:]
 	cu.LaunchKernel(zeromaskCode, cfg.Grid.X, cfg.Grid.Y, cfg.Grid.Z, cfg.Block.X, cfg.Block.Y, cfg.Block.Z, 0, stream0, args)
 
@@ -67,7 +67,7 @@ func kZeromaskAsync(dst unsafe.Pointer, maskLUT unsafe.Pointer, regions unsafe.P
 
 // maps compute capability on PTX code for zeromask kernel.
 var zeromaskMap = map[int]string{
-	0:  "",
+	0: "",
 	52: zeromaskPtx52,
 }
 
@@ -133,4 +133,4 @@ BB0_3:
 
 
 `
-)
+	)
