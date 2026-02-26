@@ -15,14 +15,22 @@ export function preview2D() {
 		return;
 	}
 
+	// Dispose 3D renderer if it was active
+	disposePreview3D();
+
 	const container = document.getElementById('container');
-	if (state.refresh || !container || chartInstance === undefined || chartInstance.isDisposed()) {
-		disposePreview2D();
-		disposePreview3D();
+	if (!container) {
+		return;
+	}
+
+	// Create chart instance only when truly needed (first time or after explicit dispose)
+	if (chartInstance === undefined || chartInstance.isDisposed()) {
 		init();
 		return;
 	}
-	update();
+
+	// Keep updates incremental to avoid visible canvas resets/flicker.
+	updateData();
 }
 
 function getColorMap(min: number, max: number) {
@@ -55,30 +63,51 @@ function tooltipFormatter(params: any) {
 	return `x: ${xnm} nm<br/>y: ${ynm} nm<br/>${value} ${ps.unit}`;
 }
 
-function update() {
+/** Incremental update — only series data + axis bounds + visualMap range. */
+function updateData() {
 	if (chartInstance === undefined || chartInstance.isDisposed()) {
 		init();
 		return;
 	}
 	const ps = get(previewState);
+	const { xScale, yScale } = getAxisScale();
 	chartInstance.setOption(
 		{
+			animation: false,
+			animationDurationUpdate: 0,
 			xAxis: {
-				max: Math.max(ps.xChosenSize - 1, 0)
+				max: Math.max(ps.xChosenSize - 1, 0),
+				axisLabel: {
+					formatter: function (value: number) {
+						return (value * xScale).toFixed(0);
+					}
+				}
 			},
 			yAxis: {
-				max: Math.max(ps.yChosenSize - 1, 0)
+				max: Math.max(ps.yChosenSize - 1, 0),
+				axisLabel: {
+					formatter: function (value: number) {
+						return (value * yScale).toFixed(0);
+					}
+				}
 			},
 			series: [
 				{
 					name: ps.quantity,
+					animation: false,
+					progressive: 0,
+					progressiveThreshold: Number.MAX_SAFE_INTEGER,
 					data: ps.scalarField
 				}
 			],
 			visualMap: [
 				{
 					max: ps.max,
-					min: ps.min
+					min: ps.min,
+					text: [ps.unit, ''],
+					inRange: {
+						color: getColorMap(ps.min, ps.max)
+					}
 				}
 			]
 		},
@@ -91,8 +120,18 @@ function init() {
 	if (!chartDom) {
 		return;
 	}
-	// Canvas renderer scales significantly better than SVG for large heatmaps.
-	chartInstance = echarts.init(chartDom, undefined, { renderer: 'canvas', useDirtyRect: true });
+	// Reuse existing instance if possible — avoids canvas teardown/flicker.
+	if (!chartInstance || chartInstance.isDisposed()) {
+		chartInstance = echarts.init(chartDom, undefined, { renderer: 'canvas', useDirtyRect: true });
+	}
+	setFullOptions();
+}
+
+/** Replace all chart options on the existing instance (no canvas destruction). */
+function setFullOptions() {
+	if (!chartInstance || chartInstance.isDisposed()) {
+		return;
+	}
 	const ps = get(previewState);
 	const { xScale, yScale } = getAxisScale();
 
@@ -205,18 +244,19 @@ function init() {
 					left: 'right'
 				}
 			],
-			series: [
-				{
-					name: ps.quantity,
-					type: 'heatmap',
-					selectedMode: false,
-					emphasis: { disabled: true },
-					progressive: 20000,
-					progressiveThreshold: 10000,
-					animation: false,
-					data: ps.scalarField
-				}
-			],
+				series: [
+					{
+						name: ps.quantity,
+						type: 'heatmap',
+						selectedMode: false,
+						emphasis: { disabled: true },
+						// Disable progressive chunks to avoid visible left-to-right repainting on each refresh.
+						progressive: 0,
+						progressiveThreshold: Number.MAX_SAFE_INTEGER,
+						animation: false,
+						data: ps.scalarField
+					}
+				],
 			grid: {
 				containLabel: true,
 				left: '10%',
@@ -248,9 +288,10 @@ function init() {
 					}
 				}
 			},
-			animation: false
-		},
-		{ notMerge: true }
+				animation: false,
+				animationDurationUpdate: 0
+			},
+			{ notMerge: true }
 	);
 }
 

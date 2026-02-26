@@ -23,6 +23,10 @@ export function preview3D() {
 export function disposePreview3D() {
 	const container = document.getElementById('container');
 	const displayInstance = get(threeDPreview);
+	if (animationFrameId !== null) {
+		cancelAnimationFrame(animationFrameId);
+		animationFrameId = null;
+	}
 	if (displayInstance && displayInstance.renderer) {
 		displayInstance.renderer.dispose();
 		displayInstance.scene.children.forEach((child) => {
@@ -51,6 +55,7 @@ interface ThreeDPreview {
 	parsingTime: number;
 }
 export const threeDPreview = writable<ThreeDPreview | null>(null);
+let animationFrameId: number | null = null;
 
 function createMesh(): THREE.InstancedMesh {
 	const shaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.55, 8);
@@ -172,7 +177,7 @@ function init() {
 	});
 
 	function animate() {
-		requestAnimationFrame(animate);
+		animationFrameId = requestAnimationFrame(animate);
 		controls.update();
 		renderer.render(scene, camera);
 	}
