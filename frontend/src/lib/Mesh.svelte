@@ -1,86 +1,142 @@
 <script lang="ts">
 	import { meshState as m } from '$api/incoming/mesh';
-	import { Input, InputAddon, ButtonGroup } from 'flowbite-svelte';
 </script>
 
 <section>
-	<h2 class="mb-4 text-2xl font-semibold">Mesh</h2>
+	<h2>Mesh</h2>
 
-	<div class="mb-6 grid gap-6 md:grid-cols-3">
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">dx</InputAddon>
-			<Input type="text" placeholder={$m.dx.toPrecision(8)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">dy</InputAddon>
-			<Input type="text" placeholder={$m.dy.toPrecision(8)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">dz</InputAddon>
-			<Input type="text" placeholder={$m.dz.toPrecision(8)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-	</div>
+	<div class="mesh-grid">
+		<!-- Cell Size -->
+		<div class="group">
+			<div class="group-label">Cell Size</div>
+			<div class="field-row">
+				<span class="label">dx</span>
+				<span class="value">{$m.dx.toPrecision(8)}</span>
+				<span class="unit">m</span>
+			</div>
+			<div class="field-row">
+				<span class="label">dy</span>
+				<span class="value">{$m.dy.toPrecision(8)}</span>
+				<span class="unit">m</span>
+			</div>
+			<div class="field-row">
+				<span class="label">dz</span>
+				<span class="value">{$m.dz.toPrecision(8)}</span>
+				<span class="unit">m</span>
+			</div>
+		</div>
 
-	<div class="mb-6 grid gap-6 md:grid-cols-3">
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Nx</InputAddon>
-			<Input type="text" placeholder=" {$m.Nx}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Ny</InputAddon>
-			<Input type="text" placeholder=" {$m.Ny}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Nz</InputAddon>
-			<Input type="text" placeholder=" {$m.Nz}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
-	</div>
+		<!-- Grid Size -->
+		<div class="group">
+			<div class="group-label">Grid Size</div>
+			<div class="field-row">
+				<span class="label">Nx</span>
+				<span class="value">{$m.Nx}</span>
+				<span class="unit"></span>
+			</div>
+			<div class="field-row">
+				<span class="label">Ny</span>
+				<span class="value">{$m.Ny}</span>
+				<span class="unit"></span>
+			</div>
+			<div class="field-row">
+				<span class="label">Nz</span>
+				<span class="value">{$m.Nz}</span>
+				<span class="unit"></span>
+			</div>
+		</div>
 
-	<div class="mb-6 grid gap-6 md:grid-cols-3">
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Tx</InputAddon>
-			<Input type="text" placeholder={$m.Tx.toExponential(6)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Ty</InputAddon>
-			<Input type="text" placeholder={$m.Ty.toExponential(6)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">Tz</InputAddon>
-			<Input type="text" placeholder={$m.Tz.toExponential(6)} />
-			<InputAddon class="w-14 !bg-transparent">m</InputAddon>
-		</ButtonGroup>
-	</div>
+		<!-- Total Size -->
+		<div class="group">
+			<div class="group-label">Total Size</div>
+			<div class="field-row">
+				<span class="label">Tx</span>
+				<span class="value">{$m.Tx.toExponential(6)}</span>
+				<span class="unit">m</span>
+			</div>
+			<div class="field-row">
+				<span class="label">Ty</span>
+				<span class="value">{$m.Ty.toExponential(6)}</span>
+				<span class="unit">m</span>
+			</div>
+			<div class="field-row">
+				<span class="label">Tz</span>
+				<span class="value">{$m.Tz.toExponential(6)}</span>
+				<span class="unit">m</span>
+			</div>
+		</div>
 
-	<div class="mb-6 grid gap-6 md:grid-cols-3">
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">PBCx</InputAddon>
-			<Input type="text" placeholder=" {$m.PBCx}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">PBCy</InputAddon>
-			<Input type="text" placeholder=" {$m.PBCy}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
-		<ButtonGroup class="h-11 w-full">
-			<InputAddon class="w-28 !bg-transparent">PBCz</InputAddon>
-			<Input type="text" placeholder=" {$m.PBCz}" />
-			<InputAddon class="w-14 !bg-transparent"></InputAddon>
-		</ButtonGroup>
+		<!-- PBC -->
+		<div class="group">
+			<div class="group-label">PBC</div>
+			<div class="field-row">
+				<span class="label">x</span>
+				<span class="value">{$m.PBCx}</span>
+				<span class="unit"></span>
+			</div>
+			<div class="field-row">
+				<span class="label">y</span>
+				<span class="value">{$m.PBCy}</span>
+				<span class="unit"></span>
+			</div>
+			<div class="field-row">
+				<span class="label">z</span>
+				<span class="value">{$m.PBCz}</span>
+				<span class="unit"></span>
+			</div>
+		</div>
 	</div>
 </section>
 
 <style>
-	section {
-		grid-area: mesh;
+	.mesh-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-lg);
+	}
+	@media (max-width: 600px) {
+		.mesh-grid { grid-template-columns: 1fr; }
+	}
+	.group-label {
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		margin-bottom: var(--space-xs);
+	}
+	.group {
+		display: grid;
+		grid-template-columns: 28px 1fr 20px;
+		gap: 0 var(--space-sm);
+		align-items: center;
+	}
+	.group-label {
+		grid-column: 1 / -1;
+	}
+	.field-row {
+		display: contents;
+	}
+	.label {
+		font-size: 12px;
+		color: var(--text-3);
+		font-family: var(--font-mono);
+		padding: 5px 0;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.value {
+		font-family: var(--font-mono);
+		font-size: 13px;
+		color: var(--text-1);
+		text-align: right;
+		padding: 5px 0;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.unit {
+		font-size: 11px;
+		color: var(--text-3);
+		font-family: var(--font-mono);
+		padding: 5px 0;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 </style>

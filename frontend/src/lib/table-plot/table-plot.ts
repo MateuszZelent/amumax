@@ -1,6 +1,7 @@
 import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { tablePlotState } from '$api/incoming/table-plot';
+import { THEME } from '$lib/theme/echarts-theme';
 
 export function plotTable() {
     if (chartInstance === undefined) {
@@ -54,19 +55,19 @@ export function init() {
             show: true,
             type: 'line',
             lineStyle: {
-                color: '#6e9bcb',
+                color: THEME.accent,
                 width: 2,
                 type: 'dashed'
             },
 
             label: {
-                backgroundColor: '#282a36',
-                color: '#fff',
+                backgroundColor: THEME.tooltipBg,
+                color: THEME.tooltipText,
                 formatter: function (params: any) {
                     return parseFloat(params.value).toPrecision(2);
                 },
                 padding: [8, 5, 8, 5],
-                borderColor: '#6e9bcb',
+                borderColor: THEME.accent,
                 borderWidth: 1,
             }
         },
@@ -83,14 +84,14 @@ export function init() {
             nameLocation: 'middle',
             nameGap: 25,
             nameTextStyle: {
-                color: '#fff',
+                color: THEME.text2,
             },
             axisTick: {
                 alignWithLabel: true,
                 length: 6,
                 lineStyle: {
                     type: 'solid',
-                    color: '#fff',
+                    color: THEME.border,
                 },
             },
             axisLabel: {
@@ -98,7 +99,7 @@ export function init() {
                 formatter: function (value: string, _index: string) {
                     return parseFloat(value).toPrecision(2);
                 },
-                color: '#fff',
+                color: THEME.text2,
                 // showMinLabel: true,
             }
         },
@@ -109,14 +110,14 @@ export function init() {
             nameLocation: 'middle',
             nameGap: 45,
             nameTextStyle: {
-                color: '#fff',
+                color: THEME.text2,
             },
             axisTick: {
                 alignWithLabel: true,
                 length: 6,
                 lineStyle: {
                     type: 'solid',
-                    color: '#fff',
+                    color: THEME.border,
                 },
             },
             axisLabel: {
@@ -124,8 +125,7 @@ export function init() {
                 formatter: function (value: string, _index: string) {
                     return parseFloat(value).toPrecision(2);
                 },
-                // formatter: "{value}",
-                color: '#fff',
+                color: THEME.text2,
                 showMinLabel: true,
             }
         },
@@ -144,7 +144,13 @@ export function init() {
     });
 }
 
+let resizeListenerAttached = false;
+
 export function resizeECharts() {
+    if (resizeListenerAttached) {
+        return;
+    }
+    resizeListenerAttached = true;
     window.addEventListener('resize', function () {
         if (chartInstance === undefined || chartInstance.isDisposed()) {
             return;

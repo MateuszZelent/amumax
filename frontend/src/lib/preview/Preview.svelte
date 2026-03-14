@@ -170,7 +170,7 @@
 				class="popout-titlebar flex items-center justify-between"
 				on:mousedown={startDrag}
 			>
-				<span class="text-xs text-gray-400 select-none">3D Preview — drag to move</span>
+				<span class="text-xs select-none" style="color: var(--text-3)">3D Preview — drag to move</span>
 				<div class="flex gap-1">
 					<button
 						class="popout-btn"
@@ -194,9 +194,7 @@
 		<!-- Mode toggle button (inline & fullscreen) -->
 		{#if viewMode !== 'popout'}
 			<button
-				class="absolute right-2 top-2 z-10 flex h-8 items-center gap-1 rounded-md border
-					border-gray-600 bg-gray-800/90 px-3 text-sm text-gray-400
-					hover:bg-gray-700 hover:text-white transition-colors backdrop-blur-sm"
+				style="position:absolute;right:8px;top:8px;z-index:10;display:flex;height:32px;align-items:center;gap:4px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-glass);padding:0 12px;font-size:12px;color:var(--text-2);backdrop-filter:blur(8px);transition:all var(--duration-fast) var(--easing-default);cursor:pointer"
 				on:click={cycleMode}
 				title={modeTitle}
 			>
@@ -207,8 +205,8 @@
 		<Toolbar3D />
 
 		{#if $p.scalarField == null && $p.vectorFieldPositions == null}
-			<div class="absolute inset-0 flex items-center justify-center text-6xl text-gray-600"
-				style={viewMode === 'popout' ? 'top: 32px;' : ''}>
+			<div class="absolute inset-0 flex items-center justify-center"
+				style="font-size:2rem;color:var(--text-3);font-weight:500;letter-spacing:0.1em;{viewMode === 'popout' ? 'top:32px;' : ''}">
 				NO DATA
 			</div>
 		{/if}
@@ -225,7 +223,6 @@
 
 <style>
 	section {
-		grid-area: display;
 	}
 	#parent-fields > div {
 		@apply p-1;
@@ -238,11 +235,11 @@
 	/* Popout floating window */
 	.preview-wrapper.popout {
 		position: fixed;
-		z-index: 9999;
-		background: #1a1b26;
-		border: 1px solid #3b3d4a;
-		border-radius: 8px;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+		z-index: var(--z-popout);
+		background: var(--surface-1);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-lg);
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
@@ -254,9 +251,9 @@
 	.popout-titlebar {
 		height: 32px;
 		min-height: 32px;
-		background: #24263a;
-		border-bottom: 1px solid #3b3d4a;
-		padding: 0 8px;
+		background: var(--surface-2);
+		border-bottom: 1px solid var(--border);
+		padding: 0 var(--space-sm);
 		cursor: move;
 		user-select: none;
 	}
@@ -266,14 +263,16 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 4px;
-		color: #888;
+		border-radius: var(--radius-sm);
+		color: var(--text-3);
 		font-size: 12px;
-		transition: all 0.15s;
+		transition: all var(--duration-fast) var(--easing-default);
+		background: transparent;
+		border: none;
 	}
 	.popout-btn:hover {
-		background: #3b3d4a;
-		color: #fff;
+		background: var(--surface-3);
+		color: var(--text-1);
 	}
 	.resize-handle {
 		position: absolute;
@@ -282,13 +281,13 @@
 		width: 16px;
 		height: 16px;
 		cursor: nwse-resize;
-		background: linear-gradient(135deg, transparent 50%, #555 50%);
-		border-radius: 0 0 8px 0;
+		background: linear-gradient(135deg, transparent 50%, var(--border-interactive) 50%);
+		border-radius: 0 0 var(--radius-lg) 0;
 	}
 
 	/* Fullscreen */
 	.preview-wrapper.fullscreen {
-		background: #1a1b26;
+		background: var(--bg);
 	}
 	.preview-wrapper.fullscreen #container {
 		height: 100vh;

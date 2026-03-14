@@ -3,6 +3,7 @@ import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { meshState } from '$api/incoming/mesh';
 import { disposePreview3D } from './preview3D';
+import { THEME } from '$lib/theme/echarts-theme';
 
 let chartInstance: echarts.ECharts | undefined;
 let resizeListenerAttached = false;
@@ -142,10 +143,10 @@ function setFullOptions() {
 			tooltip: {
 				position: 'top',
 				formatter: tooltipFormatter,
-				backgroundColor: '#282a36',
-				borderColor: '#6e9bcb',
+				backgroundColor: THEME.tooltipBg,
+				borderColor: THEME.tooltipBorder,
 				textStyle: {
-					color: '#fff'
+					color: THEME.tooltipText
 				}
 			},
 			axisPointer: {
@@ -153,13 +154,13 @@ function setFullOptions() {
 				type: 'line',
 				triggerEmphasis: false,
 				lineStyle: {
-					color: '#6e9bcb',
+					color: THEME.accent,
 					width: 2,
 					type: 'dashed'
 				},
 				label: {
-					backgroundColor: '#282a36',
-					color: '#fff',
+					backgroundColor: THEME.tooltipBg,
+					color: THEME.tooltipText,
 					formatter: function (params: any) {
 						if (params.value === undefined) {
 							return 'NaN';
@@ -167,7 +168,7 @@ function setFullOptions() {
 						return ` ${Number(params.value).toFixed(0)} idx`;
 					},
 					padding: [8, 5, 8, 5],
-					borderColor: '#6e9bcb',
+					borderColor: THEME.accent,
 					borderWidth: 1
 				}
 			},
@@ -179,13 +180,13 @@ function setFullOptions() {
 				nameLocation: 'middle',
 				nameGap: 25,
 				nameTextStyle: {
-					color: '#fff'
+					color: THEME.text2
 				},
 				axisTick: {
 					length: 6,
 					lineStyle: {
 						type: 'solid',
-						color: '#fff'
+						color: THEME.border
 					}
 				},
 				axisLabel: {
@@ -193,7 +194,7 @@ function setFullOptions() {
 					formatter: function (value: number) {
 						return (value * xScale).toFixed(0);
 					},
-					color: '#fff',
+					color: THEME.text2,
 					showMinLabel: true
 				}
 			},
@@ -205,13 +206,13 @@ function setFullOptions() {
 				nameLocation: 'middle',
 				nameGap: 45,
 				nameTextStyle: {
-					color: '#fff'
+					color: THEME.text2
 				},
 				axisTick: {
 					length: 6,
 					lineStyle: {
 						type: 'solid',
-						color: '#fff'
+						color: THEME.border
 					}
 				},
 				axisLabel: {
@@ -219,7 +220,7 @@ function setFullOptions() {
 					formatter: function (value: number) {
 						return (value * yScale).toFixed(0);
 					},
-					color: '#fff',
+					color: THEME.text2,
 					showMinLabel: true
 				}
 			},
@@ -237,7 +238,7 @@ function setFullOptions() {
 					itemHeight: 140,
 					text: [ps.unit, ''],
 					textStyle: {
-						color: '#fff'
+						color: THEME.text2
 					},
 					inRange: {
 						color: getColorMap(ps.min, ps.max)
@@ -267,15 +268,15 @@ function setFullOptions() {
 				show: true,
 				itemSize: 20,
 				iconStyle: {
-					borderColor: '#fff'
+					borderColor: THEME.toolboxIcon
 				},
 				feature: {
 					dataZoom: {
 						xAxisIndex: 0,
 						yAxisIndex: 0,
 						brushStyle: {
-							color: '#282a3655',
-							borderColor: '#6e9bcb',
+							color: THEME.brushBg,
+							borderColor: THEME.brushBorder,
 							borderWidth: 2
 						}
 					},

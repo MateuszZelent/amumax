@@ -38,36 +38,70 @@
 
 <section>
 	<h2 class="mb-4 text-2xl font-semibold">Console</h2>
-	<div class="flex flex-col gap-2">
+	<div class="console-container">
 		<div class="code" bind:this={codeDiv}>
 			{@html Prism.highlight($consoleState.hist, Prism.languages['go'], 'go')}
 		</div>
-		<br />
-		<input
-			placeholder="type commands here, or up/down"
-			size="86"
-			bind:value={command}
-			on:keydown={handleKeydown}
-		/>
+		<div class="input-row">
+			<span class="prompt">›</span>
+			<input
+				placeholder="type commands here..."
+				bind:value={command}
+				on:keydown={handleKeydown}
+			/>
+		</div>
 	</div>
 </section>
 
 <style>
 	section {
-		grid-area: console;
+	}
+	.console-container {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
 	}
 	.code {
 		white-space: pre-wrap;
-		overflow-y: scroll;
-		height: 30rem;
-		border: 1px solid #929290;
+		overflow-y: auto;
+		height: 28rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 		width: 100%;
-		padding: 5px;
-		font-family: monospace;
+		padding: var(--space-sm) var(--space-md);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		line-height: 1.6;
+		color: var(--text-2);
+		background-color: var(--surface-2);
 	}
-	input {
-		padding: 5px;
-		border: 1px solid #929290;
+	.input-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-sm);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: 0 var(--space-md);
+	}
+	.prompt {
+		color: var(--accent);
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 14px;
+		flex-shrink: 0;
+	}
+	.input-row input {
 		width: 100%;
+		background: transparent;
+		border: none;
+		color: var(--text-1);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		padding: var(--space-sm) 0;
+	}
+	.input-row input:focus {
+		outline: none;
+		box-shadow: none;
 	}
 </style>

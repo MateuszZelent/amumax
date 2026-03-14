@@ -1,3 +1,317 @@
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
+
+/* ─── IBM Plex Fonts ────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* ─── Design Tokens ─────────────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --bg:               #080d1a;
+  --surface-1:        #0f172a;
+  --surface-2:        #1a2338;
+  --surface-3:        #1e293b;
+  --surface-glass:    rgba(15, 23, 42, 0.85);
+
+  /* Borders */
+  --border:           #1e2d4a;
+  --border-subtle:    #162032;
+  --border-interactive: #2a3f66;
+
+  /* Text */
+  --text-1:           #e2e8f0;
+  --text-2:           #94a3b8;
+  --text-3:           #5a6b8a;
+
+  /* Accent */
+  --accent:           #3b82f6;
+  --accent-hover:     #2563eb;
+  --accent-subtle:    rgba(59, 130, 246, 0.15);
+
+  /* Semantic */
+  --info:             #60a5fa;
+  --warn:             #f59e0b;
+  --danger:           #ef4444;
+  --success:          #22c55e;
+
+  /* Typography */
+  --font-ui:          'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:        'IBM Plex Mono', 'Consolas', 'Fira Code', monospace;
+
+  /* Radius */
+  --radius-sm:        4px;
+  --radius-md:        6px;
+  --radius-lg:        10px;
+  --radius-xl:        14px;
+
+  /* Spacing scale (used for panel gutters, gaps) */
+  --space-xs:         4px;
+  --space-sm:         8px;
+  --space-md:         12px;
+  --space-lg:         16px;
+  --space-xl:         24px;
+
+  /* Shadows */
+  --shadow-sm:        0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:        0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg:        0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Focus */
+  --focus-ring:       0 0 0 2px var(--accent), 0 0 0 4px rgba(59, 130, 246, 0.3);
+
+  /* Motion */
+  --duration-instant: 100ms;
+  --duration-fast:    150ms;
+  --duration-normal:  250ms;
+  --duration-slow:    400ms;
+  --easing-default:   cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-index layers */
+  --z-base:           0;
+  --z-sticky:         10;
+  --z-overlay:        100;
+  --z-popout:         1000;
+  --z-modal:          2000;
+  --z-toast:          3000;
+
+  color-scheme: dark;
+}
+
+/* ─── Global Reset ──────────────────────────────────────────────────── */
+html {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  min-height: 100vh;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ─── Dark Scrollbars ───────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--easing-default);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-interactive);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--surface-1);
+}
+
+/* ─── Global Focus ──────────────────────────────────────────────────── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Selection ─────────────────────────────────────────────────────── */
+::selection {
+  background-color: var(--accent-subtle);
+  color: var(--text-1);
+}
+
+/* ─── Input base ────────────────────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-1);
+  background-color: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  transition: border-color var(--duration-fast) var(--easing-default),
+              box-shadow var(--duration-fast) var(--easing-default);
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: var(--border-interactive);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-3);
+}
+
+input[readonly] {
+  color: var(--text-2);
+  cursor: default;
+}
+
+/* ─── Button base ───────────────────────────────────────────────────── */
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+/* ─── Flowbite Dark Mode Overrides ──────────────────────────────────── */
+/* Force Flowbite components to use our navy palette instead of Tailwind gray */
+
+/* Inputs */
+.dark input[type="text"],
+.dark input[type="number"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="search"],
+.dark select,
+.dark textarea {
+  background-color: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-1) !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: var(--accent) !important;
+  --tw-ring-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Flowbite InputAddon */
+.dark [class*="InputAddon"],
+.dark .rounded-none,
+.dark .bg-gray-200,
+.dark .dark\:bg-gray-600,
+.dark .dark\:text-gray-400 {
+  background-color: var(--surface-3) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+
+/* Flowbite Buttons — ALL variants get navy treatment */
+/* Catch all Flowbite-generated button class patterns */
+.dark button.bg-primary-700,
+.dark button.dark\:bg-primary-600,
+.dark a.bg-primary-700,
+.dark [type="button"].bg-primary-700 {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+.dark button.hover\:bg-primary-800:hover {
+  background-color: var(--accent-hover) !important;
+}
+
+/* Outline buttons — the main culprit in Solver */
+.dark button.text-primary-700,
+.dark button.dark\:text-primary-500,
+.dark a.text-primary-700 {
+  color: var(--text-2) !important;
+  border-color: var(--border-interactive) !important;
+  background-color: transparent !important;
+}
+.dark button.text-primary-700:hover,
+.dark button.dark\:text-primary-500:hover,
+.dark button.hover\:text-white:hover,
+.dark a.text-primary-700:hover {
+  background-color: var(--surface-3) !important;
+  color: var(--text-1) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Catch-all: any button inside a section (Flowbite buttons in our panels) */
+section button {
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  transition: all var(--duration-fast) var(--easing-default) !important;
+}
+
+/* Focus ring override for all buttons */
+.dark button:focus-visible,
+.dark button.focus\:ring-primary-300:focus {
+  --tw-ring-color: rgba(59, 130, 246, 0.3) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* Flowbite Dropdown */
+.dark [class*="Dropdown"],
+.dark .dark\:bg-gray-700,
+.dark ul[role="menu"] {
+  background-color: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+.dark [role="menuitem"]:hover,
+.dark .dark\:hover\:bg-gray-600:hover {
+  background-color: var(--surface-3) !important;
+}
+
+/* Flowbite Card */
+.dark .dark\:bg-gray-800 {
+  background-color: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+
+/* Flowbite Progressbar */
+.dark [class*="Progressbar"],
+.dark .bg-gray-200 {
+  background-color: var(--surface-3) !important;
+}
+.dark .bg-blue-600,
+.dark .dark\:bg-blue-500 {
+  background-color: var(--accent) !important;
+}
+.dark .bg-green-600 {
+  background-color: var(--success) !important;
+}
+.dark .bg-purple-600 {
+  background-color: #8b5cf6 !important;
+}
+
+/* Flowbite Toggle */
+.dark .dark\:bg-gray-600 {
+  background-color: var(--surface-3) !important;
+}
+.dark .peer:checked ~ .dark\:bg-blue-600 {
+  background-color: var(--accent) !important;
+}
+
+/* Flowbite ButtonGroup */
+.dark [class*="ButtonGroup"] input,
+.dark [class*="ButtonGroup"] [class*="InputAddon"] {
+  background-color: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-1) !important;
+}
+
+/* Global text color overrides for Flowbite gray defaults */
+.dark .text-gray-500 { color: var(--text-2) !important; }
+.dark .text-gray-400 { color: var(--text-3) !important; }
+.dark .text-gray-900 { color: var(--text-1) !important; }
+.dark .dark\:text-gray-300 { color: var(--text-2) !important; }
+.dark .dark\:text-white { color: var(--text-1) !important; }
+.dark .border-gray-300 { border-color: var(--border) !important; }
+.dark .dark\:border-gray-500 { border-color: var(--border) !important; }
+.dark .dark\:border-gray-600 { border-color: var(--border) !important; }

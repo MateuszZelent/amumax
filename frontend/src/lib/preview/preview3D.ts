@@ -239,7 +239,7 @@ function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 function createScene(): THREE.Scene {
 	const cfg = getConfig();
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x1a1b26);
+	scene.background = new THREE.Color(0x080d1a);
 
 	if (cfg.useLighting) {
 		const b = get(brightness);

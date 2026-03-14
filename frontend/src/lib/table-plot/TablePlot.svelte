@@ -1,14 +1,33 @@
 <script lang="ts">
 	import { tablePlotState } from '$api/incoming/table-plot';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { resizeECharts } from './table-plot';
 	import MaxPoints from './inputs/MaxPoints.svelte';
 	import AutoSaveInterval from './inputs/AutoSaveInterval.svelte';
 	import XColumn from './inputs/XColumn.svelte';
 	import YColumn from './inputs/YColumn.svelte';
 	import Step from './inputs/Step.svelte';
+
+	let resizeObserver: ResizeObserver | null = null;
+
 	onMount(() => {
 		resizeECharts();
+
+		// Use ResizeObserver on container instead of window resize
+		const container = document.getElementById('table-plot');
+		if (container) {
+			resizeObserver = new ResizeObserver(() => {
+				resizeECharts();
+			});
+			resizeObserver.observe(container);
+		}
+	});
+
+	onDestroy(() => {
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+			resizeObserver = null;
+		}
 	});
 </script>
 
@@ -49,14 +68,13 @@
 
 <style>
 	section {
-		grid-area: tableplot;
 	}
 	#table-plot {
 		width: 100%;
 		height: 500px;
 	}
 	.msg {
-		color: #888;
+		color: var(--text-3);
 	}
 	#parent-fields > div {
 		@apply p-1;
