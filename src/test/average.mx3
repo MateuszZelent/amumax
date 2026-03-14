@@ -8,8 +8,12 @@
 N := 512
 c := 1e-9
 
-setgridsize(N, N, 1)
-setcellsize(c, c, c)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = c
 
 setgeom(circle(N*c))
 tol := 1e-4                    // tolerance limited by FD circle approximation

@@ -17,16 +17,20 @@ length := 160e-9
 width  :=  80e-9
 thick  :=  5e-9
 
-Nx := 64
-Ny := 32
-Nz := 2
+Nx = 64
+Ny = 32
+Nz = 2
 
 current_area := length*width
 current_density := total_current/current_area
 J = vector(0, 0, current_density)
 
-SetGridSize(Nx, Ny, Nz)
-SetCellSize(length/Nx, width/Ny, thick/Nz)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = length/Nx
+dy = width/Ny
+dz = thick/Nz
 
 alpha = 0.01
 FixedLayer = vector(cos(mp_theta), sin(mp_theta), 0)

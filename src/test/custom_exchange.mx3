@@ -1,8 +1,12 @@
 cellsizeX:=2e-9
 cellsizeY:=3e-9
 cellsizeZ:=4e-9
-setgridsize(300, 200, 4)
-setcellsize(cellsizeX,cellsizeY, cellsizeZ)
+Nx = 300
+Ny = 200
+Nz = 4
+dx = cellsizeX
+dy = cellsizeY
+dz = cellsizeZ
 
 Aex   = 0.
 alpha = 1

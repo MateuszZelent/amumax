@@ -4,13 +4,17 @@
 	for correct averages. Also check that we can save/tabulate
 */
 
-Nx := 160
-Ny := 50
-Nz := 4
+Nx = 160
+Ny = 50
+Nz = 4
 c := 1e-9
 
-setGridSize(Nx, Ny, Nz)
-setCellSize(c, c, c)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = c
+dy = c
+dz = c
 
 DefRegion(1, xrange(0, inf))
 DefRegion(2, yrange(0, inf))

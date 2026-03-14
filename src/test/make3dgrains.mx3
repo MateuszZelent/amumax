@@ -1,7 +1,11 @@
 nxyz := 64
 cellsize := 4e-9
-SetGridsize(nxyz, nxyz, nxyz)
-SetCellsize(cellsize, cellsize, cellsize)
+Nx = nxyz
+Ny = nxyz
+Nz = nxyz
+dx = cellsize
+dy = cellsize
+dz = cellsize
 
 topblock := cuboid(cellsize*16,cellsize*16,cellsize*32).transl(0,0,cellsize*16)
 bottomlayer := zrange(-0.5,0*nxyz*cellsize)

@@ -2,12 +2,16 @@
 	Test isotropic energy in sphere: energy should be the same for all m directions.
 */
 
-Nx := 32
-Ny := 32
-Nz := 32
+Nx = 32
+Ny = 32
+Nz = 32
 c  := 2e-9
-setgridsize(Nx, Ny, Nz)
-setcellsize(c, c, c)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = c
+dy = c
+dz = c
 
 Msat = 860e3
 Aex  = 13e-12

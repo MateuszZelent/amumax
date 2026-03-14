@@ -42,6 +42,60 @@ func centerWall(magComp int) {
 	PostStep(func() { centerWallInner(magComp) })
 }
 
+// centerWallInLayerProc centers the domain wall using magnetization from a single Z-layer.
+func centerWallInLayerProc(layer, c int) {
+	M := &NormMag
+	mc := cropLayer(M, layer).average()[c]
+	n := GetMesh().Size()
+	tolerance := 4 / float64(n[X]) // x*2 * expected <m> change for 1 cell shift
+
+	zero := data.Vector{0, 0, 0}
+	if shiftMagL == zero || shiftMagR == zero {
+		sign := magsign(M.GetCell(0, n[Y]/2, layer)[c])
+		shiftMagL[c] = float64(sign)
+		shiftMagR[c] = -float64(sign)
+	}
+
+	sign := magsign(shiftMagL[c])
+
+	if mc < -tolerance {
+		shift(sign)
+	} else if mc > tolerance {
+		shift(-sign)
+	}
+}
+
+func centerWallInLayer(layer, magComp int) {
+	PostStep(func() { centerWallInLayerProc(layer, magComp) })
+}
+
+// centerWallInRegionProc centers the domain wall using magnetization from a single region.
+func centerWallInRegionProc(region, c int) {
+	M := &NormMag
+	mc := M.Region(region).Average()[c]
+	n := GetMesh().Size()
+	tolerance := 4 / float64(n[X]) // x*2 * expected <m> change for 1 cell shift
+
+	zero := data.Vector{0, 0, 0}
+	if shiftMagL == zero || shiftMagR == zero {
+		sign := magsign(M.GetCell(0, n[Y]/2, n[Z]/2)[c])
+		shiftMagL[c] = float64(sign)
+		shiftMagR[c] = -float64(sign)
+	}
+
+	sign := magsign(shiftMagL[c])
+
+	if mc < -tolerance {
+		shift(sign)
+	} else if mc > tolerance {
+		shift(-sign)
+	}
+}
+
+func centerWallInRegion(region, magComp int) {
+	PostStep(func() { centerWallInRegionProc(region, magComp) })
+}
+
 func magsign(x float64) int {
 	if x > 0.1 {
 		return 1

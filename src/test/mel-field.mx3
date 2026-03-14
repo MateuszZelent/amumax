@@ -1,13 +1,17 @@
-Nx := 1
-Ny := 1
-Nz := 1
+Nx = 1
+Ny = 1
+Nz = 1
 
 csX := 0.5e-9
 csY := 1e-9
 csZ := 2e-9
 
-setgridsize(Nx, Ny, Nz)
-setcellsize(csX, csY, csZ)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = csX
+dy = csY
+dz = csZ
 
 Msat = rand()
 

@@ -9,8 +9,12 @@ d := 40e-9
 c := 4e-9
 vol := l * w * d * (pi/4)
 
-setcellsize(c, c, d)
-setgridsize(128, 64, 1)
+dx = c
+dy = c
+dz = d
+Nx = 128
+Ny = 64
+Nz = 1
 setgeom(ellipse(l, w))
 
 Msat  = 860E3

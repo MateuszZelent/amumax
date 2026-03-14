@@ -3,8 +3,12 @@
 	Kernel should be approximately 0, 0, -1 
 */
 
-	SetGridSize(128, 128, 1)
-	SetCellSize(1e-9, 1e-9, 0.5e-9)
+	Nx = 128
+Ny = 128
+Nz = 1
+	dx = 1e-9
+dy = 1e-9
+dz = 0.5e-9
 
 	Msat = 1 / mu0
 

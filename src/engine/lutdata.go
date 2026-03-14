@@ -70,6 +70,19 @@ func (l *lut) isZero() bool {
 
 func (l *lut) nonZero() bool { return !l.isZero() }
 
+// hasZero returns true if any data is 0 in any region.
+func (l *lut) hasZero() bool {
+	v := l.cpuLUT()
+	for c := range v {
+		for i := 0; i < NREGION; i++ {
+			if v[c][i] == 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (l *lut) assureAlloc() {
 	if l.gpuBuf[0] == nil {
 		for i := range l.gpuBuf {

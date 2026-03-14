@@ -5,8 +5,12 @@
 N := 128
 c := 5e-9
 
-SetGridSize(N, N, 1)
-SetCellSize(c, c, c)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = c
 
 d := 20*c
 

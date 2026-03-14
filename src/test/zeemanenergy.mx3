@@ -1,6 +1,6 @@
-Nx := 128
-Ny := 32
-Nz := 2
+Nx = 128
+Ny = 32
+Nz = 2
 
 cx := 5e-9
 cy := 4e-9
@@ -8,8 +8,12 @@ cz := 3e-9
 
 V := Nx * Ny * Nz * cx * cy * cz
 
-SetGridSize(Nx, Ny, Nz)
-SetCellSize(cx, cy, cz)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = cx
+dy = cy
+dz = cz
 
 Ms := 100e3
 Msat = Ms

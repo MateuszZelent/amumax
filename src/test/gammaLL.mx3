@@ -4,8 +4,12 @@
 
 N := 16
 c := 5e-9
-setgridsize(N, N, 1)
-setcellsize(c, c, c)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = c
 setSolver(2)
 maxerr = 1e-4
 

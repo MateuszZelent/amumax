@@ -5,8 +5,12 @@
 N := 20
 c := 4e-9
 
-SetGridSize(N, N, 1)
-SetCellSize(c, c, c)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = c
 SetGeom(circle(N*c))
 
 m = uniform(1, 0, 0)

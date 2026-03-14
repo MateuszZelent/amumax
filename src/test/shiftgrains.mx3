@@ -3,9 +3,13 @@
 	new ones should enter from the side.
 */
 
-setgridsize(512, 64, 1)
+Nx = 512
+Ny = 64
+Nz = 1
 c := 4e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 m = twodomain(1,0,0, 0,1,0, -1,0,0)
 

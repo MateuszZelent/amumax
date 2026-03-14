@@ -1,7 +1,11 @@
 N := 128
 c := 3e-9
-setgridsize(N, N, 1)
-setcellsize(c, c, c)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = c
 
 Msat  = 800e3
 Aex   = 13e-12

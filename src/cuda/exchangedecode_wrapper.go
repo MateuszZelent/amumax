@@ -113,7 +113,7 @@ const (
 {
 	.reg .pred 	%p<19>;
 	.reg .b16 	%rs<26>;
-	.reg .f32 	%f<15>;
+	.reg .f32 	%f<17>;
 	.reg .b32 	%r<215>;
 	.reg .b64 	%rd<46>;
 
@@ -142,7 +142,7 @@ const (
 	or.pred  	%p3, %p1, %p2;
 	setp.ge.s32	%p4, %r40, %r28;
 	or.pred  	%p5, %p3, %p4;
-	@%p5 bra 	BB0_22;
+	@%p5 bra 	BB0_23;
 
 	mad.lo.s32 	%r49, %r40, %r27, %r36;
 	mul.lo.s32 	%r1, %r49, %r26;
@@ -213,9 +213,9 @@ BB0_7:
 	add.s32 	%r86, %r85, %r81;
 	mul.wide.s32 	%rd17, %r86, 4;
 	add.s64 	%rd18, %rd10, %rd17;
-	ld.global.nc.f32 	%f8, [%rd18];
-	add.f32 	%f9, %f1, 0f00000000;
-	add.f32 	%f2, %f9, %f8;
+	ld.global.nc.f32 	%f9, [%rd18];
+	add.f32 	%f10, %f1, 0f00000000;
+	add.f32 	%f2, %f10, %f9;
 	and.b16  	%rs3, %rs5, 2;
 	setp.eq.s16	%p10, %rs3, 0;
 	add.s32 	%r10, %r36, -1;
@@ -247,8 +247,8 @@ BB0_10:
 	add.s32 	%r113, %r112, %r108;
 	mul.wide.s32 	%rd23, %r113, 4;
 	add.s64 	%rd24, %rd10, %rd23;
-	ld.global.nc.f32 	%f10, [%rd24];
-	add.f32 	%f3, %f2, %f10;
+	ld.global.nc.f32 	%f11, [%rd24];
+	add.f32 	%f3, %f2, %f11;
 	add.s32 	%r14, %r36, 1;
 	@%p10 bra 	BB0_12;
 
@@ -278,11 +278,17 @@ BB0_13:
 	add.s32 	%r140, %r139, %r135;
 	mul.wide.s32 	%rd29, %r140, 4;
 	add.s64 	%rd30, %rd10, %rd29;
-	ld.global.nc.f32 	%f11, [%rd30];
-	add.f32 	%f14, %f3, %f11;
+	ld.global.nc.f32 	%f12, [%rd30];
+	add.f32 	%f4, %f3, %f12;
 	setp.eq.s32	%p14, %r28, 1;
 	@%p14 bra 	BB0_21;
+	bra.uni 	BB0_14;
 
+BB0_21:
+	mul.f32 	%f16, %f4, 0f3E800000;
+	bra.uni 	BB0_22;
+
+BB0_14:
 	and.b16  	%rs4, %rs5, 4;
 	setp.eq.s16	%p15, %rs4, 0;
 	add.s32 	%r18, %r40, -1;
@@ -314,8 +320,8 @@ BB0_17:
 	add.s32 	%r167, %r166, %r162;
 	mul.wide.s32 	%rd35, %r167, 4;
 	add.s64 	%rd36, %rd10, %rd35;
-	ld.global.nc.f32 	%f12, [%rd36];
-	add.f32 	%f5, %f14, %f12;
+	ld.global.nc.f32 	%f13, [%rd36];
+	add.f32 	%f5, %f4, %f13;
 	add.s32 	%r22, %r40, 1;
 	@%p15 bra 	BB0_19;
 
@@ -345,17 +351,18 @@ BB0_20:
 	add.s32 	%r194, %r193, %r189;
 	mul.wide.s32 	%rd41, %r194, 4;
 	add.s64 	%rd42, %rd10, %rd41;
-	ld.global.nc.f32 	%f13, [%rd42];
-	add.f32 	%f14, %f5, %f13;
+	ld.global.nc.f32 	%f14, [%rd42];
+	add.f32 	%f15, %f5, %f14;
+	div.rn.f32 	%f16, %f15, 0f40C00000;
 
-BB0_21:
+BB0_22:
 	mad.lo.s32 	%r208, %r49, %r26, %r32;
 	cvta.to.global.u64 	%rd43, %rd1;
 	mul.wide.s32 	%rd44, %r208, 4;
 	add.s64 	%rd45, %rd43, %rd44;
-	st.global.f32 	[%rd45], %f14;
+	st.global.f32 	[%rd45], %f16;
 
-BB0_22:
+BB0_23:
 	ret;
 }
 

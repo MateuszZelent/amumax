@@ -2,9 +2,13 @@
 	Test that shifting introduces the correct geometry from the sides.
 */
 
-setgridsize(512, 64, 1)
+Nx = 512
+Ny = 64
+Nz = 1
 c := 2e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 m = twodomain(0,0,1, 0,1,0, 0,0,-1)
 
 ext_centerwall(2)

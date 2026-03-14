@@ -2,8 +2,12 @@
 	Test regions.loadfile
 */
 
-setgridsize(256, 128, 2)
-setcellsize(5e-9, 5e-9, 5e-9)
+Nx = 256
+Ny = 128
+Nz = 2
+dx = 5e-9
+dy = 5e-9
+dz = 5e-9
 
 defregion(1, circle(500e-9))
 defregion(2, circle(500e-9).inverse())

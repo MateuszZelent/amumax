@@ -3,9 +3,13 @@
 */
 
 N := 10
-setgridsize(2*N, N, 1)
+Nx = 2*N
+Ny = N
+Nz = 1
 c := 1e-9
-setcellsize(c, 2*c, 3*c)
+dx = c
+dy = 2*c
+dz = 3*c
 
 disk := circle(2*N*c)
 

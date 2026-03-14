@@ -2,13 +2,17 @@
 	Save an mfm image
 */
 
-Nx := 400
-Ny := 400
+Nx = 400
+Ny = 400
 c := 2e-9
 
 setpbc(2, 0, 0)
-setgridsize(Nx, Ny, 1)
-setcellsize(c, c, c)
+Nx = Nx
+Ny = Ny
+Nz = 1
+dx = c
+dy = c
+dz = c
 
 Msat = 1/mu0
 

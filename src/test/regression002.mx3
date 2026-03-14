@@ -3,14 +3,18 @@
   	Region used only for output influenced simulation.
 */
 
-Nx := 256
-Ny := 256
-Nz := 1
+Nx = 256
+Ny = 256
+Nz = 1
 
-setgridsize(Nx, Ny, Nz)
+Nx = Nx
+Ny = Ny
+Nz = Nz
 thickness := 20.0e-9
 diameter := 1.0e-6
-setcellsize(diameter/Nx, diameter/Ny, thickness/Nz)
+dx = diameter/Nx
+dy = diameter/Ny
+dz = thickness/Nz
 setgeom(cylinder(diameter, thickness))
 
 m = vortex(1, 1)

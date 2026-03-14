@@ -1,13 +1,17 @@
-Nx := 16
-Ny := 1024
-Nz := 16
+Nx = 16
+Ny = 1024
+Nz = 16
 
 csX := 1e-9
 csY := 0.5e-9
 csZ := 2e-9
 
-setgridsize(Nx, Ny, Nz)
-setcellsize(csX, csY, csZ)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = csX
+dy = csY
+dz = csZ
 
 Msat = 1000e3
 B1 = 1000e3

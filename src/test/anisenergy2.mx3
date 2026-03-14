@@ -2,9 +2,13 @@
 	Test conservation of energy with anisotropy.
 */
 
-SetGridSize(32, 10, 2)
+Nx = 32
+Ny = 10
+Nz = 2
 c := 1e-9
-SetCellSize(c, 2*c, 3*c)
+dx = c
+dy = 2*c
+dz = 3*c
 
 EnableDemag = false
 Aex = 10e-12

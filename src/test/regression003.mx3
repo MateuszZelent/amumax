@@ -2,9 +2,13 @@
 	Regression test for bug with region > 127 which was turned into negative number.
 */
 
-setgridsize(512, 512, 1)
+Nx = 512
+Ny = 512
+Nz = 1
 c := 4e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 m = uniform(1,0,0) 
 

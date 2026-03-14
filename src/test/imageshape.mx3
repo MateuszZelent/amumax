@@ -3,9 +3,13 @@
 	Reported by Aurelio Hierro.
 */
 
-SetGridSize(32, 16, 1)
+Nx = 32
+Ny = 16
+Nz = 1
 c := 1e-9
-SetCellSize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 SetGeom(ImageShape("frame.png"))
 

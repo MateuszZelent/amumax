@@ -4,8 +4,12 @@
 	Test for one random-ish angle.
 */
 
-setGridSize(1, 1, 1)
-setCellSize(1e-9, 1e-9, 1e-9)
+Nx = 1
+Ny = 1
+Nz = 1
+dx = 1e-9
+dy = 1e-9
+dz = 1e-9
 V := pow(1e-9, 3)
 
 // 

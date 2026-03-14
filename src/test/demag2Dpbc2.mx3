@@ -4,8 +4,12 @@
 */
 
 	SetPBC(32, 0, 0)
-	SetGridSize(2, 128, 1)
-	SetCellSize(1e-9, 1e-9, 0.5e-9)
+	Nx = 2
+Ny = 128
+Nz = 1
+	dx = 1e-9
+dy = 1e-9
+dz = 0.5e-9
 
 	Msat = 1 / mu0
 
@@ -30,8 +34,12 @@
 */
 
 	SetPBC(32, 0, 0)
-	SetGridSize(3, 128, 1)
-	SetCellSize(1e-9, 1e-9, 0.5e-9)
+	Nx = 3
+Ny = 128
+Nz = 1
+	dx = 1e-9
+dy = 1e-9
+dz = 0.5e-9
 
 	Msat = 1 / mu0
 

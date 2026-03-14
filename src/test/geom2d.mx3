@@ -3,8 +3,12 @@
 */
 
 N := 128
-setgridsize(2*N, N, 1)
-setcellsize(1e-9, 1e-9, 5e-9)
+Nx = 2*N
+Ny = N
+Nz = 1
+dx = 1e-9
+dy = 1e-9
+dz = 5e-9
 d := 1e-9 * N  
 
 m = uniform(1, 0, 0)

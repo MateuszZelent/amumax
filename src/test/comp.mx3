@@ -2,8 +2,12 @@
 	Test quantity components
 */
 
-setgridsize(100, 50, 2)
-setcellsize(5e-9, 4e-9, 3e-9)
+Nx = 100
+Ny = 50
+Nz = 2
+dx = 5e-9
+dy = 4e-9
+dz = 3e-9
 setgeom(xrange(0, inf))
 
 Msat = 800e3

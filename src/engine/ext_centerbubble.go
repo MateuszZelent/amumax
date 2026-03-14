@@ -6,6 +6,11 @@ import (
 	"github.com/MathieuMoalic/amumax/src/data"
 )
 
+var (
+	enableCenterBubbleX = true
+	enableCenterBubbleY = true
+)
+
 func centerBubbleInner() {
 	c := GetMesh().CellSize()
 
@@ -23,10 +28,10 @@ func centerBubbleInner() {
 	}
 
 	// put bubble to center
-	if centerIdx[X] != 0 {
+	if enableCenterBubbleX && centerIdx[X] != 0 {
 		shift(-centerIdx[X])
 	}
-	if centerIdx[Y] != 0 {
+	if enableCenterBubbleY && centerIdx[Y] != 0 {
 		yShift(-centerIdx[Y])
 	}
 }

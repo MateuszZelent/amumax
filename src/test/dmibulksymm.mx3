@@ -6,8 +6,12 @@
 N := 16
 c := 2e-9
 
-setgridsize(N, N, N)
-setcellsize(c, c, c)
+Nx = N
+Ny = N
+Nz = N
+dx = c
+dy = c
+dz = c
 
 Aex   = 10e-12
 Msat  = 1e6

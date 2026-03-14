@@ -3,8 +3,12 @@
 */
 
 N := 128
-setgridsize(N, N, 1)
-setcellsize(1e-9, 1e-9, 1e-9)
+Nx = N
+Ny = N
+Nz = 1
+dx = 1e-9
+dy = 1e-9
+dz = 1e-9
 d := 1e-9 * N  
 
 defregion(0, circle(d).inverse())

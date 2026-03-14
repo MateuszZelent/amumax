@@ -4,10 +4,14 @@
 */
 
 N := 64
-setgridsize(N, N, 1)
+Nx = N
+Ny = N
+Nz = 1
 c := 1.15e-9 / 2
 d := 1.15e-9
-setcellsize(c, c, d)
+dx = c
+dy = c
+dz = d
 //maxerr = 1e-5
 
 defregion(0, xrange(0, inf))

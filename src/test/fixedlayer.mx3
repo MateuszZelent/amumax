@@ -9,16 +9,20 @@ setsolver(4)
 
 randSeed(randomSeed)
 
-Nx := 64
-Ny := 32
-Nz := 16
+Nx = 64
+Ny = 32
+Nz = 16
 
 sX := 128e-9
 sY := 64e-9
 sZ := 32e-9
 
-setgridsize(Nx, Ny, Nz)
-setcellsize(sX/Nx, sY/Ny, sZ/Nz)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = sX/Nx
+dy = sY/Ny
+dz = sZ/Nz
 
 Msat = 800e3
 Aex = 13e-12

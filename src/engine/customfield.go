@@ -28,6 +28,11 @@ func removeCustomFields() {
 	customTerms = nil
 }
 
+// Removes all custom energy terms
+func removeCustomEnergies() {
+	customEnergies = nil
+}
+
 // addFieldTerm adds an effective field function (returning Teslas) to B_eff.
 // Be sure to also add the corresponding energy term using AddEnergyTerm.
 func addFieldTerm(b Quantity) {
@@ -435,4 +440,65 @@ func (q *normalized) EvalTo(dst *data.Slice) {
 	log.AssertMsg(dst.NComp() == q.NComp(), "Component mismatch: dst must have the same number of components as the normalized quantity in EvalTo")
 	q.orig.EvalTo(dst)
 	cuda.Normalize(dst, nil)
+}
+
+// runningAverage returns the running average of a quantity
+// over time, starting at the moment runningAverage() is called.
+// This value is updated after every Step() and depends on the time step.
+func runningAverage(q Quantity) Quantity {
+	ra := runningAverageT{q, nil, Time, 0}
+	ra.avg = cuda.Buffer(q.NComp(), GetMesh().Size())
+	cuda.Zero(ra.avg)
+	PostStep(func() {
+		dt := Time - ra.prevT
+		if dt < 0 { // Don't update the time average if we went back in time since the last step
+			return
+		}
+		ra.prevT = Time
+		ra.totalT += dt
+		val := ValueOf(q)
+		defer cuda.Recycle(val)
+		cuda.Madd2(ra.avg, ra.avg, val, float32((ra.totalT-dt)/ra.totalT), float32(dt/ra.totalT))
+	})
+	return &ra
+}
+
+type runningAverageT struct {
+	orig   Quantity
+	avg    *data.Slice
+	prevT  float64
+	totalT float64
+}
+
+func (ra *runningAverageT) EvalTo(dst *data.Slice) {
+	log.AssertMsg(dst.NComp() == ra.NComp(), "Component mismatch in RunningAverage EvalTo")
+	data.Copy(dst, ra.avg)
+}
+
+func (ra *runningAverageT) NComp() int {
+	return ra.orig.NComp()
+}
+
+// sumQuantity returns the sum of a Quantity over all cells.
+// For a vector Quantity, all components are added together.
+func sumQuantity(q Quantity) float64 {
+	val := ValueOf(q)
+	defer cuda.Recycle(val)
+	total := 0.
+	for i := 0; i < q.NComp(); i++ {
+		total += float64(cuda.Sum(val.Comp(i)))
+	}
+	return total
+}
+
+// sumVectorQuantity returns the sum of each component of a vector Quantity.
+func sumVectorQuantity(q Quantity) data.Vector {
+	log.AssertMsg(q.NComp() == 3, "SumVector requires a 3-component quantity")
+	val := ValueOf(q)
+	defer cuda.Recycle(val)
+	var v [3]float64
+	for i := 0; i < 3; i++ {
+		v[i] = float64(cuda.Sum(val.Comp(i)))
+	}
+	return vector(v[0], v[1], v[2])
 }

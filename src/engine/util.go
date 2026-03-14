@@ -140,6 +140,17 @@ func sign(x float64) float64 {
 	}
 }
 
+func sign32(x float32) float32 {
+	switch {
+	case x > 0:
+		return 1
+	case x < 0:
+		return -1
+	default:
+		return 0
+	}
+}
+
 // shortcut for slicing unaddressable_vector()[:]
 func slice(v [3]float64) []float64 {
 	return v[:]

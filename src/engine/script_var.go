@@ -36,6 +36,10 @@ func init() {
 	declVar("FixDt", &FixDt, "Set a fixed time step, 0 disables fixed step (which is the default)")
 	declVar("OpenBC", &OpenBC, "Use open boundary conditions (default=false)")
 	declVar("ext_BubbleMz", &BubbleMz, "Center magnetization 1.0 or -1.0  (default = 1.0)")
+	declVar("ext_BackGroundTilt", &BackGroundTilt, "Size of in-plane component of background magnetization. All values below this one are rounded down to perfectly out-of-plane to improve position calculation  (default = 0.25)")
+	declVar("ext_enableCenterBubbleX", &enableCenterBubbleX, "Enables centering along the X-axis during ext_centerBubble (default=true)")
+	declVar("ext_enableCenterBubbleY", &enableCenterBubbleY, "Enables centering along the Y-axis during ext_centerBubble (default=true)")
+	declVar("ext_grainCutShape", &grainCutShape, "Whether to add the complete (3D) voronoi grain, only if its centre lies within the shape (default=false)")
 	declVar("EdgeSmooth", &edgeSmooth, "Geometry edge smoothing with edgeSmooth^3 samples per cell, 0=staircase, ~8=very smooth")
 
 	declVar("Tx", &Mesh.Tx, "")

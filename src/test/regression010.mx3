@@ -2,12 +2,16 @@
 	Regression test for crash after resize when adding to exciations.
 */
 
-Nx := 32
-Ny := 16
-setgridsize(Nx, Ny, 1)
+Nx = 32
+Ny = 16
+Nx = Nx
+Ny = Ny
+Nz = 1
 
 c := 5e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 Msat = 800e3
 Aex  = 13e-12
@@ -50,8 +54,12 @@ alpha = 3
 
 steps(1)
 
-setgridsize(Nx*2, Ny, 1)
-setcellsize(2*c, 2*c, 2*c)
+Nx = Nx*2
+Ny = Ny
+Nz = 1
+dx = 2*c
+dy = 2*c
+dz = 2*c
 
 steps(1)
 

@@ -4,8 +4,12 @@
 	Same as dmi.txt but rotated over 90° to test for Y derivatives as well.
 */
 
-SetGridSize(128, 128, 1)
-SetCellSize(250e-9/128, 250e-9/128, 0.6e-9)
+Nx = 128
+Ny = 128
+Nz = 1
+dx = 250e-9/128
+dy = 250e-9/128
+dz = 0.6e-9
 
 Msat  = 1100e3
 Aex   = 16e-12

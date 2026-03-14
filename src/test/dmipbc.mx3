@@ -4,10 +4,14 @@
 
 N := 64
 setPBC(1, 0, 0)
-setgridsize(2 * N, N, 1)
+Nx = 2 * N
+Ny = N
+Nz = 1
 c := 1.15e-9 * 2
 d := 1.15e-9
-setcellsize(c, c, d)
+dx = c
+dy = c
+dz = d
 
 Aex   = 20e-12
 Ku1   = 5.9e5

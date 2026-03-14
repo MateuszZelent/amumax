@@ -236,6 +236,12 @@ func PostStep(f func()) {
 	postStep = append(postStep, f)
 }
 
+// clearPostSteps removes all registered post-step functions.
+// This clears centering routines, running averages, etc.
+func clearPostSteps() {
+	postStep = nil
+}
+
 func Break() {
 	Inject <- func() { Pause = true }
 }

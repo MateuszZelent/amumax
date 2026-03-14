@@ -3,8 +3,12 @@
     This failed before commit e30a37c0c4bc6a4b8697b202b9e95322763e84aa
 */
 
-setgridsize(64,64,1)
-setcellsize(0.1,0.1,0.1)
+Nx = 64
+Ny = 64
+Nz = 1
+dx = 0.1
+dy = 0.1
+dz = 0.1
 setpbc(1,1,0)
 
 anisU = vector(0,0,1)

@@ -3,14 +3,18 @@
 	failed on GTX TITAN, presumably because of race conditions. Fixed since xyz branch.
 */
 
-Nx := 256
-Ny := 256
-Nz := 1
-SetGridsize(Nx, Ny, Nz)
+Nx = 256
+Ny = 256
+Nz = 1
+Nx = Nx
+Ny = Ny
+Nz = Nz
 CellX := 1500e-9/Nx
 CellY := 1500e-9/Ny
 CellZ := 5e-9
-SetCellsize(CellX, CellY, CellZ)
+dx = CellX
+dy = CellY
+dz = CellZ
 
 // DEFINE CONTACT
 posX := 0.e-9

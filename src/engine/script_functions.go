@@ -47,11 +47,14 @@ func init() {
 	DeclFunc("ext_InterDind", interDind, "Sets Dind coupling between two regions.")
 	DeclFunc("ext_centerBubble", centerBubble, "centerBubble shifts m after each step to keep the bubble position close to the center of the window")
 	DeclFunc("ext_centerWall", centerWall, "centerWall(c) shifts m after each step to keep m_c close to zero")
+	DeclFunc("ext_centerWallInRegion", centerWallInRegion, "centerWallInRegion(R, c) shifts m after each step to keep m_c in region R close to zero")
+	DeclFunc("ext_centerWallInLayer", centerWallInLayer, "centerWallInLayer(L, c) shifts m after each step to keep m_c in layer L close to zero")
 	DeclFunc("ext_make3dgrains", voronoi3d, "3D Voronoi tesselation over shape (grain size, starting region number, num regions, shape, seed)")
 	DeclFunc("ext_makegrains", voronoi, "Voronoi tesselation (grain size, num regions)")
 	DeclFunc("ext_rmSurfaceCharge", removeLRSurfaceCharge, "Compensate magnetic charges on the left and right sides of an in-plane magnetized wire. Arguments: region, mx on left and right side, resp.")
 	DeclFunc("SetGeom", Geometry.setGeom, "Sets the geometry to a given shape")
 	DeclFunc("Minimize", minimize, "Use steepest conjugate gradient method to minimize the total energy")
+	DeclFunc("ext_EnableUnsafe", enableUnsafe, "Deprecated. Only here to ensure maximal backwards compatibility with mumax3.9c.")
 
 	// DeclFunc("ReCreateMesh", ReCreateMesh, "")
 	DeclFunc("SmoothMesh", SmoothMesh, "")
@@ -73,6 +76,7 @@ func init() {
 	DeclFunc("RunWhile", runWhile, "Run while condition function is true")
 	DeclFunc("SetSolver", setSolver, "Set solver type. 1:Euler, 2:Heun, 3:Bogaki-Shampine, 4: Runge-Kutta (RK45), 5: Dormand-Prince, 6: Fehlberg, -1: Backward Euler")
 	DeclFunc("Exit", Exit, "Exit from the program")
+	DeclFunc("ClearPostSteps", clearPostSteps, "Clear the postStep array, removing all functions executed after each solver step (centering routines, running averages, etc.)")
 	DeclFunc("RunShell", runShell, "Run a shell command")
 
 	DeclFunc("SaveOvf", saveOVF, "Save space-dependent quantity once, with auto filename")
@@ -81,6 +85,7 @@ func init() {
 	DeclFunc("SnapshotAs", snapshotAs, "Save image of quantity with custom filename")
 
 	DeclFunc("Ellipsoid", ellipsoid, "3D Ellipsoid with axes in meter")
+	DeclFunc("Superball", superball, "3D Superball with diameter in meter and shape parameter p. Interpolates between a cube (p=+∞), sphere (p=1), octahedron (p=0.5) and empty space (p≤0).")
 	DeclFunc("Ellipse", ellipse, "2D Ellipse with axes in meter")
 	DeclFunc("Cone", cone, "3D Cone with diameter and height in meter. The base is at z=0. If the height is positive, the tip points in the +z direction.")
 	DeclFunc("Cylinder", cylinder, "3D Cylinder with diameter and height in meter")
@@ -91,7 +96,8 @@ func init() {
 	DeclFunc("Wave", wave, "Wave with (Period, Min amplitude and Max amplitude) in meter")
 	DeclFunc("SinWaveguide", sinWaveguide, "Finite sinusoidal waveguide along x. Arguments: length, width, height, period, sinAmp (all in meter). Use RotY/RotZ to reorient it.")
 	DeclFunc("SinWaveguide2", sinWaveguide2, "Full-featured sinusoidal waveguide along x. Arguments: length, width, height, period, centerAmp, phase, z0 (all in meter/radians). centerAmp is the centerline amplitude; outer envelope = centerAmp + height/2.")
-	DeclFunc("Triangle", triangle, "Equilateral triangle with side in meter")
+	DeclFunc("Triangle", triangle, "2D triangle with vertices (x0, y0), (x1, y1) and (x2, y2)")
+	DeclFunc("EqTriangle", eqTriangle, "Equilateral triangle with side in meter")
 	DeclFunc("RTriangle", rTriangle, "Rounded Equilateral triangle with side in meter")
 	DeclFunc("Diamond", diamond, "Diamond with side in meter")
 	DeclFunc("Hexagon", hexagon, "Hexagon with side in meter")
@@ -133,10 +139,16 @@ func init() {
 	DeclFunc("Save", savedQuantities.save, "Save space-dependent quantity as the zarr standard.")
 
 	DeclFunc("TableSave", tableSave, "Save the data table right now.")
+	DeclFunc("TablePrint", myprint, "Print anyting in the data table")
 	DeclFunc("TableAdd", tableAdd, "Save the data table periodically.")
 	DeclFunc("TableAddVar", tableAddVar, "Save the data table periodically.")
 	DeclFunc("TableAddAs", tableAddAs, "Save the data table periodically.")
 	DeclFunc("TableAutoSave", tableAutoSave, "Save the data table periodically.")
+
+	DeclFunc("RemoveCustomEnergies", removeCustomEnergies, "Removes all custom energies")
+	DeclFunc("RunningAverage", runningAverage, "Records the time-average of a quantity from the moment this function is called.\nNote: this may impact performance since the Quantity will be evaluated after every step.")
+	DeclFunc("Sum", sumQuantity, "Sum of Quantity over all cells in the grid. For a vector Quantity, all components are added together.")
+	DeclFunc("SumVector", sumVectorQuantity, "Sum of vector Quantity over all cells in the grid.")
 }
 
 // DeclFunc Add a function to the script world

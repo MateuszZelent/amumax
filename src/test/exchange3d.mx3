@@ -4,8 +4,12 @@
 
 d := 100e-9                
 N := 32                   
-setgridsize(N, N, N/4)
-setcellsize(d/N, d/N, d/N)
+Nx = N
+Ny = N
+Nz = N/4
+dx = d/N
+dy = d/N
+dz = d/N
 
 msat  = 800e3
 aex   = 13e-12

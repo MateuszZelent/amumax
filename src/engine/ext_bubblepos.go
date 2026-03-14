@@ -5,16 +5,24 @@ import (
 )
 
 var (
-	BubblePos   = newVectorValue("ext_bubblepos", "m", "Bubble core position", bubblePos)
-	BubbleDist  = newScalarValue("ext_bubbledist", "m", "Bubble traveled distance", bubbleDist)
-	BubbleSpeed = newScalarValue("ext_bubblespeed", "m/s", "Bubble velocity", bubbleSpeed)
-	BubbleMz    = 1.0
+	BubblePos      = newVectorValue("ext_bubblepos", "m", "Bubble core position", bubblePos)
+	BubbleDist     = newScalarValue("ext_bubbledist", "m", "Bubble traveled distance", bubbleDist)
+	BubbleSpeed    = newScalarValue("ext_bubblespeed", "m/s", "Bubble velocity", bubbleSpeed)
+	BubbleMz       = 1.0
+	BackGroundTilt = 0.25
 )
 
 func bubblePos() []float64 {
 	m := NormMag.Buffer()
 	n := GetMesh().Size()
 	c := GetMesh().CellSize()
+
+	g := Geometry.Gpu()
+	var geo [][]float32
+	if !g.IsNil() {
+		geo = g.Comp(0).HostCopy().Scalars()[0] // geometry[Y, X]
+	}
+
 	mz := m.Comp(Z).HostCopy().Scalars()[0]
 
 	posx, posy := 0., 0.
@@ -24,32 +32,30 @@ func bubblePos() []float64 {
 	}
 
 	{
-		var magsum float32
-		var weightedsum float32
-
-		for iy := range mz {
-			for ix := range mz[0] {
-				magsum += ((mz[iy][ix]*float32(BubbleMz) + 1.) / 2.)
-				weightedsum += ((mz[iy][ix]*float32(BubbleMz) + 1.) / 2.) * float32(iy)
-			}
-		}
-		posy = float64(weightedsum / magsum)
-	}
-
-	{
-		var magsum float32
-		var weightedsum float32
+		var mag float64
+		var magsum float64
+		var weightedsumx float64
+		var weightedsumy float64
 
 		for ix := range mz[0] {
 			for iy := range mz {
-				magsum += ((mz[iy][ix]*float32(BubbleMz) + 1.) / 2.)
-				weightedsum += ((mz[iy][ix]*float32(BubbleMz) + 1.) / 2.) * float32(ix)
+				mag = backgroundAdjust(mz[iy][ix]*float32(BubbleMz) + 1.) // 1/2 is divided out
+
+				// weight cells according to geometry: 0 weight outside
+				if !g.IsNil() {
+					mag *= float64(geo[iy][ix])
+				}
+
+				magsum += mag
+				weightedsumx += mag * float64(ix)
+				weightedsumy += mag * float64(iy)
 			}
 		}
-		posx = float64(weightedsum / magsum)
+		posx = float64(weightedsumx / magsum)
+		posy = float64(weightedsumy / magsum)
 	}
 
-	return []float64{(posx-float64(n[X]/2))*c[X] + getShiftPos(), (posy-float64(n[Y]/2))*c[Y] + getShiftYPos(), 0}
+	return []float64{(posx-float64(n[X]/2))*c[X] + getShiftPos(), (posy-float64(n[Y]/2))*c[Y] + getShiftYPos(), 0.}
 }
 
 var (
@@ -107,4 +113,11 @@ func bubbleSpeed() float64 {
 	prevBdist = dist
 
 	return v
+}
+
+func backgroundAdjust(arg float32) float64 {
+	if float64(arg) < BackGroundTilt {
+		return float64(0)
+	}
+	return float64(arg)
 }

@@ -3,9 +3,13 @@
 	Reference solution from the same geometry with 2D discretization.
 */
 
-SetGridSize(64, 64, 2)
+Nx = 64
+Ny = 64
+Nz = 2
 c := 0.6e-9
-SetCellSize(c, c, c/2)
+dx = c
+dy = c
+dz = c/2
 
 Msat  = 1100e3
 Aex   = 16e-12

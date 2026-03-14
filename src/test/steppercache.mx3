@@ -2,8 +2,12 @@
     Test if the stepper cache buffers are flushed when starting a new run
 */
 
-setgridsize(1,1,1)
-setcellsize(1,1,1)
+Nx = 1
+Ny = 1
+Nz = 1
+dx = 1
+dy = 1
+dz = 1
 
 msat = 1000e3
 alpha = 0.1

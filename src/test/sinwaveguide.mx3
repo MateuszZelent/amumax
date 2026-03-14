@@ -4,8 +4,12 @@
 	constant width in y, and a sinusoidal centerline in z.
 */
 
-SetGridSize(11, 5, 9)
-SetCellSize(5e-9, 10e-9, 10e-9)
+Nx = 11
+Ny = 5
+Nz = 9
+dx = 5e-9
+dy = 10e-9
+dz = 10e-9
 
 length := 30e-9
 width := 20e-9

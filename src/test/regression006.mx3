@@ -2,8 +2,12 @@
 	Regression test for buggy intergrain exchange reported by Jonathan Leliaert
 */
 
-setgridsize(256, 64, 1)
-setcellsize(3.125e-9, 3.125e-9, 15e-9)
+Nx = 256
+Ny = 64
+Nz = 1
+dx = 3.125e-9
+dy = 3.125e-9
+dz = 15e-9
 
 Msat    = 860e3
 Aex     = 13e-12

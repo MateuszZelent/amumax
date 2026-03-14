@@ -18,8 +18,12 @@
 
 E_exch_oommf := 154.4891365
 
-setgridsize(4,4,1)
-setcellsize(1,1,1)
+Nx = 4
+Ny = 4
+Nz = 1
+dx = 1
+dy = 1
+dz = 1
 m.loadfile("./testdata/randommag4x4x1.ovf")
 
 enabledemag = false

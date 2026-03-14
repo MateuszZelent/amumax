@@ -2,12 +2,16 @@
 	Test quantity averages.
 */
 
-Nx := 200
-Ny := 100
-setgridsize(Nx, Ny, 1)
+Nx = 200
+Ny = 100
+Nx = Nx
+Ny = Ny
+Nz = 1
 
 c := 5e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 setGeom(circle(Nx*c))
 

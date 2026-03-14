@@ -3,11 +3,15 @@
 	Reported by Ben Van de Wiele.
 */
 
-Ny := 64
-Nx := 16*Ny
+Ny = 64
+Nx = 16*Ny
 c := 3.125e-9
-setgridsize(Nx, Ny, 1)
-setcellsize(c, c, 15e-9)
+Nx = Nx
+Ny = Ny
+Nz = 1
+dx = c
+dy = c
+dz = 15e-9
 
 Msat    = 1.7e6
 Aex     = 21e-12

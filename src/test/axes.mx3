@@ -2,9 +2,13 @@
 	Not really a test. Makes a snapshot showing the orientation of our axes.
 */
 
-setgridsize(400, 300, 1)
+Nx = 400
+Ny = 300
+Nz = 1
 c := 1e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 S := 8 * c
 

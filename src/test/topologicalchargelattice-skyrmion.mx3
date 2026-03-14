@@ -6,8 +6,12 @@
 
 tol := 0.005
 
-setgridsize(64, 128, 8)
-setcellsize(3e-9, 1.5e-9, 8e-9)
+Nx = 64
+Ny = 128
+Nz = 8
+dx = 3e-9
+dy = 1.5e-9
+dz = 8e-9
 
 // aka CoPt
 Msat    = 1000e3

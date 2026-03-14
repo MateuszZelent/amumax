@@ -4,8 +4,12 @@
 	Reference solution by mumax2.
 */
 
-setgridsize(32, 32, 4)
-setcellsize(100e-9/32, 100e-9/32, 10e-9/4)
+Nx = 32
+Ny = 32
+Nz = 4
+dx = 100e-9/32
+dy = 100e-9/32
+dz = 10e-9/4
 
 Msat  = 800e3
 Aex   = 13e-12

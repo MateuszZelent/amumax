@@ -3,10 +3,14 @@
 */
 
 N := 64
-setgridsize(N, N + 4, 1)
+Nx = N
+Ny = N + 4
+Nz = 1
 c := 1.15e-9 * 2
 d := 1.15e-9
-setcellsize(c, c, d)
+dx = c
+dy = c
+dz = d
 
 Aex   = 20e-12
 Ku1   = 5.9e5

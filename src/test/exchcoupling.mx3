@@ -1,8 +1,12 @@
 N := 256
 c := 4e-9
 d := 40e-9
-setgridsize(N, N, 1)
-setcellsize(c, c, d)
+Nx = N
+Ny = N
+Nz = 1
+dx = c
+dy = c
+dz = d
 
 setGeom(circle(N*c))
 

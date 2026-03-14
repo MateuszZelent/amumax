@@ -2,16 +2,20 @@
 	Test for reversal driven by Slonczewski STT.
 */
 
-Nx := 64
-Ny := 32
-Nz := 1
+Nx = 64
+Ny = 32
+Nz = 1
 
 sX := 160e-9
 sY := 80e-9
 sZ := 5e-9
  
-setgridsize(Nx, Ny, Nz)
-setcellsize(sX/Nx, sY/Ny, sZ/Nz)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = sX/Nx
+dy = sY/Ny
+dz = sZ/Nz
 
 Msat  = 800e3
 Aex   = 13e-12

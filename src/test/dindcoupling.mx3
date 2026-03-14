@@ -8,10 +8,14 @@
 
 Msat = 1.2
 cs := 1
-nx := 8
+nx = 8
 
-setcellsize(cs,cs,cs)
-setgridsize(nx,nx,1)
+dx = cs
+dy = cs
+dz = cs
+Nx = nx
+Ny = nx
+Nz = 1
 setpbc(1,1,0)
 
 l  := cs*(nx/2.+0.1)

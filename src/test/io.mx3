@@ -2,8 +2,12 @@
 	Test I/O.
 */
 
-setgridsize(50, 25, 1)
-setcellsize(1e-9, 1e-9, 1e-9)
+Nx = 50
+Ny = 25
+Nz = 1
+dx = 1e-9
+dy = 1e-9
+dz = 1e-9
 setgeom(circle(50e-9))
 m = uniform(1,1,1)
 

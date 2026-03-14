@@ -2,8 +2,12 @@
     Test the FreeLayerThickness for the Slonczewski torque
 */
 
-SetGridSize(1,1,2)
-SetCellSize(1e-9,1e-9,1e-9)
+Nx = 1
+Ny = 1
+Nz = 2
+dx = 1e-9
+dy = 1e-9
+dz = 1e-9
 
 // Arbitrary material parameters which result in a non zero Slonczewski Torque
 Msat = 4.3
@@ -25,7 +29,9 @@ torqueWanted := Vector(
 
 // Adding empty layers to the system should not change the result 
 // if we set the freeLayerThickness by hand.
-Setgridsize(1,1,4)
+Nx = 1
+Ny = 1
+Nz = 4
 SetGeom(Layers(0,2))
 FreeLayerThickness = 1e-9
 

@@ -20,11 +20,15 @@ xcellsize := 2.00e-9
 ycellsize := 2.00e-9
 zcellsize := 1.70e-9
 
-nx := floor(flength/xcellsize)
-ny := floor(fwidth/ycellsize)
+nx = floor(flength/xcellsize)
+ny = floor(fwidth/ycellsize)
 print("grid:", nx, ny)
-setgridsize(128, 32, 1)
-setcellsize(xcellsize, ycellsize, zcellsize)
+Nx = 128
+Ny = 32
+Nz = 1
+dx = xcellsize
+dy = ycellsize
+dz = zcellsize
 
 /* Input parameters */
 Msat  = 817647

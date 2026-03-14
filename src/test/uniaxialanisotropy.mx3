@@ -4,8 +4,12 @@
 	and verify the relaxed my against OOMMF values.
 */
 
-setgridsize(64, 64, 1)
-setcellsize(4e-9, 4e-9, 2e-9)
+Nx = 64
+Ny = 64
+Nz = 1
+dx = 4e-9
+dy = 4e-9
+dz = 2e-9
 
 Aex   = 13e-12
 alpha = 1

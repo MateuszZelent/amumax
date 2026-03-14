@@ -2,11 +2,15 @@
 	Test if smoothed geometry is handled correctly by demag calculation and Mfull.
 */
 
-Nx := 100
-Ny := 50
-setgridsize(Nx, Ny, 2)
+Nx = 100
+Ny = 50
+Nx = Nx
+Ny = Ny
+Nz = 2
 c := 1e-9
-setcellsize(c, c , c)
+dx = c
+dy = c
+dz = c
 
 // reference demag field for full slab
 msat = 1/mu0

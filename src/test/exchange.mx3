@@ -2,8 +2,12 @@
 	Test exchange field
 */
 
-setgridsize(300, 200, 4)
-setcellsize(2e-9, 3e-9, 4e-9)
+Nx = 300
+Ny = 200
+Nz = 4
+dx = 2e-9
+dy = 3e-9
+dz = 4e-9
 
 msat  = 800e3
 aex   = 13e-12

@@ -4,8 +4,12 @@
 Gsize := 20
 Ared := 0.75
 Delta_x := 450.0/128.0
-SetGridsize(128, 128, 1)
-SetCellsize(Delta_x*1e-9, Delta_x*1e-9, 30e-9)
+Nx = 128
+Ny = 128
+Nz = 1
+dx = Delta_x*1e-9
+dy = Delta_x*1e-9
+dz = 30e-9
 
 alpha = 0.02
 Msat  = 860e3

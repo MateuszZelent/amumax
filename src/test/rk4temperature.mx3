@@ -3,8 +3,12 @@
 */
 
 c := 10e-9
-setcellsize(c, c, c)
-setgridsize(256, 256, 1)
+dx = c
+dy = c
+dz = c
+Nx = 256
+Ny = 256
+Nz = 1
 
 Msat  = 1e6 
 Aex   = 0 

@@ -2,10 +2,14 @@
 	Test masking of quantity (implemented in engine/customfield.go)
 */
 
-nx := 64
+nx = 64
 cs := 1e-9
-setgridsize(Nx,Nx,1)
-setcellsize(cs,cs,cs)
+Nx = Nx
+Ny = Nx
+Nz = 1
+dx = cs
+dy = cs
+dz = cs
 
 d := cs*nx
 mask := Masked(ConstVector(0,0,1),Circle(d))

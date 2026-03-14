@@ -4,13 +4,17 @@
 
 randommagseed(666)
 
-Nx := 128
-Ny := 64
-Nz := 32
-setgridsize(Nx, Ny, Nz)
+Nx = 128
+Ny = 64
+Nz = 32
+Nx = Nx
+Ny = Ny
+Nz = Nz
 
 c := 5e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 Msat = 800e3
 Aex  = 13e-12

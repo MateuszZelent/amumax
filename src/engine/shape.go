@@ -99,6 +99,30 @@ func ellipsoid(diamx, diamy, diamz float64) shape {
 	}
 }
 
+// superball with given diameter and shape parameter p
+// A superball is defined by the inequality:
+//
+//	|x/r|^(2p) + |y/r|^(2p) + |z/r|^(2p) ≤ 1
+//
+// where r is the radius and p controls the shape:
+//   - p > 1 gives a rounded cube
+//   - p = 1 gives a sphere
+//   - p = 0.5 gives an octahedron
+//   - p <= 0 gives empty space
+//
+// for consistency with other shapes, diameter (2r) is used as parameter instead of radius
+func superball(diameter, p float64) shape {
+	if p <= 0 { // Yields empty shape
+		return func(x, y, z float64) bool { return false }
+	}
+	return func(x, y, z float64) bool {
+		norm := math.Pow(math.Abs(2*x/diameter), 2*p) +
+			math.Pow(math.Abs(2*y/diameter), 2*p) +
+			math.Pow(math.Abs(2*z/diameter), 2*p)
+		return norm <= 1
+	}
+}
+
 func ellipse(diamx, diamy float64) shape {
 	return ellipsoid(diamx, diamy, math.Inf(1))
 }
@@ -138,8 +162,32 @@ func rect(sidex, sidey float64) shape {
 	}
 }
 
-// Equilateral triangle with given sides.
-func triangle(side float64) shape {
+// 2D triangle with given vertices using barycentric coordinates.
+func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
+	denom := x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1) // 2 * area
+	if denom == 0 {
+		return func(x, y, z float64) bool { return false }
+	}
+	A2m1 := 1 / denom
+
+	Sc := A2m1 * (y0*x2 - x0*y2)
+	Sx := A2m1 * (y2 - y0)
+	Sy := A2m1 * (x0 - x2)
+
+	Tc := A2m1 * (x0*y1 - y0*x1)
+	Tx := A2m1 * (y0 - y1)
+	Ty := A2m1 * (x1 - x0)
+
+	return func(x, y, z float64) bool {
+		// barycentric coordinates
+		s := Sc + Sx*x + Sy*y
+		t := Tc + Tx*x + Ty*y
+		return ((0 <= s) && (0 <= t) && (s+t <= 1))
+	}
+}
+
+// eqTriangle creates an equilateral triangle with given side length, centered at origin.
+func eqTriangle(side float64) shape {
 	return func(x, y, z float64) bool {
 		c := math.Sqrt(3)
 		return y > -side/(2*c) && y < x*c+side/c && y < -x*c+side/c

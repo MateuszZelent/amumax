@@ -5,8 +5,12 @@
 N := 5
 c := 1e-9
 
-setgridsize(N, N, N)
-setcellsize(c, c, c)
+Nx = N
+Ny = N
+Nz = N
+dx = c
+dy = c
+dz = c
 
 Msat = 1 / mu0
 tol := 5e-4

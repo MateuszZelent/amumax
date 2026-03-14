@@ -2,8 +2,12 @@
 	tests CenterInplaneWall and CompensateSurfaceCharges
 */
 
-setgridsize(128, 32, 1)
-setcellsize(5e-9, 5e-9, 30e-9)
+Nx = 128
+Ny = 32
+Nz = 1
+dx = 5e-9
+dy = 5e-9
+dz = 30e-9
 
 Msat    = 860e3
 Aex     = 13e-12

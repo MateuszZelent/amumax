@@ -2,12 +2,16 @@
 	Test loading external data files.
 */
 
-Nx := 128
-Ny := 64
-setgridsize(Nx, Ny, 1)
+Nx = 128
+Ny = 64
+Nx = Nx
+Ny = Ny
+Nz = 1
 
 c := 5e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 Msat = 800e3
 Aex  = 13e-12

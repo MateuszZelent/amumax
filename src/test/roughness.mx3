@@ -2,12 +2,16 @@
 	Regression test for Roughness shape.
 */
 
-Nx := 500
-Ny := 200
-Nz := 10
+Nx = 500
+Ny = 200
+Nz = 10
 c := 1e-9
-setgridsize(Nx, Ny, Nz)
-setcellsize(c, c, c)
+Nx = Nx
+Ny = Ny
+Nz = Nz
+dx = c
+dy = c
+dz = c
 
 setgeom(ellipse(Nx*c, Ny*c).intersect(grainroughness(40e-9, 0, 5e-9, 123)))
 

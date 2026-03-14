@@ -3,8 +3,12 @@
 	In this simulation, the DMI interaction converts a Bloch wall to a Néel wall.
 */
 
-SetGridSize(128, 128, 1)
-SetCellSize(250e-9/128, 250e-9/128, 0.6e-9)
+Nx = 128
+Ny = 128
+Nz = 1
+dx = 250e-9/128
+dy = 250e-9/128
+dz = 0.6e-9
 
 Msat  = 110e3
 Dind   = 0.1e-3 // J/m2.

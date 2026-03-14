@@ -3,8 +3,12 @@
 	Should not crash script.
 */
 
-setgridsize(1, 1, 1)
-setcellsize(1, 1, 1)
+Nx = 1
+Ny = 1
+Nz = 1
+dx = 1
+dy = 1
+dz = 1
 
 i:=0
 

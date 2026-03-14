@@ -3,10 +3,14 @@
 */
 
 N := 10
-setgridsize(N, N, 2)
+Nx = N
+Ny = N
+Nz = 2
 
 c := 1e-9
-setcellsize(c, c, c)
+dx = c
+dy = c
+dz = c
 
 defRegion(0, layer(0))
 defRegion(1, layer(1))
