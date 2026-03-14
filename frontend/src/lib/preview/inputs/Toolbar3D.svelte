@@ -29,13 +29,13 @@
 
 	{#if expanded}
 		<div class="toolbar-content">
-			<!-- Brightness -->
 			<div class="control-group">
-				<label class="control-label">
+				<div class="control-label">
 					Brightness
 					<span class="control-value">{brightnessVal.toFixed(1)}</span>
-				</label>
+				</div>
 				<input
+					aria-label="3D preview brightness"
 					type="range"
 					min="0.3"
 					max="3.0"
@@ -46,9 +46,8 @@
 				/>
 			</div>
 
-			<!-- Quality -->
 			<div class="control-group">
-				<label class="control-label">Quality</label>
+				<div class="control-label">Quality</div>
 				<div class="btn-group">
 					{#each levels as { key, label }}
 						<button

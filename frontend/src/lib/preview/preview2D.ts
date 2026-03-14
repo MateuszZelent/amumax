@@ -3,11 +3,16 @@ import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { meshState } from '$api/incoming/mesh';
 import { disposePreview3D } from './preview3D';
-import { THEME } from '$lib/theme/echarts-theme';
+import { ECHARTS_THEME_NAME, THEME, ensureAmumaxEChartsTheme } from '$lib/theme/echarts-theme';
 
 let chartInstance: echarts.ECharts | undefined;
-let resizeListenerAttached = false;
-let resizeListener: (() => void) | null = null;
+let resizeObserver: ResizeObserver | null = null;
+
+type ColorScale = {
+	min: number;
+	max: number;
+	palette: string[];
+};
 
 export function preview2D() {
 	const state = get(previewState);
@@ -35,11 +40,112 @@ export function preview2D() {
 	updateData();
 }
 
-function getColorMap(min: number, max: number) {
+function getColorScale(min: number, max: number): ColorScale {
 	if (min < 0 && max > 0) {
-		return ['#313695', '#ffffff', '#a50026'];
+		const bound = Math.max(Math.abs(min), Math.abs(max));
+		return {
+			min: -bound,
+			max: bound,
+			palette: ['#15315f', '#2f6caa', '#90b9df', '#f4f1ed', '#efb09d', '#cf6256', '#7d1d34']
+		};
 	}
-	return ['#ffffff', '#a50026'];
+
+	if (max <= 0) {
+		return {
+			min,
+			max,
+			palette: ['#f3f7fd', '#cfdef1', '#91b8dd', '#5688bd', '#285b93', '#14365f']
+		};
+	}
+
+	return {
+		min,
+		max,
+		palette: ['#0a1220', '#143d67', '#1c6d8f', '#24a0a4', '#8ed6ac', '#f1f7bb']
+	};
+}
+
+function formatMagnitude(value: number) {
+	if (!Number.isFinite(value)) {
+		return 'NaN';
+	}
+
+	if (value === 0) {
+		return '0';
+	}
+
+	const abs = Math.abs(value);
+	if (abs >= 1000 || abs < 1e-2) {
+		return value.toExponential(2);
+	}
+	if (abs >= 10) {
+		return value.toFixed(1);
+	}
+	if (abs >= 1) {
+		return value.toFixed(2);
+	}
+	return value.toPrecision(2);
+}
+
+function formatDistanceNm(distanceNm: number) {
+	if (!Number.isFinite(distanceNm)) {
+		return 'NaN';
+	}
+
+	if (Math.abs(distanceNm) >= 1000) {
+		return (distanceNm / 1000).toFixed(2);
+	}
+
+	return distanceNm.toFixed(0);
+}
+
+function axisPointerLabelFormatter(axis: 'x' | 'y', scale: number) {
+	return function (params: { value?: number }) {
+		if (params.value === undefined) {
+			return 'NaN';
+		}
+		return `${axis}: ${formatDistanceNm(Number(params.value) * scale)} nm`;
+	};
+}
+
+function buildVisualMap(quantity: string, unit: string, min: number, max: number) {
+	const scale = getColorScale(min, max);
+	const unitSuffix = unit ? ` ${unit}` : '';
+
+	return {
+		type: 'continuous' as const,
+		min: scale.min,
+		max: scale.max,
+		calculable: false,
+		realtime: false,
+		precision: 3,
+		orient: 'vertical' as const,
+		right: 8,
+		top: 'middle' as const,
+		itemWidth: 12,
+		itemHeight: 188,
+		align: 'right' as const,
+		padding: [12, 10, 12, 10],
+		textGap: 10,
+		backgroundColor: 'rgba(15, 23, 42, 0.76)',
+		borderColor: THEME.border,
+		borderWidth: 1,
+		text: [`${formatMagnitude(scale.max)}${unitSuffix}`, `${formatMagnitude(scale.min)}`],
+		textStyle: {
+			color: THEME.text2,
+			fontSize: 11,
+			fontWeight: 600
+		},
+		formatter: (value: number) => `${formatMagnitude(value)}${unitSuffix}`,
+		inRange: {
+			color: scale.palette
+		},
+		outOfRange: {
+			color: ['rgba(107, 122, 154, 0.18)']
+		},
+		seriesIndex: 0,
+		showLabel: true
+	};
 }
 
 function getAxisScale() {
@@ -59,10 +165,16 @@ function tooltipFormatter(params: any) {
 		return 'NaN';
 	}
 	const { xScale, yScale } = getAxisScale();
-	const xnm = (Number(params.value[0]) * xScale).toFixed(1);
-	const ynm = (Number(params.value[1]) * yScale).toFixed(1);
-	const value = Number(params.value[2]).toPrecision(6);
-	return `x: ${xnm} nm<br/>y: ${ynm} nm<br/>${value} ${ps.unit}`;
+	const xnm = Number(params.value[0]) * xScale;
+	const ynm = Number(params.value[1]) * yScale;
+	const value = Number(params.value[2]);
+	const unitSuffix = ps.unit ? ` ${ps.unit}` : '';
+	return [
+		`<strong>${ps.quantity}</strong>`,
+		`x: ${formatDistanceNm(xnm)} nm`,
+		`y: ${formatDistanceNm(ynm)} nm`,
+		`value: ${formatMagnitude(value)}${unitSuffix}`
+	].join('<br/>');
 }
 
 /** Incremental update — only series data + axis bounds + visualMap range. */
@@ -73,6 +185,7 @@ function updateData() {
 	}
 	const ps = get(previewState);
 	const { xScale, yScale } = getAxisScale();
+	const visualMap = buildVisualMap(ps.quantity, ps.unit, ps.min, ps.max) as any;
 	chartInstance.setOption(
 		{
 			animation: false,
@@ -102,16 +215,7 @@ function updateData() {
 					data: ps.scalarField
 				}
 			],
-			visualMap: [
-				{
-					max: ps.max,
-					min: ps.min,
-					text: [ps.unit, ''],
-					inRange: {
-						color: getColorMap(ps.min, ps.max)
-					}
-				}
-			]
+			visualMap: [visualMap]
 		},
 		{ lazyUpdate: true }
 	);
@@ -124,8 +228,10 @@ function init() {
 	}
 	// Reuse existing instance if possible — avoids canvas teardown/flicker.
 	if (!chartInstance || chartInstance.isDisposed()) {
-		chartInstance = echarts.init(chartDom, undefined, { renderer: 'canvas', useDirtyRect: true });
+		ensureAmumaxEChartsTheme();
+		chartInstance = echarts.init(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
 	}
+	resizeECharts();
 	setFullOptions();
 }
 
@@ -136,40 +242,22 @@ function setFullOptions() {
 	}
 	const ps = get(previewState);
 	const { xScale, yScale } = getAxisScale();
+	const visualMap = buildVisualMap(ps.quantity, ps.unit, ps.min, ps.max);
 
 	// @ts-ignore
 	chartInstance.setOption(
 		{
 			tooltip: {
 				position: 'top',
+				confine: true,
 				formatter: tooltipFormatter,
 				backgroundColor: THEME.tooltipBg,
 				borderColor: THEME.tooltipBorder,
+				borderWidth: 1,
+				padding: [10, 12],
 				textStyle: {
-					color: THEME.tooltipText
-				}
-			},
-			axisPointer: {
-				show: true,
-				type: 'line',
-				triggerEmphasis: false,
-				lineStyle: {
-					color: THEME.accent,
-					width: 2,
-					type: 'dashed'
-				},
-				label: {
-					backgroundColor: THEME.tooltipBg,
 					color: THEME.tooltipText,
-					formatter: function (params: any) {
-						if (params.value === undefined) {
-							return 'NaN';
-						}
-						return ` ${Number(params.value).toFixed(0)} idx`;
-					},
-					padding: [8, 5, 8, 5],
-					borderColor: THEME.accent,
-					borderWidth: 1
+					fontSize: 12
 				}
 			},
 			xAxis: {
@@ -178,9 +266,33 @@ function setFullOptions() {
 				max: Math.max(ps.xChosenSize - 1, 0),
 				name: 'x (nm)',
 				nameLocation: 'middle',
-				nameGap: 25,
+				nameGap: 30,
 				nameTextStyle: {
-					color: THEME.text2
+					color: THEME.text2,
+					fontWeight: 600
+				},
+				axisLine: {
+					show: true,
+					lineStyle: {
+						color: THEME.border
+					}
+				},
+				axisPointer: {
+					show: true,
+					label: {
+						show: true,
+						backgroundColor: THEME.tooltipBg,
+						color: THEME.tooltipText,
+						padding: [6, 8],
+						borderColor: THEME.accent,
+						borderWidth: 1,
+						formatter: axisPointerLabelFormatter('x', xScale)
+					},
+					lineStyle: {
+						color: THEME.accent,
+						width: 1.5,
+						type: 'dashed'
+					}
 				},
 				axisTick: {
 					length: 6,
@@ -192,10 +304,13 @@ function setFullOptions() {
 				axisLabel: {
 					show: true,
 					formatter: function (value: number) {
-						return (value * xScale).toFixed(0);
+						return formatDistanceNm(value * xScale);
 					},
 					color: THEME.text2,
 					showMinLabel: true
+				},
+				splitLine: {
+					show: false
 				}
 			},
 			yAxis: {
@@ -204,9 +319,33 @@ function setFullOptions() {
 				max: Math.max(ps.yChosenSize - 1, 0),
 				name: 'y (nm)',
 				nameLocation: 'middle',
-				nameGap: 45,
+				nameGap: 54,
 				nameTextStyle: {
-					color: THEME.text2
+					color: THEME.text2,
+					fontWeight: 600
+				},
+				axisLine: {
+					show: true,
+					lineStyle: {
+						color: THEME.border
+					}
+				},
+				axisPointer: {
+					show: true,
+					label: {
+						show: true,
+						backgroundColor: THEME.tooltipBg,
+						color: THEME.tooltipText,
+						padding: [6, 8],
+						borderColor: THEME.accent,
+						borderWidth: 1,
+						formatter: axisPointerLabelFormatter('y', yScale)
+					},
+					lineStyle: {
+						color: THEME.accent,
+						width: 1.5,
+						type: 'dashed'
+					}
 				},
 				axisTick: {
 					length: 6,
@@ -218,34 +357,16 @@ function setFullOptions() {
 				axisLabel: {
 					show: true,
 					formatter: function (value: number) {
-						return (value * yScale).toFixed(0);
+						return formatDistanceNm(value * yScale);
 					},
 					color: THEME.text2,
 					showMinLabel: true
+				},
+				splitLine: {
+					show: false
 				}
 			},
-			visualMap: [
-				{
-					type: 'continuous',
-					min: ps.min,
-					max: ps.max,
-					calculable: true,
-					realtime: false,
-					formatter: function (value: any) {
-						return Number(value).toPrecision(2);
-					},
-					itemWidth: 9,
-					itemHeight: 140,
-					text: [ps.unit, ''],
-					textStyle: {
-						color: THEME.text2
-					},
-					inRange: {
-						color: getColorMap(ps.min, ps.max)
-					},
-					left: 'right'
-				}
-			],
+			visualMap: [visualMap],
 				series: [
 					{
 						name: ps.quantity,
@@ -260,15 +381,26 @@ function setFullOptions() {
 					}
 				],
 			grid: {
-				containLabel: true,
-				left: '10%',
-				right: '10%'
+				containLabel: false,
+				left: 58,
+				right: 78,
+				top: 42,
+				bottom: 52
 			},
 			toolbox: {
 				show: true,
+				top: 10,
+				right: 10,
 				itemSize: 20,
+				itemGap: 12,
 				iconStyle: {
-					borderColor: THEME.toolboxIcon
+					borderColor: THEME.toolboxIcon,
+					borderWidth: 1.15
+				},
+				emphasis: {
+					iconStyle: {
+						borderColor: THEME.text1
+					}
 				},
 				feature: {
 					dataZoom: {
@@ -307,24 +439,31 @@ export function disposePreview2D() {
 	}
 	chartInstance = undefined;
 
-	// Remove resize listener and reset flag so re-init works
-	if (resizeListener) {
-		window.removeEventListener('resize', resizeListener);
-		resizeListener = null;
+	if (resizeObserver) {
+		resizeObserver.disconnect();
+		resizeObserver = null;
 	}
-	resizeListenerAttached = false;
 }
 
 export function resizeECharts() {
-	if (resizeListenerAttached) {
+	const container = document.getElementById('container');
+	if (!container) {
 		return;
 	}
-	resizeListener = function () {
-		if (chartInstance === undefined || chartInstance.isDisposed()) {
-			return;
-		}
+
+	if (!resizeObserver) {
+		resizeObserver = new ResizeObserver(() => {
+			if (chartInstance === undefined || chartInstance.isDisposed()) {
+				return;
+			}
+			chartInstance.resize();
+		});
+	}
+
+	resizeObserver.disconnect();
+	resizeObserver.observe(container);
+
+	if (chartInstance !== undefined && !chartInstance.isDisposed()) {
 		chartInstance.resize();
-	};
-	window.addEventListener('resize', resizeListener);
-	resizeListenerAttached = true;
+	}
 }

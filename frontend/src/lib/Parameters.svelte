@@ -1,163 +1,221 @@
 <script lang="ts">
-	import { parametersState as p } from '$api/incoming/parameters';
+	import { parametersState as parameters } from '$api/incoming/parameters';
 	import { postSelectedRegion } from '$api/outgoing/parameters';
+	import EmptyState from '$lib/ui/EmptyState.svelte';
+	import Panel from '$lib/ui/Panel.svelte';
+	import SelectField from '$lib/ui/SelectField.svelte';
+	import TextField from '$lib/ui/TextField.svelte';
+	import Toggle from '$lib/ui/Toggle.svelte';
 
-	let dropdownOpen = false;
-	let showZeroValues = false;
+	let search = $state('');
+	let showAll = $state(false);
+
+	function inferGroup(name: string) {
+		if (/^(Aex|Msat|alpha|Ku|Kc|Dbulk|Dind|Lambda|Pol|Temp|B1|B2)/.test(name)) {
+			return 'Material';
+		}
+		if (/^(B_|Edens_|ext_|J|I_oersted|J_oersted|torque|LLtorque)/.test(name)) {
+			return 'Fields & energy';
+		}
+		if (/^(geom|region|frozenspins|NoDemagSpins|MFM)/.test(name)) {
+			return 'Regions & geometry';
+		}
+		return 'Other';
+	}
+
+	const regionOptions = $derived($parameters.regions.map((region) => ({ value: String(region), label: `Region ${region}` })));
+
+	const visibleFields = $derived(
+		$parameters.fields.filter((field) => {
+			if (!showAll && !field.changed) {
+				return false;
+			}
+
+			if (!search.trim()) {
+				return true;
+			}
+
+			const term = search.trim().toLowerCase();
+			return (
+				field.name.toLowerCase().includes(term) ||
+				field.description.toLowerCase().includes(term) ||
+				field.value.toLowerCase().includes(term)
+			);
+		})
+	);
+
+	const groupedFields = $derived(
+		Array.from(
+			visibleFields.reduce((map, field) => {
+				const group = inferGroup(field.name);
+				const bucket = map.get(group) ?? [];
+				bucket.push(field);
+				map.set(group, bucket);
+				return map;
+			}, new Map<string, typeof visibleFields>())
+		)
+	);
 </script>
 
-<section>
-	<h2>Parameters</h2>
-
-	<div class="toolbar">
-		<!-- Region selector -->
-		<div class="dropdown-wrapper">
-			<button
-				class="dropdown-trigger"
-				on:click={() => dropdownOpen = !dropdownOpen}
-			>
-				<span class="dropdown-label">Region</span>
-				<span class="dropdown-value">{$p.selectedRegion}</span>
-				<span class="dropdown-arrow">▾</span>
-			</button>
-			{#if dropdownOpen}
-				<div class="dropdown-menu">
-					{#each $p.regions as region}
-						<button
-							class="dropdown-item"
-							class:active={$p.selectedRegion === region}
-							on:click={() => { postSelectedRegion(region); dropdownOpen = false; }}
-						>
-							{region}
-						</button>
-					{/each}
-				</div>
-			{/if}
+<Panel
+	title="Parameters"
+	subtitle="Searchable inspector with changed/default filtering and grouped readonly values."
+	panelId="parameters"
+	eyebrow="Inspector"
+>
+	<div class="parameter-toolbar">
+		<SelectField
+			label="Region"
+			value={$parameters.selectedRegion}
+			options={regionOptions}
+			onchange={(value) => postSelectedRegion(Number(value))}
+		/>
+		<TextField
+			label="Search"
+			placeholder="Filter by name, description or value"
+			value={search}
+			oninput={(event) => (search = (event.currentTarget as HTMLInputElement).value)}
+		/>
+		<div class="parameter-toggle">
+			<Toggle label="Show unchanged values" checked={showAll} onchange={(next) => (showAll = next)} />
 		</div>
-
-		<!-- Toggle -->
-		<label class="toggle">
-			<input type="checkbox" bind:checked={showZeroValues} />
-			<span class="toggle-label">Show unchanged</span>
-		</label>
 	</div>
 
-	<div class="params-list">
-		{#each $p.fields as field}
-			{#if field.changed || showZeroValues}
-				<div class="param-row">
-					<span class="param-name">{field.name}</span>
-					<span class="param-value">{field.value}</span>
-					<span class="param-desc">{field.description}</span>
-				</div>
-			{/if}
-		{/each}
-	</div>
-</section>
+	{#if !groupedFields.length}
+		<EmptyState
+			title="No parameters match the current filters"
+			description="Clear the search term or show unchanged values to broaden the inspector."
+			tone="info"
+		/>
+	{:else}
+		<div class="parameter-groups">
+			{#each groupedFields as [group, fields]}
+				<section class="parameter-group">
+					<header>
+						<h3>{group}</h3>
+						<p>{fields.length} item{fields.length === 1 ? '' : 's'}</p>
+					</header>
+					<div class="parameter-list">
+						{#each fields as field}
+							<article class="parameter-card" data-changed={field.changed}>
+								<div class="parameter-card__topline">
+									<strong>{field.name}</strong>
+									<span>{field.changed ? 'Changed' : 'Default'}</span>
+								</div>
+								<div class="parameter-card__value">{field.value}</div>
+								<p>{field.description}</p>
+							</article>
+						{/each}
+					</div>
+				</section>
+			{/each}
+		</div>
+	{/if}
+</Panel>
 
 <style>
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: var(--space-md);
-		margin-bottom: var(--space-md);
-		flex-wrap: wrap;
+	.parameter-toolbar {
+		display: grid;
+		grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto;
+		gap: 0.9rem;
+		align-items: end;
 	}
 
-	/* ─── Dropdown ─────────────────────────────────────────────── */
-	.dropdown-wrapper {
-		position: relative;
-	}
-	.dropdown-trigger {
+	.parameter-toggle {
 		display: flex;
-		align-items: center;
-		padding: 6px 10px;
-		gap: var(--space-sm);
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		color: var(--text-1);
-		font-size: 13px;
-		cursor: pointer;
-		transition: border-color var(--duration-fast) var(--easing-default);
+		justify-content: flex-end;
+		padding-bottom: 0.15rem;
 	}
-	.dropdown-trigger:hover { border-color: var(--border-interactive); }
-	.dropdown-label { color: var(--text-3); flex-shrink: 0; }
-	.dropdown-value { font-weight: 600; font-family: var(--font-mono); }
-	.dropdown-arrow { color: var(--text-3); font-size: 11px; }
-	.dropdown-menu {
-		position: absolute;
-		top: 100%; left: 0;
-		z-index: var(--z-overlay);
-		margin-top: 4px;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		box-shadow: var(--shadow-lg);
-		max-height: 200px;
-		overflow-y: auto;
-		min-width: 120px;
-	}
-	.dropdown-item {
-		display: block; width: 100%;
-		padding: 5px 12px; text-align: left;
-		background: transparent; border: none;
-		color: var(--text-2); font-size: 13px;
-		font-family: var(--font-mono); cursor: pointer;
-		transition: all var(--duration-instant) var(--easing-default);
-	}
-	.dropdown-item:hover { background: var(--surface-3); color: var(--text-1); }
-	.dropdown-item.active { color: var(--accent); font-weight: 600; }
 
-	/* ─── Toggle ───────────────────────────────────────────────── */
-	.toggle {
+	.parameter-groups {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.parameter-group {
+		display: grid;
+		gap: 0.8rem;
+	}
+
+	.parameter-group header {
 		display: flex;
-		align-items: center;
-		gap: var(--space-sm);
-		cursor: pointer;
-		font-size: 13px;
+		justify-content: space-between;
+		gap: 0.75rem;
+		align-items: baseline;
 	}
-	.toggle input[type="checkbox"] {
-		width: 16px; height: 16px;
-		accent-color: var(--accent);
-		cursor: pointer;
-	}
-	.toggle-label { color: var(--text-2); }
 
-	/* ─── Parameters list ─────────────────────────────────────── */
-	.params-list {
+	.parameter-group h3 {
+		margin: 0;
+		font-size: 0.96rem;
+	}
+
+	.parameter-group p {
+		margin: 0;
+		color: var(--text-2);
+		font-size: 0.85rem;
+	}
+
+	.parameter-list {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.8rem;
+	}
+
+	.parameter-card {
 		display: flex;
 		flex-direction: column;
-		gap: 0;
+		gap: 0.55rem;
+		padding: 0.9rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-subtle);
+		background: rgba(255, 255, 255, 0.03);
+		min-width: 0;
 	}
-	.param-row {
-		display: grid;
-		grid-template-columns: 120px 1fr 2fr;
-		gap: var(--space-sm);
+
+	.parameter-card[data-changed='true'] {
+		border-color: rgba(87, 200, 182, 0.3);
+		background: rgba(87, 200, 182, 0.05);
+	}
+
+	.parameter-card__topline {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.75rem;
 		align-items: baseline;
-		padding: 4px 0;
-		border-bottom: 1px solid var(--border-subtle);
 	}
-	.param-row:last-child { border-bottom: none; }
-	.param-name {
-		font-family: var(--font-mono);
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--text-1);
-		text-align: right;
-		padding-right: var(--space-sm);
+
+	.parameter-card__topline strong {
+		font-size: 0.95rem;
 	}
-	.param-value {
-		font-family: var(--font-mono);
-		font-size: 13px;
-		color: var(--accent);
-	}
-	.param-desc {
-		font-size: 12px;
-		font-style: italic;
+
+	.parameter-card__topline span {
+		font-size: 0.76rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
 		color: var(--text-3);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	}
+
+	.parameter-card__value {
+		font-family: 'IBM Plex Mono', monospace;
+		font-size: 0.92rem;
+		color: var(--text-1);
+		overflow-wrap: anywhere;
+	}
+
+	@media (max-width: 1023px) {
+		.parameter-toolbar {
+			grid-template-columns: 1fr;
+		}
+
+		.parameter-toggle {
+			justify-content: flex-start;
+		}
+	}
+
+	@media (max-width: 767px) {
+		.parameter-list {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

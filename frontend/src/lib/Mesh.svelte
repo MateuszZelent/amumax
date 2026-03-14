@@ -1,142 +1,94 @@
 <script lang="ts">
-	import { meshState as m } from '$api/incoming/mesh';
+	import { meshState as mesh } from '$api/incoming/mesh';
+	import Panel from '$lib/ui/Panel.svelte';
+	import ReadonlyField from '$lib/ui/ReadonlyField.svelte';
+
+	const dimensions = $derived([
+		{ label: 'dx', value: $mesh.dx.toPrecision(8), unit: 'm', group: 'Cell size' },
+		{ label: 'dy', value: $mesh.dy.toPrecision(8), unit: 'm', group: 'Cell size' },
+		{ label: 'dz', value: $mesh.dz.toPrecision(8), unit: 'm', group: 'Cell size' },
+		{ label: 'Nx', value: `${$mesh.Nx}`, group: 'Grid' },
+		{ label: 'Ny', value: `${$mesh.Ny}`, group: 'Grid' },
+		{ label: 'Nz', value: `${$mesh.Nz}`, group: 'Grid' },
+		{ label: 'Tx', value: $mesh.Tx.toExponential(6), unit: 'm', group: 'Size' },
+		{ label: 'Ty', value: $mesh.Ty.toExponential(6), unit: 'm', group: 'Size' },
+		{ label: 'Tz', value: $mesh.Tz.toExponential(6), unit: 'm', group: 'Size' },
+		{ label: 'PBCx', value: `${$mesh.PBCx}`, group: 'Boundaries' },
+		{ label: 'PBCy', value: `${$mesh.PBCy}`, group: 'Boundaries' },
+		{ label: 'PBCz', value: `${$mesh.PBCz}`, group: 'Boundaries' }
+	]);
+
+	const grouped = $derived(
+		Array.from(
+			dimensions.reduce((map, entry) => {
+				const bucket = map.get(entry.group) ?? [];
+				bucket.push(entry);
+				map.set(entry.group, bucket);
+				return map;
+			}, new Map<string, typeof dimensions>())
+		)
+	);
 </script>
 
-<section>
-	<h2>Mesh</h2>
-
-	<div class="mesh-grid">
-		<!-- Cell Size -->
-		<div class="group">
-			<div class="group-label">Cell Size</div>
-			<div class="field-row">
-				<span class="label">dx</span>
-				<span class="value">{$m.dx.toPrecision(8)}</span>
-				<span class="unit">m</span>
+<Panel
+	title="Mesh"
+	subtitle="Technical mesh facts exposed as true readonly values."
+	panelId="mesh"
+	eyebrow="Inspector"
+>
+	<div class="mesh-groups">
+		{#each grouped as [group, entries]}
+			<div class="mesh-group">
+				<header>{group}</header>
+				<div class="mesh-grid">
+					{#each entries as entry}
+						<ReadonlyField
+							label={entry.label}
+							value={entry.value}
+							unit={entry.unit ?? ''}
+							mono={true}
+						/>
+					{/each}
+				</div>
 			</div>
-			<div class="field-row">
-				<span class="label">dy</span>
-				<span class="value">{$m.dy.toPrecision(8)}</span>
-				<span class="unit">m</span>
-			</div>
-			<div class="field-row">
-				<span class="label">dz</span>
-				<span class="value">{$m.dz.toPrecision(8)}</span>
-				<span class="unit">m</span>
-			</div>
-		</div>
-
-		<!-- Grid Size -->
-		<div class="group">
-			<div class="group-label">Grid Size</div>
-			<div class="field-row">
-				<span class="label">Nx</span>
-				<span class="value">{$m.Nx}</span>
-				<span class="unit"></span>
-			</div>
-			<div class="field-row">
-				<span class="label">Ny</span>
-				<span class="value">{$m.Ny}</span>
-				<span class="unit"></span>
-			</div>
-			<div class="field-row">
-				<span class="label">Nz</span>
-				<span class="value">{$m.Nz}</span>
-				<span class="unit"></span>
-			</div>
-		</div>
-
-		<!-- Total Size -->
-		<div class="group">
-			<div class="group-label">Total Size</div>
-			<div class="field-row">
-				<span class="label">Tx</span>
-				<span class="value">{$m.Tx.toExponential(6)}</span>
-				<span class="unit">m</span>
-			</div>
-			<div class="field-row">
-				<span class="label">Ty</span>
-				<span class="value">{$m.Ty.toExponential(6)}</span>
-				<span class="unit">m</span>
-			</div>
-			<div class="field-row">
-				<span class="label">Tz</span>
-				<span class="value">{$m.Tz.toExponential(6)}</span>
-				<span class="unit">m</span>
-			</div>
-		</div>
-
-		<!-- PBC -->
-		<div class="group">
-			<div class="group-label">PBC</div>
-			<div class="field-row">
-				<span class="label">x</span>
-				<span class="value">{$m.PBCx}</span>
-				<span class="unit"></span>
-			</div>
-			<div class="field-row">
-				<span class="label">y</span>
-				<span class="value">{$m.PBCy}</span>
-				<span class="unit"></span>
-			</div>
-			<div class="field-row">
-				<span class="label">z</span>
-				<span class="value">{$m.PBCz}</span>
-				<span class="unit"></span>
-			</div>
-		</div>
+		{/each}
 	</div>
-</section>
+</Panel>
 
 <style>
+	.mesh-groups {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.mesh-group {
+		display: grid;
+		gap: 0.8rem;
+	}
+
+	.mesh-group header {
+		font-size: 0.76rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-3);
+	}
+
 	.mesh-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--space-lg);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.8rem;
 	}
-	@media (max-width: 600px) {
-		.mesh-grid { grid-template-columns: 1fr; }
+
+	@media (max-width: 1023px) {
+		.mesh-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 	}
-	.group-label {
-		font-size: 10px;
-		font-weight: 600;
-		color: var(--text-3);
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		margin-bottom: var(--space-xs);
-	}
-	.group {
-		display: grid;
-		grid-template-columns: 28px 1fr 20px;
-		gap: 0 var(--space-sm);
-		align-items: center;
-	}
-	.group-label {
-		grid-column: 1 / -1;
-	}
-	.field-row {
-		display: contents;
-	}
-	.label {
-		font-size: 12px;
-		color: var(--text-3);
-		font-family: var(--font-mono);
-		padding: 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.value {
-		font-family: var(--font-mono);
-		font-size: 13px;
-		color: var(--text-1);
-		text-align: right;
-		padding: 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.unit {
-		font-size: 11px;
-		color: var(--text-3);
-		font-family: var(--font-mono);
-		padding: 5px 0;
-		border-bottom: 1px solid var(--border-subtle);
+
+	@media (max-width: 639px) {
+		.mesh-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

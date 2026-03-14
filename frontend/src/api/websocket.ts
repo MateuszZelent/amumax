@@ -12,6 +12,7 @@ import { preview3D } from '$lib/preview/preview3D';
 import { preview2D } from '$lib/preview/preview2D';
 import { plotTable } from '$lib/table-plot/table-plot';
 import { metricsState, type Metrics } from './incoming/metrics';
+import type { ConnectionState } from '$lib/ui/types';
 
 type MainUpdate = {
 	console?: Console;
@@ -25,6 +26,7 @@ type MainUpdate = {
 };
 
 export let connected = writable(false);
+export let connectionState = writable<ConnectionState>('disconnected');
 let previewRenderScheduled = false;
 let tableRenderScheduled = false;
 
@@ -109,8 +111,14 @@ function connectWS(
 export function initializeWebSocket() {
 	connectWS(
 		'./ws',
-		() => connected.set(true),
-		() => connected.set(false),
+		() => {
+			connected.set(true);
+			connectionState.set('connected');
+		},
+		() => {
+			connected.set(false);
+			connectionState.update((state) => (state === 'connected' ? 'reconnecting' : 'disconnected'));
+		},
 		parseMsgpack
 	);
 	connectWS(

@@ -1,107 +1,183 @@
 <script lang="ts">
 	import { consoleState } from '$api/incoming/console';
 	import { postCommand } from '$api/outgoing/console';
-
+	import { connectionState } from '$api/websocket';
+	import Button from '$lib/ui/Button.svelte';
+	import EmptyState from '$lib/ui/EmptyState.svelte';
+	import Panel from '$lib/ui/Panel.svelte';
 	import Prism from 'prismjs';
-	import 'prismjs/components/prism-go'; // Ensure the import path is correct
-	import { onMount, tick } from 'svelte';
+	import 'prismjs/components/prism-go';
+	import { tick } from 'svelte';
 
-	let command = '';
+	let command = $state('');
+	let commandHistory = $state<string[]>([]);
+	let historyIndex = $state(-1);
 	let codeDiv: HTMLDivElement | null = null;
 
-	// Handle Enter key to submit commands
-	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			postCommand(command);
-			event.preventDefault(); // Prevent the default action to avoid form submission or newline in input
-		}
-	}
+	const highlightedConsole = $derived(Prism.highlight($consoleState.hist, Prism.languages['go'], 'go'));
+
 	async function scrollDown() {
-		if (codeDiv) {
-			// Wait for the DOM to update (e.g. after a new line in hist is added)
-			await tick();
-			const isAtBottom = codeDiv.scrollTop + codeDiv.clientHeight >= codeDiv.scrollHeight - 100;
-			if (isAtBottom) {
-				codeDiv.scrollBy(0, codeDiv.scrollHeight);
-			}
+		if (!codeDiv) {
+			return;
+		}
+		await tick();
+		const isNearBottom = codeDiv.scrollTop + codeDiv.clientHeight >= codeDiv.scrollHeight - 96;
+		if (isNearBottom) {
+			codeDiv.scrollTop = codeDiv.scrollHeight;
 		}
 	}
 
-	$: {
-		$consoleState.hist; // Trigger the reactive statement when hist changes
-		scrollDown();
+	function submitCommand() {
+		const next = command.trim();
+		if (!next || $connectionState === 'disconnected') {
+			return;
+		}
+		postCommand(next);
+		commandHistory = [next, ...commandHistory.filter((entry) => entry !== next)].slice(0, 30);
+		historyIndex = -1;
+		command = '';
 	}
-	onMount(() => {
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			submitCommand();
+			return;
+		}
+
+		if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			if (!commandHistory.length) {
+				return;
+			}
+			historyIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
+			command = commandHistory[historyIndex] ?? command;
+		}
+
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			if (!commandHistory.length) {
+				return;
+			}
+			historyIndex = Math.max(historyIndex - 1, -1);
+			command = historyIndex === -1 ? '' : (commandHistory[historyIndex] ?? '');
+		}
+	}
+
+	$effect(() => {
+		$consoleState.hist;
 		scrollDown();
 	});
 </script>
 
-<section>
-	<h2 class="mb-4 text-2xl font-semibold">Console</h2>
-	<div class="console-container">
-		<div class="code" bind:this={codeDiv}>
-			{@html Prism.highlight($consoleState.hist, Prism.languages['go'], 'go')}
+<Panel title="Console" subtitle="Terminal-like command channel with history and sticky input." panelId="console" eyebrow="Diagnostics">
+	<div class="console-shell">
+		<div class="console-shell__output" bind:this={codeDiv}>
+			{#if !$consoleState.hist}
+				<EmptyState
+					title={$connectionState === 'disconnected' ? 'Console offline' : 'Console is ready'}
+					description={$connectionState === 'disconnected'
+						? 'Reconnect to the backend to restore the command channel.'
+						: 'Run commands to inspect or steer the simulation engine.'}
+					tone={$connectionState === 'disconnected' ? 'warn' : 'info'}
+					compact={true}
+				/>
+			{:else}
+				<div class="console-shell__code">{@html highlightedConsole}</div>
+			{/if}
 		</div>
-		<div class="input-row">
-			<span class="prompt">›</span>
+
+		<div class="console-shell__input">
 			<input
-				placeholder="type commands here..."
-				bind:value={command}
-				on:keydown={handleKeydown}
+				placeholder={$connectionState === 'connected'
+					? 'Run a command. Use ↑ and ↓ for history.'
+					: 'Console disabled while disconnected.'}
+				value={command}
+				oninput={(event) => (command = (event.currentTarget as HTMLInputElement).value)}
+				onkeydown={handleKeydown}
+				disabled={$connectionState === 'disconnected'}
 			/>
+			<Button variant="solid" tone="accent" onclick={submitCommand} disabled={$connectionState === 'disconnected'}>
+				Send
+			</Button>
 		</div>
 	</div>
-</section>
+</Panel>
 
 <style>
-	section {
-	}
-	.console-container {
+	.console-shell {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-xs);
+		gap: 0.9rem;
+		min-height: 0;
 	}
-	.code {
+
+	.console-shell__output {
+		min-height: var(--terminal-height);
+		max-height: var(--terminal-height);
+		overflow: auto;
+		padding: 1rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-subtle);
+		background:
+			linear-gradient(180deg, rgba(8, 12, 22, 0.96), rgba(7, 10, 18, 0.98)),
+			#060911;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	}
+
+	.console-shell__code {
 		white-space: pre-wrap;
-		overflow-y: auto;
-		height: 28rem;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		width: 100%;
-		padding: var(--space-sm) var(--space-md);
-		font-family: var(--font-mono);
-		font-size: 13px;
+		font-family: 'IBM Plex Mono', monospace;
+		font-size: 0.85rem;
 		line-height: 1.6;
-		color: var(--text-2);
-		background-color: var(--surface-2);
-	}
-	.input-row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-sm);
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-md);
-		padding: 0 var(--space-md);
-	}
-	.prompt {
-		color: var(--accent);
-		font-family: var(--font-mono);
-		font-weight: 600;
-		font-size: 14px;
-		flex-shrink: 0;
-	}
-	.input-row input {
-		width: 100%;
-		background: transparent;
-		border: none;
 		color: var(--text-1);
-		font-family: var(--font-mono);
-		font-size: 13px;
-		padding: var(--space-sm) 0;
 	}
-	.input-row input:focus {
+
+	.console-shell__input {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 0.75rem;
+		position: sticky;
+		bottom: 0;
+	}
+
+	.console-shell__input input {
+		min-height: 2.8rem;
+		padding: 0 0.95rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-subtle);
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-1);
 		outline: none;
-		box-shadow: none;
+	}
+
+	.console-shell__input input:focus {
+		border-color: var(--border-interactive);
+		box-shadow: var(--focus-ring);
+	}
+
+	.console-shell__input input::placeholder {
+		color: var(--text-3);
+	}
+
+	:global(.token.comment),
+	:global(.token.prolog),
+	:global(.token.doctype),
+	:global(.token.cdata) {
+		color: #7b8fb6;
+	}
+
+	:global(.token.keyword) {
+		color: #7cb5ff;
+	}
+
+	:global(.token.string),
+	:global(.token.attr-value) {
+		color: #7ad5a4;
+	}
+
+	:global(.token.number),
+	:global(.token.boolean) {
+		color: #ffbf73;
 	}
 </style>

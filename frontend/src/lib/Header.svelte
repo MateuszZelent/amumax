@@ -1,109 +1,118 @@
 <script lang="ts">
 	import { headerState } from '$api/incoming/header';
-	import { connected } from '$api/websocket';
+	import { connectionState } from '$api/websocket';
+	import Button from '$lib/ui/Button.svelte';
+	import ConnectionBadge from '$lib/ui/ConnectionBadge.svelte';
+	import StatusBadge from '$lib/ui/StatusBadge.svelte';
+	import { panelPreferences, setDensityMode } from '$lib/ui/preferences';
+
+	const solverTone = $derived(
+		$headerState.status === 'running'
+			? 'success'
+			: $headerState.status === 'paused'
+				? 'warn'
+				: 'danger'
+	);
+
+	const solverLabel = $derived.by(() => {
+		if (!$headerState.status) {
+			return 'Idle';
+		}
+		return $headerState.status[0].toUpperCase() + $headerState.status.slice(1);
+	});
+
+	function toggleDensity() {
+		setDensityMode($panelPreferences.densityMode === 'compact' ? 'cozy' : 'compact');
+	}
 </script>
 
-<section class="header-bar">
-	<div class="header-content">
-		<!-- Connection & Status -->
-		<div class="status-group">
-			<div class="connection-badge" class:connected={$connected} class:disconnected={!$connected}>
-				<span class="dot"></span>
-				{#if $connected}
-					{#if $headerState.status === 'running'}
-						<span class="label">Running</span>
-					{:else if $headerState.status === 'paused'}
-						<span class="label">Paused</span>
-					{:else}
-						<span class="label">Idle</span>
-					{/if}
-				{:else}
-					<span class="label">Disconnected</span>
-				{/if}
-			</div>
-		</div>
-
-		<!-- File Path -->
-		<div class="file-path">
-			{$headerState.path}
-		</div>
-
-		<!-- Version -->
-		<div class="version">
-			v{$headerState.version}
-		</div>
+<header class="topbar">
+	<div class="topbar__cluster topbar__cluster--status">
+		<ConnectionBadge state={$connectionState} />
+		<StatusBadge label={solverLabel} tone={solverTone} pulse={$headerState.status === 'running'} />
 	</div>
-</section>
+
+	<div class="topbar__path">
+		<div class="topbar__eyebrow">Workspace</div>
+		<strong>{$headerState.path || 'No simulation file loaded'}</strong>
+	</div>
+
+	<div class="topbar__cluster topbar__cluster--meta">
+		<div class="topbar__version">v{$headerState.version || 'dev'}</div>
+		<Button
+			variant="outline"
+			size="sm"
+			tone="info"
+			onclick={toggleDensity}
+			title="Toggle UI density"
+		>
+			Density: {$panelPreferences.densityMode}
+		</Button>
+	</div>
+</header>
 
 <style>
-	.header-bar {
+	.topbar {
 		position: sticky;
 		top: 0;
 		z-index: var(--z-sticky);
-		background: var(--surface-1);
-		border-bottom: 1px solid var(--border);
-		padding: var(--space-sm) var(--space-lg);
-		backdrop-filter: blur(12px);
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 1rem;
+		padding: 1rem 1.1rem;
+		border: 1px solid var(--border-subtle);
+		border-radius: calc(var(--radius-lg) + 0.15rem);
+		background:
+			linear-gradient(180deg, rgba(18, 29, 49, 0.96), rgba(10, 18, 30, 0.94)),
+			var(--surface-glass);
+		backdrop-filter: blur(18px);
+		box-shadow: var(--shadow-panel);
 	}
-	.header-content {
+
+	.topbar__cluster {
 		display: flex;
 		align-items: center;
-		gap: var(--space-lg);
-		max-width: 100%;
+		gap: 0.75rem;
+		flex-wrap: wrap;
 	}
-	.status-group {
-		flex-shrink: 0;
-	}
-	.connection-badge {
-		display: flex;
-		align-items: center;
-		gap: var(--space-xs);
-		padding: 3px 10px;
-		border-radius: 20px;
-		font-size: 12px;
-		font-weight: 500;
-		letter-spacing: 0.02em;
-		transition: all var(--duration-fast) var(--easing-default);
-	}
-	.connection-badge.connected {
-		background: rgba(34, 197, 94, 0.12);
-		color: var(--success);
-		border: 1px solid rgba(34, 197, 94, 0.25);
-	}
-	.connection-badge.disconnected {
-		background: rgba(239, 68, 68, 0.12);
-		color: var(--danger);
-		border: 1px solid rgba(239, 68, 68, 0.25);
-	}
-	.dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-	.connected .dot {
-		background: var(--success);
-		box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
-	}
-	.disconnected .dot {
-		background: var(--danger);
-		box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
-	}
-	.file-path {
-		flex: 1;
+
+	.topbar__path {
 		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.topbar__eyebrow {
+		font-size: 0.74rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--text-3);
+	}
+
+	.topbar__path strong {
+		font-size: 1.04rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-family: var(--font-mono);
-		font-size: 13px;
-		color: var(--text-2);
 	}
-	.version {
-		flex-shrink: 0;
-		font-size: 12px;
-		font-family: var(--font-mono);
+
+	.topbar__version {
+		font-size: 0.85rem;
 		color: var(--text-3);
-		white-space: nowrap;
+	}
+
+	@media (max-width: 1023px) {
+		.topbar {
+			grid-template-columns: 1fr;
+		}
+
+		.topbar__cluster--meta {
+			justify-content: space-between;
+		}
 	}
 </style>

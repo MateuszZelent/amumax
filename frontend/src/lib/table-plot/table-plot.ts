@@ -1,7 +1,7 @@
 import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { tablePlotState } from '$api/incoming/table-plot';
-import { THEME } from '$lib/theme/echarts-theme';
+import { ECHARTS_THEME_NAME, THEME, ensureAmumaxEChartsTheme } from '$lib/theme/echarts-theme';
 
 export function plotTable() {
     if (chartInstance === undefined) {
@@ -13,6 +13,7 @@ export function plotTable() {
 }
 
 let chartInstance: echarts.ECharts;
+let resizeObserver: ResizeObserver | null = null;
 
 function update() {
     if (chartInstance === undefined) {
@@ -46,7 +47,8 @@ export function init() {
         return;
     }
     // https://apache.github.io/echarts-handbook/en/best-practices/canvas-vs-svg
-    chartInstance = echarts.init(chartDom, undefined, { renderer: 'canvas', useDirtyRect: true });
+    ensureAmumaxEChartsTheme();
+    chartInstance = echarts.init(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
     let t = get(tablePlotState);
 
     // @ts-ignore
@@ -142,19 +144,29 @@ export function init() {
             }
         ]
     });
+
+    resizeECharts();
 }
 
-let resizeListenerAttached = false;
-
 export function resizeECharts() {
-    if (resizeListenerAttached) {
+    const chartDom = document.getElementById('table-plot');
+    if (!chartDom) {
         return;
     }
-    resizeListenerAttached = true;
-    window.addEventListener('resize', function () {
-        if (chartInstance === undefined || chartInstance.isDisposed()) {
-            return;
-        }
+
+    if (!resizeObserver) {
+        resizeObserver = new ResizeObserver(() => {
+            if (chartInstance === undefined || chartInstance.isDisposed()) {
+                return;
+            }
+            chartInstance.resize();
+        });
+    }
+
+    resizeObserver.disconnect();
+    resizeObserver.observe(chartDom);
+
+    if (chartInstance !== undefined && !chartInstance.isDisposed()) {
         chartInstance.resize();
-    });
+    }
 }

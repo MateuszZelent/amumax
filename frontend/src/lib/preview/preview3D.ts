@@ -6,6 +6,7 @@ import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls
 import { get } from 'svelte/store';
 import { writable } from 'svelte/store';
 import { disposePreview2D } from './preview2D';
+import { THEME } from '$lib/theme/echarts-theme';
 
 // ─── Quality presets ────────────────────────────────────────────────
 export type QualityLevel = 'low' | 'high' | 'ultra';
@@ -147,6 +148,10 @@ export function disposePreview3D() {
 			container.innerHTML = '';
 		}
 	}
+	if (resizeObserver) {
+		resizeObserver.disconnect();
+		resizeObserver = null;
+	}
 }
 
 // ─── Types & state ──────────────────────────────────────────────────
@@ -160,6 +165,7 @@ interface ThreeDPreview {
 }
 export const threeDPreview = writable<ThreeDPreview | null>(null);
 let animationFrameId: number | null = null;
+let resizeObserver: ResizeObserver | null = null;
 
 // ─── Geometry & Material ────────────────────────────────────────────
 function createMesh(): THREE.InstancedMesh {
@@ -239,7 +245,7 @@ function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 function createScene(): THREE.Scene {
 	const cfg = getConfig();
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x080d1a);
+	scene.background = new THREE.Color(THEME.bg);
 
 	if (cfg.useLighting) {
 		const b = get(brightness);
@@ -331,17 +337,23 @@ function init() {
 	// [Fix #2] update() after store is set so it can find the mesh
 	update();
 
-	// [Fix #12] Handle window resize for 3D renderer
-	const onResize = () => {
-		const container = document.getElementById('container');
-		if (!container) return;
-		const w = container.clientWidth;
-		const h = container.clientHeight;
-		renderer.setSize(w, h);
-		camera.aspect = w / h;
-		camera.updateProjectionMatrix();
-	};
-	window.addEventListener('resize', onResize);
+	const container = document.getElementById('container');
+	if (container) {
+		if (!resizeObserver) {
+			resizeObserver = new ResizeObserver(() => {
+				const current = document.getElementById('container');
+				if (!current) return;
+				const w = current.clientWidth;
+				const h = current.clientHeight;
+				renderer.setSize(w, h);
+				camera.aspect = w / h;
+				camera.updateProjectionMatrix();
+			});
+		}
+
+		resizeObserver.disconnect();
+		resizeObserver.observe(container);
+	}
 
 	function animate() {
 		animationFrameId = requestAnimationFrame(animate);

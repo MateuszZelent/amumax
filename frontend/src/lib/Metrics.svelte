@@ -1,180 +1,111 @@
 <script lang="ts">
-	import { metricsState as m } from '$api/incoming/metrics';
+	import { metricsState as metrics } from '$api/incoming/metrics';
 	import { postResetError } from '$api/outgoing/metrics';
+	import Button from '$lib/ui/Button.svelte';
+	import EmptyState from '$lib/ui/EmptyState.svelte';
+	import MetricTile from '$lib/ui/MetricTile.svelte';
+	import Panel from '$lib/ui/Panel.svelte';
+
+	function pct(value: number) {
+		return `${value.toFixed(1)}%`;
+	}
+
+	function gib(value: number) {
+		return `${(value / 1024).toFixed(2)} GiB`;
+	}
 </script>
 
-<section>
-	<h2>Metrics</h2>
-
-	{#if $m.error}
-		<div class="error-state">
-			<p class="error-msg">Error collecting metrics: {$m.error}</p>
-			<button class="retry-btn" on:click={postResetError}>Retry</button>
-		</div>
+<Panel title="Metrics" subtitle="Host and simulation telemetry with compact signal-first cards." panelId="metrics" eyebrow="Diagnostics">
+	{#if $metrics.error}
+		<EmptyState
+			title="Telemetry unavailable"
+			description={`The backend could not collect system metrics: ${$metrics.error}`}
+			tone="danger"
+		>
+			<Button variant="solid" tone="danger" onclick={postResetError}>Retry metrics</Button>
+		</EmptyState>
 	{:else}
-		<div class="metrics-grid">
-			<!-- System -->
-			<div class="metric-group">
-				<div class="group-label">System</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">CPU</span>
-						<span class="tile-value">{$m.cpuPercentTotal.toFixed(1)}%</span>
-					</div>
-					<div class="bar"><div class="bar-fill blue" style="width: {$m.cpuPercentTotal}%"></div></div>
+		<div class="metrics-sections">
+			<section class="metrics-section">
+				<header>
+					<h3>Host</h3>
+					<p>Machine-wide resource pressure.</p>
+				</header>
+				<div class="metrics-grid">
+					<MetricTile label="CPU total" value={pct($metrics.cpuPercentTotal)} progress={$metrics.cpuPercentTotal} tone="info" />
+					<MetricTile label="RAM total" value={pct($metrics.ramPercentTotal)} progress={$metrics.ramPercentTotal} tone="accent" />
+					<MetricTile label="GPU util." value={pct($metrics.gpuUtilizationPercent)} progress={$metrics.gpuUtilizationPercent} tone="info" />
+					<MetricTile
+						label="Power draw"
+						value={`${$metrics.gpuPowerDraw.toFixed(1)} W`}
+						detail={`${$metrics.gpuPowerLimit.toFixed(1)} W limit`}
+						progress={$metrics.gpuPowerLimit > 0 ? ($metrics.gpuPowerDraw / $metrics.gpuPowerLimit) * 100 : 0}
+						tone="warn"
+					/>
 				</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">RAM</span>
-						<span class="tile-value">{$m.ramPercentTotal.toFixed(1)}%</span>
-					</div>
-					<div class="bar"><div class="bar-fill green" style="width: {$m.ramPercentTotal}%"></div></div>
-				</div>
-			</div>
+			</section>
 
-			<!-- Simulation -->
-			<div class="metric-group">
-				<div class="group-label">Simulation (PID {$m.pid})</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">CPU</span>
-						<span class="tile-value">{$m.cpuPercent.toFixed(1)}%</span>
-					</div>
-					<div class="bar"><div class="bar-fill blue" style="width: {Math.min($m.cpuPercent, 100)}%"></div></div>
+			<section class="metrics-section">
+				<header>
+					<h3>Simulation</h3>
+					<p>Process-scoped diagnostics and GPU residency.</p>
+				</header>
+				<div class="metrics-grid">
+					<MetricTile label="PID" value={`${$metrics.pid}`} detail={$metrics.gpuName || 'No GPU name'} />
+					<MetricTile label="CPU proc." value={pct($metrics.cpuPercent)} progress={$metrics.cpuPercent} tone="info" />
+					<MetricTile label="RAM proc." value={pct($metrics.ramPercent)} progress={$metrics.ramPercent} tone="accent" />
+					<MetricTile
+						label="VRAM used"
+						value={gib($metrics.gpuVramUsed)}
+						detail={`${gib($metrics.gpuVramTotal)} total`}
+						progress={$metrics.gpuVramTotal > 0 ? ($metrics.gpuVramUsed / $metrics.gpuVramTotal) * 100 : 0}
+						tone={$metrics.gpuVramTotal > 0 && $metrics.gpuVramUsed / $metrics.gpuVramTotal > 0.8 ? 'warn' : 'default'}
+					/>
+					<MetricTile label="GPU temp." value={`${$metrics.gpuTemperature}°C`} detail={$metrics.gpuUUID || 'UUID unavailable'} tone={$metrics.gpuTemperature > 80 ? 'warn' : 'default'} />
 				</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">RAM</span>
-						<span class="tile-value">{$m.ramPercent.toFixed(1)}%</span>
-					</div>
-					<div class="bar"><div class="bar-fill green" style="width: {$m.ramPercent}%"></div></div>
-				</div>
-			</div>
-
-			<!-- GPU -->
-			<div class="metric-group">
-				<div class="group-label">GPU — {$m.gpuName}</div>
-				<div class="stat-row">
-					<span class="stat-label">Temp</span>
-					<span class="stat-value">{$m.gpuTemperature}°C</span>
-				</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">Utilization</span>
-						<span class="tile-value">{$m.gpuUtilizationPercent}%</span>
-					</div>
-					<div class="bar"><div class="bar-fill purple" style="width: {$m.gpuUtilizationPercent}%"></div></div>
-				</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">Power</span>
-						<span class="tile-value">{$m.gpuPowerDraw.toFixed(0)} W</span>
-					</div>
-					<div class="bar"><div class="bar-fill purple" style="width: {($m.gpuPowerDraw / $m.gpuPowerLimit) * 100}%"></div></div>
-				</div>
-				<div class="metric-tile">
-					<div class="tile-header">
-						<span class="tile-name">VRAM</span>
-						<span class="tile-value">{($m.gpuVramUsed / 1024).toFixed(1)} / {($m.gpuVramTotal / 1024).toFixed(1)} GiB</span>
-					</div>
-					<div class="bar"><div class="bar-fill purple" style="width: {($m.gpuVramUsed / $m.gpuVramTotal) * 100}%"></div></div>
-				</div>
-			</div>
+			</section>
 		</div>
 	{/if}
-</section>
+</Panel>
 
 <style>
+	.metrics-sections {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.metrics-section {
+		display: grid;
+		gap: 0.8rem;
+		padding: 0.2rem 0;
+	}
+
+	.metrics-section header {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.metrics-section h3 {
+		margin: 0;
+		font-size: 0.95rem;
+	}
+
+	.metrics-section p {
+		margin: 0;
+		color: var(--text-2);
+		font-size: 0.88rem;
+	}
+
 	.metrics-grid {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-lg);
-	}
-	.metric-group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-sm);
-	}
-	.group-label {
-		font-size: 10px;
-		font-weight: 600;
-		color: var(--text-3);
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-	}
-	.metric-tile {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-	}
-	.tile-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-	.tile-name {
-		font-size: 12px;
-		color: var(--text-2);
-	}
-	.tile-value {
-		font-size: 12px;
-		font-family: var(--font-mono);
-		color: var(--text-1);
-		font-weight: 500;
-	}
-	.bar {
-		height: 4px;
-		background: var(--surface-3);
-		border-radius: 2px;
-		overflow: hidden;
-	}
-	.bar-fill {
-		height: 100%;
-		border-radius: 2px;
-		transition: width var(--duration-normal) var(--easing-default);
-	}
-	.bar-fill.blue   { background: var(--accent); }
-	.bar-fill.green  { background: var(--success); }
-	.bar-fill.purple { background: #8b5cf6; }
-
-	.stat-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 2px 0;
-	}
-	.stat-label {
-		font-size: 12px;
-		color: var(--text-2);
-	}
-	.stat-value {
-		font-size: 12px;
-		font-family: var(--font-mono);
-		color: var(--text-1);
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.8rem;
 	}
 
-	/* Error state */
-	.error-state {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-sm);
-		align-items: flex-start;
-	}
-	.error-msg {
-		color: var(--danger);
-		font-size: 13px;
-	}
-	.retry-btn {
-		padding: 6px 14px;
-		background: transparent;
-		border: 1px solid var(--danger);
-		border-radius: var(--radius-md);
-		color: var(--danger);
-		font-size: 13px;
-		cursor: pointer;
-		transition: all var(--duration-fast) var(--easing-default);
-	}
-	.retry-btn:hover {
-		background: rgba(239, 68, 68, 0.1);
+	@media (max-width: 639px) {
+		.metrics-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
