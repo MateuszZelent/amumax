@@ -1,7 +1,12 @@
-import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { tablePlotState } from '$api/incoming/table-plot';
-import { ECHARTS_THEME_NAME, THEME, ensureAmumaxEChartsTheme } from '$lib/theme/echarts-theme';
+import {
+	ECHARTS_THEME_NAME,
+	THEME,
+	ensureAmumaxEChartsTheme,
+	initECharts,
+	type ECharts
+} from '$lib/theme/echarts-theme';
 
 export function plotTable() {
     if (chartInstance === undefined) {
@@ -12,7 +17,7 @@ export function plotTable() {
     }
 }
 
-let chartInstance: echarts.ECharts;
+let chartInstance: ECharts;
 let resizeObserver: ResizeObserver | null = null;
 
 function update() {
@@ -48,7 +53,7 @@ export function init() {
     }
     // https://apache.github.io/echarts-handbook/en/best-practices/canvas-vs-svg
     ensureAmumaxEChartsTheme();
-    chartInstance = echarts.init(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
+    chartInstance = initECharts(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
     let t = get(tablePlotState);
 
     // @ts-ignore

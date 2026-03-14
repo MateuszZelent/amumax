@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { tablePlotState } from '$api/incoming/table-plot';
 	import {
 		postAutoSaveInterval,
@@ -12,6 +13,7 @@
 	import SelectField from '$lib/ui/SelectField.svelte';
 	import StatusBadge from '$lib/ui/StatusBadge.svelte';
 	import TextField from '$lib/ui/TextField.svelte';
+	import { plotTable } from './table-plot';
 
 	let autosaveDraft = $state('');
 	let maxPointsDraft = $state('');
@@ -45,6 +47,10 @@
 		postStep(value);
 		stepDraft = '';
 	}
+
+	onMount(() => {
+		void plotTable();
+	});
 </script>
 
 <Panel
@@ -53,9 +59,9 @@
 	panelId="tableplot"
 	eyebrow="Visualization"
 >
-	<svelte:fragment slot="actions">
+	{#snippet actions()}
 		<StatusBadge label={`${$tablePlotState.data.length} points`} tone={$tablePlotState.data.length ? 'info' : 'default'} />
-	</svelte:fragment>
+	{/snippet}
 
 	{#if $tablePlotState.data.length === 0}
 		<EmptyState

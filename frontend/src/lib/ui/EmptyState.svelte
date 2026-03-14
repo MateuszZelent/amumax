@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { StatusTone } from './types';
 
 	type Props = {
@@ -6,9 +7,10 @@
 		description: string;
 		tone?: StatusTone;
 		compact?: boolean;
+		children?: Snippet;
 	};
 
-	let { title, description, tone = 'default', compact = false }: Props = $props();
+	let { title, description, tone = 'default', compact = false, children }: Props = $props();
 </script>
 
 <div class="ui-empty" data-tone={tone} data-compact={compact}>
@@ -16,7 +18,9 @@
 	<h3>{title}</h3>
 	<p>{description}</p>
 	<div class="ui-empty__actions">
-		<slot />
+		{#if children}
+			{@render children()}
+		{/if}
 	</div>
 </div>
 

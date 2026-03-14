@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { StatusTone } from './types';
 
 	type Props = {
@@ -11,6 +12,8 @@
 		collapsed?: boolean;
 		className?: string;
 		onToggleCollapse?: () => void;
+		children?: Snippet;
+		actions?: Snippet;
 	};
 
 	let {
@@ -22,7 +25,9 @@
 		collapsible = false,
 		collapsed = false,
 		className = '',
-		onToggleCollapse
+		onToggleCollapse,
+		children,
+		actions
 	}: Props = $props();
 </script>
 
@@ -41,7 +46,9 @@
 		</div>
 
 		<div class="ui-panel__actions">
-			<slot name="actions" />
+			{#if actions}
+				{@render actions()}
+			{/if}
 			{#if collapsible}
 				<button
 					class="ui-panel__collapse"
@@ -58,7 +65,9 @@
 
 	{#if !collapsed}
 		<div class="ui-panel__body">
-			<slot />
+			{#if children}
+				{@render children()}
+			{/if}
 		</div>
 	{/if}
 </section>

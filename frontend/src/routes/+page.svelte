@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import type { Component } from 'svelte';
 
 	import { headerState } from '$api/incoming/header';
 	import { connected, initializeWebSocket } from '$api/websocket';
@@ -10,9 +11,7 @@
 	import Mesh from '$lib/Mesh.svelte';
 	import Metrics from '$lib/Metrics.svelte';
 	import Parameters from '$lib/Parameters.svelte';
-	import Preview from '$lib/preview/Preview.svelte';
 	import Solver from '$lib/Solver.svelte';
-	import TablePlot from '$lib/table-plot/TablePlot.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import { panelPreferences, setActiveCompactTab } from '$lib/ui/preferences';
 	import type { CompactTab, WorkspaceMode } from '$lib/ui/types';
@@ -21,6 +20,8 @@
 
 	let workspaceMode = $state<WorkspaceMode>('wide');
 	let showShortcuts = $state(false);
+	let PreviewComponent = $state<Component | null>(null);
+	let TablePlotComponent = $state<Component | null>(null);
 
 	const compactTabs: { id: CompactTab; label: string }[] = [
 		{ id: 'visualization', label: 'Visuals' },
@@ -101,6 +102,13 @@
 		syncWorkspaceMode();
 		window.addEventListener('resize', syncWorkspaceMode);
 		window.addEventListener('keydown', handleShortcuts);
+
+		void Promise.all([import('$lib/preview/Preview.svelte'), import('$lib/table-plot/TablePlot.svelte')]).then(
+			([previewModule, tablePlotModule]) => {
+				PreviewComponent = previewModule.default;
+				TablePlotComponent = tablePlotModule.default;
+			}
+		);
 	});
 
 	onDestroy(() => {
@@ -133,10 +141,18 @@
 	<div class="workspace">
 		<!-- Row 1: Visualization -->
 		<div class="zone-viz">
-			<Preview />
+			{#if PreviewComponent}
+				<PreviewComponent />
+			{:else}
+				<div class="workspace-loading-card">Loading preview surface…</div>
+			{/if}
 		</div>
 		<div class="zone-table">
-			<TablePlot />
+			{#if TablePlotComponent}
+				<TablePlotComponent />
+			{:else}
+				<div class="workspace-loading-card">Loading analytical plot…</div>
+			{/if}
 		</div>
 
 		<!-- Row 2: Controls -->
@@ -250,5 +266,21 @@
 		background: rgba(255, 255, 255, 0.03);
 		font-family: 'IBM Plex Mono', monospace;
 		color: var(--text-1);
+	}
+
+	.workspace-loading-card {
+		display: grid;
+		place-items: center;
+		min-height: calc(var(--canvas-min-height) + 8.5rem);
+		padding: 1rem;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-lg);
+		background:
+			linear-gradient(180deg, rgba(18, 28, 47, 0.96), rgba(9, 15, 25, 0.96)),
+			var(--surface-1);
+		color: var(--text-2);
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		box-shadow: var(--shadow-soft);
 	}
 </style>

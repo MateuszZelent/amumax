@@ -21,9 +21,19 @@
 	import type { SelectOption } from '$lib/ui/SelectField.svelte';
 	import type { ViewportMode } from '$lib/ui/types';
 	import { get } from 'svelte/store';
-import { onDestroy, onMount } from 'svelte';
-	import { resizeECharts } from './preview2D';
-	import { qualityLevel, resetCamera, setQuality, threeDPreview, type QualityLevel } from './preview3D';
+	import { onDestroy, onMount } from 'svelte';
+	import { preview2D, resizeECharts } from './preview2D';
+	import {
+		preview3D,
+		qualityLevel,
+		renderMode,
+		resetCamera,
+		setQuality,
+		setRenderMode,
+		threeDPreview,
+		type Preview3DRenderMode,
+		type QualityLevel
+	} from './preview3D';
 	import Toolbar3D from './inputs/Toolbar3D.svelte';
 	import { quantities } from './inputs/quantities';
 
@@ -60,6 +70,13 @@ import { onDestroy, onMount } from 'svelte';
 		(['low', 'high', 'ultra'] as QualityLevel[]).map((level) => ({
 			value: level,
 			label: level.toUpperCase()
+		}))
+	);
+
+	const renderOptions = $derived(
+		(['glyph', 'voxel'] as Preview3DRenderMode[]).map((mode) => ({
+			value: mode,
+			label: mode === 'glyph' ? 'Arrows' : 'Voxel'
 		}))
 	);
 
@@ -155,12 +172,23 @@ import { onDestroy, onMount } from 'svelte';
 		setMode(customEvent.detail);
 	}
 
+	async function renderCurrentPreview() {
+		const state = get(previewState);
+		if (state.type === '3D') {
+			await preview3D();
+			return;
+		}
+
+		await preview2D();
+	}
+
 	onMount(() => {
 		document.addEventListener('fullscreenchange', onFullscreenChange);
 		document.addEventListener('mousemove', onMouseMove);
 		document.addEventListener('mouseup', onMouseUp);
 		window.addEventListener('amumax:preview-mode', onPreviewModeRequest as EventListener);
 		scheduleResize();
+		void renderCurrentPreview();
 	});
 
 	onDestroy(() => {
@@ -178,7 +206,7 @@ import { onDestroy, onMount } from 'svelte';
 	eyebrow="Visualization"
 	tone={previewTone}
 >
-	<svelte:fragment slot="actions">
+	{#snippet actions()}
 		<StatusBadge label={$previewState.type || 'Awaiting data'} tone={hasData ? 'info' : 'default'} />
 		<div class="preview-mode-switcher">
 			<Button
@@ -206,7 +234,7 @@ import { onDestroy, onMount } from 'svelte';
 				{viewMode === 'fullscreen' ? 'Exit' : 'Fullscreen'}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 
 	<div class="preview-toolbar">
 		<SelectField
@@ -248,7 +276,12 @@ import { onDestroy, onMount } from 'svelte';
 				/>
 			{/if}
 			<div class="preview-toolbar__actions">
-				<Button variant="outline" tone="accent" onclick={resetCamera} disabled={$previewState.nComp !== 3}>
+				<Button
+					variant="outline"
+					tone="accent"
+					onclick={resetCamera}
+					disabled={$previewState.nComp !== 3 || $previewState.type !== '3D'}
+				>
 					Reset camera
 				</Button>
 				<Button
@@ -267,6 +300,14 @@ import { onDestroy, onMount } from 'svelte';
 			options={qualityOptions}
 			onchange={(next) => setQuality(next as QualityLevel)}
 		/>
+		{#if $previewState.type === '3D' && $previewState.nComp === 3}
+			<SegmentedControl
+				label="Render"
+				value={$renderMode}
+				options={renderOptions}
+				onchange={(next) => setRenderMode(next as Preview3DRenderMode)}
+			/>
+		{/if}
 	</div>
 
 	<div

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { StatusTone } from './types';
 
 	type Variant = 'solid' | 'outline' | 'ghost' | 'subtle';
@@ -15,6 +16,7 @@
 		title?: string;
 		ariaLabel?: string;
 		onclick?: (event: MouseEvent) => void;
+		children?: Snippet;
 	};
 
 	let {
@@ -27,7 +29,8 @@
 		className = '',
 		title = '',
 		ariaLabel = '',
-		onclick
+		onclick,
+		children
 	}: Props = $props();
 </script>
 
@@ -40,7 +43,9 @@
 	aria-label={ariaLabel || undefined}
 	onclick={onclick}
 >
-	<slot />
+	{#if children}
+		{@render children()}
+	{/if}
 </button>
 
 <style>

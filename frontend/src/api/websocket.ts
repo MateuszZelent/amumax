@@ -8,9 +8,6 @@ import { type Mesh, meshState } from './incoming/mesh';
 import { type Parameters, parametersState, sortFieldsByName } from './incoming/parameters';
 import { type TablePlot, tablePlotState } from './incoming/table-plot';
 import { get, writable } from 'svelte/store';
-import { preview3D } from '$lib/preview/preview3D';
-import { preview2D } from '$lib/preview/preview2D';
-import { plotTable } from '$lib/table-plot/table-plot';
 import { metricsState, type Metrics } from './incoming/metrics';
 import type { ConnectionState } from '$lib/ui/types';
 
@@ -30,6 +27,22 @@ export let connectionState = writable<ConnectionState>('disconnected');
 let previewRenderScheduled = false;
 let tableRenderScheduled = false;
 
+async function renderPreview() {
+	if (get(previewState).type === '3D') {
+		const { preview3D } = await import('$lib/preview/preview3D');
+		await preview3D();
+		return;
+	}
+
+	const { preview2D } = await import('$lib/preview/preview2D');
+	await preview2D();
+}
+
+async function renderTablePlot() {
+	const { plotTable } = await import('$lib/table-plot/table-plot');
+	await plotTable();
+}
+
 function schedulePreviewRender() {
 	if (previewRenderScheduled) {
 		return;
@@ -37,11 +50,7 @@ function schedulePreviewRender() {
 	previewRenderScheduled = true;
 	requestAnimationFrame(() => {
 		previewRenderScheduled = false;
-		if (get(previewState).type === '3D') {
-			preview3D();
-		} else {
-			preview2D();
-		}
+		void renderPreview();
 	});
 }
 
@@ -52,7 +61,7 @@ function scheduleTableRender() {
 	tableRenderScheduled = true;
 	requestAnimationFrame(() => {
 		tableRenderScheduled = false;
-		plotTable();
+		void renderTablePlot();
 	});
 }
 

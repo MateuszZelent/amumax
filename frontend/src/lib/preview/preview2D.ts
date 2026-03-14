@@ -1,17 +1,31 @@
 import { previewState } from '$api/incoming/preview';
-import * as echarts from 'echarts';
 import { get } from 'svelte/store';
 import { meshState } from '$api/incoming/mesh';
 import { disposePreview3D } from './preview3D';
-import { ECHARTS_THEME_NAME, THEME, ensureAmumaxEChartsTheme } from '$lib/theme/echarts-theme';
+import {
+	ECHARTS_THEME_NAME,
+	THEME,
+	ensureAmumaxEChartsTheme,
+	initECharts,
+	type ECharts
+} from '$lib/theme/echarts-theme';
 
-let chartInstance: echarts.ECharts | undefined;
+let chartInstance: ECharts | undefined;
 let resizeObserver: ResizeObserver | null = null;
 
 type ColorScale = {
 	min: number;
 	max: number;
 	palette: string[];
+};
+
+type AxisMetrics = {
+	xExtentNm: number;
+	yExtentNm: number;
+	xDisplayStepNm: number;
+	yDisplayStepNm: number;
+	xCategories: number[];
+	yCategories: number[];
 };
 
 export function preview2D() {
@@ -92,19 +106,28 @@ function formatDistanceNm(distanceNm: number) {
 		return 'NaN';
 	}
 
-	if (Math.abs(distanceNm) >= 1000) {
-		return (distanceNm / 1000).toFixed(2);
+	const abs = Math.abs(distanceNm);
+	if (abs >= 1000) {
+		return distanceNm.toFixed(0);
 	}
 
-	return distanceNm.toFixed(0);
+	if (abs >= 100) {
+		return distanceNm.toFixed(0);
+	}
+
+	if (abs >= 10) {
+		return distanceNm.toFixed(1);
+	}
+
+	return distanceNm.toFixed(2);
 }
 
-function axisPointerLabelFormatter(axis: 'x' | 'y', scale: number) {
+function axisPointerLabelFormatter(axis: 'x' | 'y') {
 	return function (params: { value?: number }) {
 		if (params.value === undefined) {
 			return 'NaN';
 		}
-		return `${axis}: ${formatDistanceNm(Number(params.value) * scale)} nm`;
+		return `${axis}: ${formatDistanceNm(Number(params.value))} nm`;
 	};
 }
 
@@ -148,14 +171,21 @@ function buildVisualMap(quantity: string, unit: string, min: number, max: number
 	};
 }
 
-function getAxisScale() {
+function getAxisMetrics(): AxisMetrics {
 	const ps = get(previewState);
 	const mesh = get(meshState);
-	const xDen = Math.max(ps.xChosenSize, 1);
-	const yDen = Math.max(ps.yChosenSize, 1);
+	const xChosenSize = Math.max(ps.xChosenSize, 1);
+	const yChosenSize = Math.max(ps.yChosenSize, 1);
+	const xExtentNm = mesh.dx * 1e9 * mesh.Nx;
+	const yExtentNm = mesh.dy * 1e9 * mesh.Ny;
+
 	return {
-		xScale: (mesh.dx * 1e9 * mesh.Nx) / xDen,
-		yScale: (mesh.dy * 1e9 * mesh.Ny) / yDen
+		xExtentNm,
+		yExtentNm,
+		xDisplayStepNm: xChosenSize > 1 ? xExtentNm / (xChosenSize - 1) : xExtentNm,
+		yDisplayStepNm: yChosenSize > 1 ? yExtentNm / (yChosenSize - 1) : yExtentNm,
+		xCategories: Array.from({ length: xChosenSize }, (_, index) => index),
+		yCategories: Array.from({ length: yChosenSize }, (_, index) => index)
 	};
 }
 
@@ -164,9 +194,9 @@ function tooltipFormatter(params: any) {
 	if (params.value === undefined) {
 		return 'NaN';
 	}
-	const { xScale, yScale } = getAxisScale();
-	const xnm = Number(params.value[0]) * xScale;
-	const ynm = Number(params.value[1]) * yScale;
+	const { xDisplayStepNm, yDisplayStepNm } = getAxisMetrics();
+	const xnm = Number(params.value[0]) * xDisplayStepNm;
+	const ynm = Number(params.value[1]) * yDisplayStepNm;
 	const value = Number(params.value[2]);
 	const unitSuffix = ps.unit ? ` ${ps.unit}` : '';
 	return [
@@ -184,26 +214,28 @@ function updateData() {
 		return;
 	}
 	const ps = get(previewState);
-	const { xScale, yScale } = getAxisScale();
+	const { xCategories, yCategories, xDisplayStepNm, yDisplayStepNm } = getAxisMetrics();
 	const visualMap = buildVisualMap(ps.quantity, ps.unit, ps.min, ps.max) as any;
 	chartInstance.setOption(
 		{
 			animation: false,
 			animationDurationUpdate: 0,
 			xAxis: {
-				max: Math.max(ps.xChosenSize - 1, 0),
+				data: xCategories,
 				axisLabel: {
 					formatter: function (value: number) {
-						return (value * xScale).toFixed(0);
-					}
+						return formatDistanceNm(Number(value) * xDisplayStepNm);
+					},
+					hideOverlap: true
 				}
 			},
 			yAxis: {
-				max: Math.max(ps.yChosenSize - 1, 0),
+				data: yCategories,
 				axisLabel: {
 					formatter: function (value: number) {
-						return (value * yScale).toFixed(0);
-					}
+						return formatDistanceNm(Number(value) * yDisplayStepNm);
+					},
+					hideOverlap: true
 				}
 			},
 			series: [
@@ -229,7 +261,7 @@ function init() {
 	// Reuse existing instance if possible — avoids canvas teardown/flicker.
 	if (!chartInstance || chartInstance.isDisposed()) {
 		ensureAmumaxEChartsTheme();
-		chartInstance = echarts.init(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
+		chartInstance = initECharts(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
 	}
 	resizeECharts();
 	setFullOptions();
@@ -241,7 +273,7 @@ function setFullOptions() {
 		return;
 	}
 	const ps = get(previewState);
-	const { xScale, yScale } = getAxisScale();
+	const { xCategories, yCategories, xDisplayStepNm, yDisplayStepNm } = getAxisMetrics();
 	const visualMap = buildVisualMap(ps.quantity, ps.unit, ps.min, ps.max);
 
 	// @ts-ignore
@@ -261,9 +293,8 @@ function setFullOptions() {
 				}
 			},
 			xAxis: {
-				type: 'value',
-				min: 0,
-				max: Math.max(ps.xChosenSize - 1, 0),
+				type: 'category',
+				data: xCategories,
 				name: 'x (nm)',
 				nameLocation: 'middle',
 				nameGap: 30,
@@ -286,7 +317,7 @@ function setFullOptions() {
 						padding: [6, 8],
 						borderColor: THEME.accent,
 						borderWidth: 1,
-						formatter: axisPointerLabelFormatter('x', xScale)
+						formatter: axisPointerLabelFormatter('x')
 					},
 					lineStyle: {
 						color: THEME.accent,
@@ -304,19 +335,20 @@ function setFullOptions() {
 				axisLabel: {
 					show: true,
 					formatter: function (value: number) {
-						return formatDistanceNm(value * xScale);
+						return formatDistanceNm(Number(value) * xDisplayStepNm);
 					},
 					color: THEME.text2,
-					showMinLabel: true
+					showMinLabel: true,
+					showMaxLabel: true,
+					hideOverlap: true
 				},
 				splitLine: {
 					show: false
 				}
 			},
 			yAxis: {
-				type: 'value',
-				min: 0,
-				max: Math.max(ps.yChosenSize - 1, 0),
+				type: 'category',
+				data: yCategories,
 				name: 'y (nm)',
 				nameLocation: 'middle',
 				nameGap: 54,
@@ -339,7 +371,7 @@ function setFullOptions() {
 						padding: [6, 8],
 						borderColor: THEME.accent,
 						borderWidth: 1,
-						formatter: axisPointerLabelFormatter('y', yScale)
+						formatter: axisPointerLabelFormatter('y')
 					},
 					lineStyle: {
 						color: THEME.accent,
@@ -357,10 +389,12 @@ function setFullOptions() {
 				axisLabel: {
 					show: true,
 					formatter: function (value: number) {
-						return formatDistanceNm(value * yScale);
+						return formatDistanceNm(Number(value) * yDisplayStepNm);
 					},
 					color: THEME.text2,
-					showMinLabel: true
+					showMinLabel: true,
+					showMaxLabel: true,
+					hideOverlap: true
 				},
 				splitLine: {
 					show: false
@@ -381,9 +415,9 @@ function setFullOptions() {
 					}
 				],
 			grid: {
-				containLabel: false,
+				containLabel: true,
 				left: 58,
-				right: 78,
+				right: 92,
 				top: 42,
 				bottom: 52
 			},
@@ -430,12 +464,8 @@ function setFullOptions() {
 }
 
 export function disposePreview2D() {
-	const container = document.getElementById('container');
-	if (container) {
-		const echartsInstance = echarts.getInstanceByDom(container);
-		if (echartsInstance) {
-			echartsInstance.dispose();
-		}
+	if (chartInstance && !chartInstance.isDisposed()) {
+		chartInstance.dispose();
 	}
 	chartInstance = undefined;
 

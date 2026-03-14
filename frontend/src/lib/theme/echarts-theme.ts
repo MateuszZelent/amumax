@@ -1,4 +1,30 @@
-import * as echarts from 'echarts';
+import { use, init, registerTheme, type ECharts } from 'echarts/core';
+import { HeatmapChart, LineChart } from 'echarts/charts';
+import {
+	AxisPointerComponent,
+	DataZoomInsideComponent,
+	DataZoomSliderComponent,
+	GridComponent,
+	ToolboxComponent,
+	TooltipComponent,
+	VisualMapComponent
+} from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+
+use([
+	LineChart,
+	HeatmapChart,
+	GridComponent,
+	TooltipComponent,
+	ToolboxComponent,
+	VisualMapComponent,
+	AxisPointerComponent,
+	DataZoomInsideComponent,
+	DataZoomSliderComponent,
+	CanvasRenderer
+]);
+
+export { init as initECharts, type ECharts };
 
 export const THEME = {
 	bg: '#080d1a',
@@ -30,7 +56,7 @@ export function ensureAmumaxEChartsTheme() {
 		return;
 	}
 
-	echarts.registerTheme(ECHARTS_THEME_NAME, {
+	registerTheme(ECHARTS_THEME_NAME, {
 		color: [THEME.info, THEME.accent, '#7dd3fc', '#34d399'],
 		backgroundColor: 'transparent',
 		textStyle: {

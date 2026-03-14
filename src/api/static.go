@@ -8,7 +8,8 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-//go:embed static/*
+// Include the full SvelteKit output, including the `_app` directory.
+//go:embed all:static
 var staticFiles embed.FS
 
 // Create a sub FS excluding the `index.html` to serve static files.
