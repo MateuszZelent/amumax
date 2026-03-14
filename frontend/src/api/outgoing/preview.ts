@@ -24,3 +24,7 @@ export function postYChosenSize(yChosenSize: number) {
 export function postRefresh() {
 	post('preview/refresh', {});
 }
+
+export function postAllLayers(allLayers: boolean) {
+	post('preview/allLayers', { allLayers });
+}

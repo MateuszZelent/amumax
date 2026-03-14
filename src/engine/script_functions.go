@@ -89,6 +89,8 @@ func init() {
 	DeclFunc("Cuboid", cuboid, "Cuboid with sides in meter")
 	DeclFunc("Rect", rect, "2D rectangle with size in meter")
 	DeclFunc("Wave", wave, "Wave with (Period, Min amplitude and Max amplitude) in meter")
+	DeclFunc("SinWaveguide", sinWaveguide, "Finite sinusoidal waveguide along x. Arguments: length, width, height, period, sinAmp (all in meter). Use RotY/RotZ to reorient it.")
+	DeclFunc("SinWaveguide2", sinWaveguide2, "Full-featured sinusoidal waveguide along x. Arguments: length, width, height, period, centerAmp, phase, z0 (all in meter/radians). centerAmp is the centerline amplitude; outer envelope = centerAmp + height/2.")
 	DeclFunc("Triangle", triangle, "Equilateral triangle with side in meter")
 	DeclFunc("RTriangle", rTriangle, "Rounded Equilateral triangle with side in meter")
 	DeclFunc("Diamond", diamond, "Diamond with side in meter")

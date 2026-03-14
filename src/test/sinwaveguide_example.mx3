@@ -1,0 +1,102 @@
+/*
+	Sinusoidal waveguide example.
+	Permalloy waveguide with sinusoidal centerline in XZ plane.
+	
+	Parameters:
+	  - Waveguide width:    1 µm (in y)
+	  - Waveguide length:   2 µm (along x)
+	  - Sinusoid period:    2 µm
+	  - Sinusoid amplitude: 20 nm (centerline oscillation in z)
+	  - Thickness:          2 nm
+
+	Grid Z must be large enough: 2*sinAmp + height = 42 nm minimum
+	Using Nz=64, dz=1nm → totalZ = 64nm (±32nm range fits ±20nm oscillation)
+*/
+
+
+
+// --- Geometry ---
+length := 4e-6     // 2 µm waveguide length along x
+period := 4e-6       // 2 µm sinusoid period
+width  := 1e-6       // 1 µm waveguide width in y
+height := 2e-9       // 6 nm thickness -> 3 cells across z
+sinAmp := 14e-9      // 20 nm amplitude of sinusoidal oscillation in z
+margines := 2e-9
+EdgeSmooth = 0
+PBCx=2
+
+// --- Grid ---
+Nx = 1024
+Ny = 256
+dz = 1e-9       // cell Z: 1 nm → total Z = 64 nm
+Tx = 4e-6
+Ty = 1e-6   // total Y size: 1.28 µm
+Tz = 2 * sinAmp + height + margines
+
+SmoothMesh(True, True, False)
+
+SetGeom(SinWaveguide(length, width, height, period, sinAmp))
+
+
+// --- Initial magnetization ---
+m = Uniform(0, 0, 1)
+
+
+Msat=956e3
+aex=10e-12
+alpha=0.01
+anisu=vector(0,0, 1)
+Ku1=0.8e6
+dind=0.00124
+nd := cylinder(200e-9, 200e-9)
+m.SetInShape(nd, BlochSkyrmion(-1,-1).scale(2,2,1))
+snapshot(m)
+alpha=0.1
+maxerr=0.9e-5
+mindt = 1.0e-14
+
+MinimizerStop = 0.6e-7
+print("Maxangle: ", maxAngle)
+
+relax()
+minimize()
+// saveas(m,"stable")
+
+tableadd(B_ext)
+
+tableadd(J)
+tableadd(torque)
+tableadd(e_total)
+tableadd(MaxTorque)
+tableautosave(1e-12)
+tableadd(ext_bubblepos)
+tableadd(ext_bubblespeed)
+tableadd(ext_bubbledist)
+// autosave(m,5e-12)
+
+// autosnapshot(m.comp(2),1e-11)
+// print(m)
+
+jj := 400
+tshift := 50e-9
+
+print(maxAngle)
+ts:=70e-8
+
+Pol = 0.4
+xi = 0.2
+val := 20000000000000.00000000
+
+TableAddVar(val,"Jval","Jval")
+
+tableAdd(ext_bubblepos)
+tableAdd(MaxAngle)
+info := sprint("stage 0")
+
+print("ruch")
+
+//J = vector(0,val,0)
+
+
+J = vector(val,0, 0)
+run(100e-9)

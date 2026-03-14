@@ -6,6 +6,7 @@ import { disposePreview3D } from './preview3D';
 
 let chartInstance: echarts.ECharts | undefined;
 let resizeListenerAttached = false;
+let resizeListener: (() => void) | null = null;
 
 export function preview2D() {
 	const state = get(previewState);
@@ -304,17 +305,25 @@ export function disposePreview2D() {
 		}
 	}
 	chartInstance = undefined;
+
+	// Remove resize listener and reset flag so re-init works
+	if (resizeListener) {
+		window.removeEventListener('resize', resizeListener);
+		resizeListener = null;
+	}
+	resizeListenerAttached = false;
 }
 
 export function resizeECharts() {
 	if (resizeListenerAttached) {
 		return;
 	}
-	window.addEventListener('resize', function () {
+	resizeListener = function () {
 		if (chartInstance === undefined || chartInstance.isDisposed()) {
 			return;
 		}
 		chartInstance.resize();
-	});
+	};
+	window.addEventListener('resize', resizeListener);
 	resizeListenerAttached = true;
 }

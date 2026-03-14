@@ -21,6 +21,7 @@ type PreviewState struct {
 	Unit                 string       `msgpack:"unit"`
 	Component            string       `msgpack:"component"`
 	Layer                int          `msgpack:"layer"`
+	AllLayers            bool         `msgpack:"allLayers"`
 	Type                 string       `msgpack:"type"`
 	VectorFieldValues    []Vector3f   `msgpack:"vectorFieldValues"`
 	VectorFieldPositions []Vector3i   `msgpack:"vectorFieldPositions"`
@@ -55,6 +56,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		Quantity:             "m",
 		Component:            "3D",
 		Layer:                0,
+		AllLayers:            false,
 		MaxPoints:            8192,
 		Type:                 "3D",
 		VectorFieldValues:    nil,
@@ -80,6 +82,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 	e.POST("/api/preview/refresh", previewState.postPreviewRefresh)
 	e.POST("/api/preview/XChosenSize", previewState.postXChosenSize)
 	e.POST("/api/preview/YChosenSize", previewState.postYChosenSize)
+	e.POST("/api/preview/allLayers", previewState.postAllLayers)
 
 	return previewState
 }
@@ -122,6 +125,16 @@ func (s *PreviewState) UpdateQuantityBuffer() {
 	}
 	GPUIn := engine.ValueOf(s.getQuantity())
 	defer cuda.Recycle(GPUIn)
+
+	if s.AllLayers && s.Type == "3D" {
+		s.updateAllLayers(GPUIn, componentCount)
+		return
+	}
+
+	if s.AllLayers && s.Type != "3D" {
+		s.updateAllLayersScalar(GPUIn)
+		return
+	}
 
 	CPUOut := data.NewSlice(componentCount, [3]int{s.XChosenSize, s.YChosenSize, 1})
 	GPUOut := cuda.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
@@ -174,6 +187,156 @@ func (s *PreviewState) normalizeVectors(f *data.Slice) {
 			}
 		}
 	}
+}
+
+func (s *PreviewState) updateAllLayers(GPUIn *data.Slice, componentCount int) {
+	nz := GPUIn.Size()[2]
+	valArray := make([]Vector3f, 0)
+	posArray := make([]Vector3i, 0)
+
+	CPUOut := data.NewSlice(componentCount, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	GPUOut := cuda.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	defer GPUOut.Free()
+
+	for layer := 0; layer < nz; layer++ {
+		for c := 0; c < componentCount; c++ {
+			cuda.Resize(GPUOut, GPUIn.Comp(c), layer)
+			data.Copy(CPUOut.Comp(c), GPUOut)
+		}
+		vf := CPUOut.Vectors()
+		yLen := len(vf[0][0])
+		xLen := len(vf[0][0][0])
+		for posx := 0; posx < xLen; posx++ {
+			for posy := 0; posy < yLen; posy++ {
+				valx := vf[0][0][posy][posx]
+				valy := vf[1][0][posy][posx]
+				valz := vf[2][0][posy][posx]
+				if (valx == 0 && valy == 0 && valz == 0) || math.IsNaN(float64(valx)) {
+					continue
+				}
+				posArray = append(posArray, Vector3i{X: posx, Y: posy, Z: layer})
+				valArray = append(valArray, Vector3f{X: valx, Y: valy, Z: valz})
+			}
+		}
+	}
+
+	// Normalize all vectors
+	maxnorm := float64(0)
+	for _, v := range valArray {
+		norm := math.Sqrt(float64(v.X*v.X + v.Y*v.Y + v.Z*v.Z))
+		if norm > maxnorm {
+			maxnorm = norm
+		}
+	}
+	if maxnorm > 0 {
+		factor := float32(1 / maxnorm)
+		for i := range valArray {
+			valArray[i].X *= factor
+			valArray[i].Y *= factor
+			valArray[i].Z *= factor
+		}
+	}
+
+	s.VectorFieldPositions = posArray
+	s.VectorFieldValues = valArray
+	s.ScalarField = nil
+	s.DataPointsCount = len(valArray)
+}
+
+// updateAllLayersScalar projects all Z layers into a single 2D heatmap.
+// For each (x,y) cell, the value with the largest absolute magnitude across
+// all Z layers is kept (max-abs projection). This lets the user see the
+// complete 3D structure flattened into a 2D scalar plot.
+func (s *PreviewState) updateAllLayersScalar(GPUIn *data.Slice) {
+	nz := GPUIn.Size()[2]
+	xSize := s.XChosenSize
+	ySize := s.YChosenSize
+
+	// Accumulator: best value per (y, x) — keep value with max |val|
+	acc := make([][]float32, ySize)
+	for y := 0; y < ySize; y++ {
+		acc[y] = make([]float32, xSize)
+	}
+	hasValue := make([][]bool, ySize)
+	for y := 0; y < ySize; y++ {
+		hasValue[y] = make([]bool, xSize)
+	}
+
+	CPUOut := data.NewSlice(1, [3]int{xSize, ySize, 1})
+	GPUOut := cuda.NewSlice(1, [3]int{xSize, ySize, 1})
+	defer GPUOut.Free()
+
+	compIdx := 0
+	if s.getQuantity().NComp() > 1 {
+		compIdx = s.getComponent()
+	}
+
+	for layer := 0; layer < nz; layer++ {
+		cuda.Resize(GPUOut, GPUIn.Comp(compIdx), layer)
+		data.Copy(CPUOut.Comp(0), GPUOut)
+		scalars := CPUOut.Scalars()
+
+		for posy := 0; posy < ySize; posy++ {
+			for posx := 0; posx < xSize; posx++ {
+				val := scalars[0][posy][posx]
+				if math.IsNaN(float64(val)) {
+					continue
+				}
+				if !hasValue[posy][posx] {
+					acc[posy][posx] = val
+					hasValue[posy][posx] = true
+				} else {
+					// Max-abs projection: keep value with larger magnitude
+					if math.Abs(float64(val)) > math.Abs(float64(acc[posy][posx])) {
+						acc[posy][posx] = val
+					}
+				}
+			}
+		}
+	}
+
+	// Build the scalar field output (same format as UpdateScalarField)
+	var min, max float32
+	minMaxSet := false
+	valArray := make([][3]float32, 0, xSize*ySize)
+
+	for posx := 0; posx < xSize; posx++ {
+		for posy := 0; posy < ySize; posy++ {
+			if !hasValue[posy][posx] {
+				continue
+			}
+			val := acc[posy][posx]
+			if !minMaxSet {
+				min, max = val, val
+				minMaxSet = true
+			} else {
+				if val < min {
+					min = val
+				}
+				if val > max {
+					max = val
+				}
+			}
+			valArray = append(valArray, [3]float32{float32(posx), float32(posy), val})
+		}
+	}
+
+	if len(valArray) == 0 {
+		s.Min = 0
+		s.Max = 0
+		s.ScalarField = nil
+		s.VectorFieldValues = nil
+		s.VectorFieldPositions = nil
+		s.DataPointsCount = 0
+		return
+	}
+
+	s.Min = min
+	s.Max = max
+	s.ScalarField = valArray
+	s.VectorFieldValues = nil
+	s.VectorFieldPositions = nil
+	s.DataPointsCount = len(valArray)
 }
 
 func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
@@ -525,6 +688,21 @@ func (s *PreviewState) postYChosenSize(c echo.Context) error {
 	s.YChosenSize = req.YChosenSize
 	s.Refresh = true
 	engine.InjectAndWait(s.updateMask)
+	s.ws.broadcastEngineState()
+	return c.JSON(http.StatusOK, nil)
+}
+
+func (s *PreviewState) postAllLayers(c echo.Context) error {
+	type Request struct {
+		AllLayers bool `msgpack:"allLayers"`
+	}
+	req := new(Request)
+	if err := c.Bind(req); err != nil {
+		log.Log.Err("%v", err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Invalid request payload"})
+	}
+	s.AllLayers = req.AllLayers
+	s.Refresh = true
 	s.ws.broadcastEngineState()
 	return c.JSON(http.StatusOK, nil)
 }

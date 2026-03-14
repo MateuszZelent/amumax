@@ -8,6 +8,7 @@ export interface Preview {
 	unit: string;
 	component: string;
 	layer: number;
+	allLayers: boolean;
 	type: string;
 	vectorFieldValues: VectorField;
 	vectorFieldPositions: VectorField;
@@ -30,6 +31,7 @@ export const previewState = writable<Preview>({
 	unit: '',
 	component: '',
 	layer: 0,
+	allLayers: false,
 	maxPoints: 0,
 	type: '',
 	vectorFieldValues: [],

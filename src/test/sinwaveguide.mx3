@@ -1,0 +1,27 @@
+/*
+	Regression test for a finite sinusoidal waveguide in the XZ plane.
+	The waveguide is centered around z=0, has finite length along x,
+	constant width in y, and a sinusoidal centerline in z.
+*/
+
+SetGridSize(11, 5, 9)
+SetCellSize(5e-9, 10e-9, 10e-9)
+
+length := 30e-9
+width := 20e-9
+height := 10e-9
+period := 40e-9
+sinAmp := 20e-9
+
+SetGeom(SinWaveguide(length, width, height, period, sinAmp))
+
+// Center of the guide at x=0.
+Expect("center cell inside", geom.GetCell(5, 2, 4), 1, 1e-12)
+
+// At x = period/4 the centerline reaches z = +sinAmp.
+Expect("crest cell inside", geom.GetCell(7, 2, 6), 1, 1e-12)
+Expect("cell below crest outside", geom.GetCell(7, 2, 4), 0, 1e-12)
+
+// Finite extent in x and y.
+Expect("outside length", geom.GetCell(9, 2, 4), 0, 1e-12)
+Expect("outside width", geom.GetCell(5, 4, 4), 0, 1e-12)

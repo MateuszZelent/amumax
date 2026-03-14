@@ -21,6 +21,77 @@ func wave(period, amin, amax float64) shape {
 	}
 }
 
+// sinWaveguide creates a finite waveguide whose centerline follows a sinusoidal path.
+// The waveguide propagates along x. In the XZ plane you see a sine wave.
+// length: total waveguide length along x
+// width:  waveguide width in y
+// height: waveguide thickness in z
+// period: spatial period of the sine oscillation along x
+// sinAmp: amplitude of the sinusoidal oscillation in z
+func sinWaveguide(length, width, height, period, sinAmp float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("SinWaveguide: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("SinWaveguide: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("SinWaveguide: height must be > 0, got %g", height)
+	case period <= 0:
+		log.Log.ErrAndExit("SinWaveguide: period must be > 0, got %g", period)
+	}
+
+	halfLength := length / 2
+	halfWidth := width / 2
+	halfHeight := height / 2
+	k := 2 * math.Pi / period
+
+	return func(x, y, z float64) bool {
+		if math.Abs(x) > halfLength || math.Abs(y) > halfWidth {
+			return false
+		}
+		zCenter := sinAmp * math.Sin(k*x)
+		return math.Abs(z-zCenter) <= halfHeight
+	}
+}
+
+// sinWaveguide2 creates a finite waveguide whose centerline follows a sinusoidal path.
+// Propagates along x; in the XZ plane you see a sinusoidal strip of thickness height.
+// Centered at the origin; use .Transl() to reposition, .RotZ(Pi/2) for propagation along y.
+//
+// length:    total extent along x
+// width:     extent in y
+// height:    thickness in z (measured vertically, not normal to curve)
+// period:    spatial period of the sine along x
+// centerAmp: amplitude of the CENTERLINE oscillation in z
+//            (visible outer envelope = centerAmp + height/2)
+// phase:     initial phase of the sine (radians); 0 = zero-crossing at x=0
+// z0:        vertical offset of the centerline
+func sinWaveguide2(length, width, height, period, centerAmp, phase, z0 float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("SinWaveguide2: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("SinWaveguide2: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("SinWaveguide2: height must be > 0, got %g", height)
+	case period <= 0:
+		log.Log.ErrAndExit("SinWaveguide2: period must be > 0, got %g", period)
+	}
+
+	halfL := length / 2
+	halfW := width / 2
+	halfH := height / 2
+	k := 2 * math.Pi / period
+
+	return func(x, y, z float64) bool {
+		if x < -halfL || x > halfL || y < -halfW || y > halfW {
+			return false
+		}
+		zCenter := z0 + centerAmp*math.Sin(k*x+phase)
+		return z >= zCenter-halfH && z <= zCenter+halfH
+	}
+}
+
 // ellipsoid with given diameters
 func ellipsoid(diamx, diamy, diamz float64) shape {
 	return func(x, y, z float64) bool {
