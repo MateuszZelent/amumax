@@ -8,7 +8,7 @@ import (
 // SetTemperature Set Bth to thermal noise (Brown).
 // see temperature.cu
 
-func SetTemperature(Bth, noise *data.Slice, k2mu0Mu0VgammaDt float64, Msat, Temp, Alpha MSlice) {
+func SetTemperature(Bth, noise *data.Slice, k2mu0Mu0VgammaDt float64, Msat, Temp, Alpha, Sponge MSlice) {
 	log.AssertMsg(Bth.NComp() == 1 && noise.NComp() == 1,
 		"Component mismatch: Bth and noise must both have 1 component in SetTemperature")
 
@@ -19,5 +19,6 @@ func SetTemperature(Bth, noise *data.Slice, k2mu0Mu0VgammaDt float64, Msat, Temp
 		Msat.DevPtr(0), Msat.Mul(0),
 		Temp.DevPtr(0), Temp.Mul(0),
 		Alpha.DevPtr(0), Alpha.Mul(0),
+		Sponge.DevPtr(0),
 		N, cfg)
 }

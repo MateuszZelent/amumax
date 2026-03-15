@@ -51,8 +51,10 @@ func setLLTorque(dst *data.Slice) {
 	}
 	alpha := Alpha.MSlice()
 	defer alpha.Recycle()
+	sponge := spongeAlphaMSlice()
+	defer sponge.Recycle()
 	if precess {
-		cuda.LLTorque(dst, NormMag.Buffer(), dst, alpha) // overwrite dst with torque
+		cuda.LLTorque(dst, NormMag.Buffer(), dst, alpha, sponge) // overwrite dst with torque
 	} else {
 		cuda.LLNoPrecess(dst, NormMag.Buffer(), dst)
 	}
@@ -79,11 +81,13 @@ func addSTTorque(dst *data.Slice) {
 		defer j.Recycle()
 		alpha := Alpha.MSlice()
 		defer alpha.Recycle()
+		sponge := spongeAlphaMSlice()
+		defer sponge.Recycle()
 		xi := Xi.MSlice()
 		defer xi.Recycle()
 		pol := Pol.MSlice()
 		defer pol.Recycle()
-		cuda.AddZhangLiTorque(dst, NormMag.Buffer(), msat, j, alpha, xi, pol, GetMesh())
+		cuda.AddZhangLiTorque(dst, NormMag.Buffer(), msat, j, alpha, xi, pol, sponge, GetMesh())
 	}
 	if !disableSlonczewskiTorque && !FixedLayer.isZero() {
 		msat := Msat.MSlice()
@@ -94,6 +98,8 @@ func addSTTorque(dst *data.Slice) {
 		defer fixedP.Recycle()
 		alpha := Alpha.MSlice()
 		defer alpha.Recycle()
+		sponge := spongeAlphaMSlice()
+		defer sponge.Recycle()
 		pol := Pol.MSlice()
 		defer pol.Recycle()
 		lambda := Lambda.MSlice()
@@ -104,7 +110,7 @@ func addSTTorque(dst *data.Slice) {
 		defer thickness.Recycle()
 		cuda.AddSlonczewskiTorque2(dst, NormMag.Buffer(),
 			msat, j, fixedP, alpha, pol, lambda, epsPrime,
-			thickness,
+			thickness, sponge,
 			currentSignFromFixedLayerPosition[fixedLayerPosition],
 			GetMesh())
 	}

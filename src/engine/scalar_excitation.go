@@ -116,6 +116,7 @@ func (e *scalarExcitation) SetRegionFn(region int, f func() [3]float64) {
 
 func (e *scalarExcitation) average() float64        { return qAverageUniverse(e)[0] }
 func (e *scalarExcitation) Average() float64        { return e.average() }
+func (e *scalarExcitation) isZero() bool           { return e.perRegion.isZero() && len(e.extraTerms) == 0 }
 func (e *scalarExcitation) IsUniform() bool         { return e.perRegion.IsUniform() }
 func (e *scalarExcitation) Name() string            { return e.name }
 func (e *scalarExcitation) Unit() string            { return e.perRegion.Unit() }

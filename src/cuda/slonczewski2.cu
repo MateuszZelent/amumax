@@ -15,6 +15,7 @@ addslonczewskitorque2(float* __restrict__ tx, float* __restrict__ ty, float* __r
                       float* __restrict__ py_,        float  py_mul,
                       float* __restrict__ pz_,        float  pz_mul,
                       float* __restrict__ alpha_,     float  alpha_mul,
+                      float* __restrict__ sponge_,
                       float* __restrict__ pol_,       float  pol_mul,
                       float* __restrict__ lambda_,    float  lambda_mul,
                       float* __restrict__ epsPrime_,  float  epsPrime_mul,
@@ -30,7 +31,7 @@ addslonczewskitorque2(float* __restrict__ tx, float* __restrict__ ty, float* __r
         float  J = amul(jz_, jz_mul, i);
         float3 p = normalized(vmul(px_, py_, pz_, px_mul, py_mul, pz_mul, i));
         float  Ms           = amul(Ms_, Ms_mul, i);
-        float  alpha        = amul(alpha_, alpha_mul, i);
+        float  alpha        = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
         float  pol          = amul(pol_, pol_mul, i);
         float  lambda       = amul(lambda_, lambda_mul, i);
         float  epsilonPrime = amul(epsPrime_, epsPrime_mul, i);

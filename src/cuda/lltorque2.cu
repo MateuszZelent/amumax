@@ -7,14 +7,15 @@ extern "C" __global__ void
 lltorque2(float* __restrict__  tx, float* __restrict__  ty, float* __restrict__  tz,
           float* __restrict__  mx, float* __restrict__  my, float* __restrict__  mz,
           float* __restrict__  hx, float* __restrict__  hy, float* __restrict__  hz,
-          float* __restrict__  alpha_, float alpha_mul, int N) {
+          float* __restrict__  alpha_, float alpha_mul,
+          float* __restrict__  sponge_, int N) {
 
     int i =  ( blockIdx.y*gridDim.x + blockIdx.x ) * blockDim.x + threadIdx.x;
     if (i < N) {
 
         float3 m = {mx[i], my[i], mz[i]};
         float3 H = {hx[i], hy[i], hz[i]};
-        float alpha = amul(alpha_, alpha_mul, i);
+        float alpha = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
 
         float3 mxH = cross(m, H);
         float gilb = -1.0f / (1.0f + alpha * alpha);

@@ -514,6 +514,58 @@ my_top_layer = job.m_chunked[0, -1,:,:,1]
 - **Avoid Too Small or Too Large Chunks**: Very small chunks (<1MB) can lead to overhead, while very large chunks may negate the benefits of chunking.
 - **Monitor Performance**: Experiment with different chunking strategies to find the optimal configuration for your specific use case.
 
+### Absorbing Boundary Conditions (ABC)
+
+Amumax supports regionless Absorbing Boundary Conditions via a per-cell `SpongeAlpha` damping field. This avoids consuming limited region slots when setting up smooth damping layers near simulation boundaries to absorb spin waves.
+
+#### Quick Setup
+
+```go
+// tanh profile along X boundaries, 100nm wide, max damping 1.0, steepness 6
+ext_SetAbsorbingBoundary(100e-9, 1.0, "x", "tanh", 6)
+
+// Quadratic profile along both X and Y
+ext_SetAbsorbingBoundary(200e-9, 0.5, "xy", "power", 2)
+
+// Linear ramp along Y only
+ext_SetAbsorbingBoundary(150e-9, 1.0, "y", "linear", 0)
+
+// Remove ABC
+ext_ClearAbsorbingBoundary()
+```
+
+**Arguments:** `ext_SetAbsorbingBoundary(width, maxAlpha, direction, profile, param)`
+
+| Argument    | Description |
+|-------------|-------------|
+| `width`     | Thickness of the absorbing layer (m) |
+| `maxAlpha`  | Peak damping value at the simulation edge |
+| `direction` | `"x"`, `"y"`, or `"xy"` |
+| `profile`   | `"linear"`, `"power"`, or `"tanh"` |
+| `param`     | Profile parameter: steepness for `tanh` (e.g. 4–10), exponent for `power` (e.g. 2), ignored for `linear` |
+
+Calling `ext_SetAbsorbingBoundary` again **replaces** the previous ABC (does not stack). You can also set `SpongeAlpha` directly for full manual control. The ABC profile is visible in the web UI under the `SpongeAlpha` quantity.
+
+#### Automatic Configuration
+
+`ext_AutoAbsorbingBoundary` uses the **Kalinikos-Slavin dispersion relation** (DE mode) to compute the shortest spin wave wavelength at a given frequency, then automatically sets the ABC width:
+
+```go
+// Auto-configure ABC for waves up to 30 GHz along X, with α_max=1.0 and 3 wavelengths width
+ext_AutoAbsorbingBoundary(30, "x", 1.0, 3)
+```
+
+**Arguments:** `ext_AutoAbsorbingBoundary(maxFreqGHz, direction, maxAlpha, nWavelengths)`
+
+| Argument       | Description |
+|----------------|-------------|
+| `maxFreqGHz`   | Maximum spin wave frequency to absorb (GHz) |
+| `direction`    | `"x"`, `"y"`, or `"xy"` |
+| `maxAlpha`     | Peak damping at boundary |
+| `nWavelengths` | Number of shortest wavelengths for sponge width (3–5 recommended) |
+
+The function reads `Msat`, `Aex`, and film thickness from the current simulation, solves for k_max, and logs all computed values.
+
 ### Other Changes
 
 - Removed the Google trackers in the GUI.

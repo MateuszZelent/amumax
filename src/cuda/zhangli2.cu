@@ -19,6 +19,7 @@ addzhanglitorque2(float* __restrict__ tx, float* __restrict__ ty, float* __restr
                   float* __restrict__ jy_, float jy_mul,
                   float* __restrict__ jz_, float jz_mul,
                   float* __restrict__ alpha_, float alpha_mul,
+                  float* __restrict__ sponge_,
                   float* __restrict__ xi_, float xi_mul,
                   float* __restrict__ pol_, float pol_mul,
                   float cx, float cy, float cz,
@@ -34,7 +35,7 @@ addzhanglitorque2(float* __restrict__ tx, float* __restrict__ ty, float* __restr
 
     int i = idx(ix, iy, iz);
 
-    float alpha = amul(alpha_, alpha_mul, i);
+    float alpha = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
     float xi    = amul(xi_, xi_mul, i);
     float pol   = amul(pol_, pol_mul, i);
     float invMs = inv_Msat(Ms_, Ms_mul, i);

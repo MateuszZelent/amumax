@@ -12,14 +12,15 @@ import (
 //
 // see lltorque.cu
 
-func LLTorque(torque, m, B *data.Slice, alpha MSlice) {
+func LLTorque(torque, m, B *data.Slice, alpha, sponge MSlice) {
 	N := torque.Len()
 	cfg := make1DConf(N)
 
 	kLltorque2Async(torque.DevPtr(X), torque.DevPtr(Y), torque.DevPtr(Z),
 		m.DevPtr(X), m.DevPtr(Y), m.DevPtr(Z),
 		B.DevPtr(X), B.DevPtr(Y), B.DevPtr(Z),
-		alpha.DevPtr(0), alpha.Mul(0), N, cfg)
+		alpha.DevPtr(0), alpha.Mul(0),
+		sponge.DevPtr(0), N, cfg)
 }
 
 // LLNoPrecess Landau-Lifshitz torque with precession disabled.
