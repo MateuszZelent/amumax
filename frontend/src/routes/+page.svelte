@@ -103,7 +103,10 @@
 		window.addEventListener('resize', syncWorkspaceMode);
 		window.addEventListener('keydown', handleShortcuts);
 
-		void Promise.all([import('$lib/preview/Preview.svelte'), import('$lib/table-plot/TablePlot.svelte')]).then(
+		void Promise.all([
+			import('$lib/preview/Preview.svelte'),
+			import('$lib/table-plot/TablePlot.svelte')
+		]).then(
 			([previewModule, tablePlotModule]) => {
 				PreviewComponent = previewModule.default;
 				TablePlotComponent = tablePlotModule.default;
@@ -155,25 +158,25 @@
 			{/if}
 		</div>
 
-		<!-- Row 2: Controls -->
-		<div class="zone-solver">
-			<Solver />
-		</div>
-		<div class="zone-mesh">
-			<Mesh />
-		</div>
-
-		<!-- Row 3: Diagnostics -->
+		<!-- Row 2: Console + Solver -->
 		<div class="zone-console">
 			<Console />
 		</div>
-		<div class="zone-metrics">
-			<Metrics />
+		<div class="zone-solver">
+			<Solver />
 		</div>
 
-		<!-- Row 4: Inspector (full width) -->
+		<!-- Row 3: Mesh + Parameters -->
+		<div class="zone-mesh">
+			<Mesh />
+		</div>
 		<div class="zone-params">
 			<Parameters />
+		</div>
+
+		<!-- Row 4: Diagnostics (full width) -->
+		<div class="zone-metrics">
+			<Metrics />
 		</div>
 	</div>
 

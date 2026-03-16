@@ -26,6 +26,7 @@ type Flags struct {
 	Tunnel          string
 	Insecure        bool
 	NewEngine       bool
+	Fft             bool
 
 	WebUIDisabled     bool
 	WebUIAddress      string
@@ -50,6 +51,7 @@ func (flags *Flags) ParseFlags(rootCmd *cobra.Command) {
 	rootCmd.Flags().StringVarP(&flags.Tunnel, "tunnel", "t", "", "Tunnel the web interface through SSH using the given host from your ssh config, empty string disables tunneling")
 	rootCmd.Flags().BoolVar(&flags.Insecure, "insecure", false, "Allows to run shell commands")
 	rootCmd.Flags().BoolVarP(&flags.NewEngine, "new-engine", "n", false, "New engine, experimental")
+	rootCmd.Flags().BoolVar(&flags.Fft, "fft", false, "Enable real-time FFT computation for spectrum/spectrogram")
 
 	rootCmd.Flags().BoolVar(&flags.WebUIDisabled, "webui-disable", false, "Whether to disable the web interface")
 	rootCmd.Flags().StringVar(&flags.WebUIAddress, "webui-addr", "localhost:35367", "Address (URI) to serve web GUI (e.g., 0.0.0.0:8080/proxy/worker1)")

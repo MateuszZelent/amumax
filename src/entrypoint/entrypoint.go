@@ -45,6 +45,7 @@ func Entrypoint(cmd *cobra.Command, args []string, flags *flags.Flags) {
 	}
 
 	engine.Insecure = flags.Insecure
+	engine.FftEnabled = flags.Fft
 
 	defer engine.CleanExit() // flushes pending output, if any
 
@@ -96,6 +97,11 @@ func runInteractive(flags *flags.Flags) {
         Aex = 10e-12
         m = RandomMag()
     `
+	if flags.Fft {
+		script += `
+        FftTrack(m, 0, 30, 0.1)
+    `
+	}
 	code, err := engine.World.Compile(script)
 	log.Log.PanicIfError(err)
 	engine.EvalFile(code)

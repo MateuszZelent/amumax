@@ -9,6 +9,7 @@ import { type Parameters, parametersState, sortFieldsByName } from './incoming/p
 import { type TablePlot, tablePlotState } from './incoming/table-plot';
 import { get, writable } from 'svelte/store';
 import { metricsState, type Metrics } from './incoming/metrics';
+import { fftState, type FftData } from './incoming/fft';
 import type { ConnectionState } from '$lib/ui/types';
 
 type MainUpdate = {
@@ -20,6 +21,7 @@ type MainUpdate = {
 	tablePlot?: TablePlot;
 	preview?: Preview | null;
 	metrics?: Metrics;
+	fft?: FftData;
 };
 
 export let connected = writable(false);
@@ -167,6 +169,9 @@ export function parseMsgpack(data: ArrayBuffer) {
 	}
 	if (msg.metrics) {
 		metricsState.set(msg.metrics);
+	}
+	if (msg.fft) {
+		fftState.set(msg.fft);
 	}
 }
 

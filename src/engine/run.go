@@ -226,6 +226,7 @@ func step(output bool) {
 	}
 	if output {
 		saveIfNeeded()
+		doFftStep()
 	}
 }
 

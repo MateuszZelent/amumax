@@ -157,7 +157,7 @@ a {
 	gap: var(--panel-gap);
 }
 
-.zone-params {
+.zone-metrics {
 	grid-column: 1 / -1;
 }
 
@@ -178,7 +178,7 @@ a {
 		grid-template-columns: 1fr;
 	}
 
-	.zone-params {
+	.zone-metrics {
 		grid-column: 1;
 	}
 }

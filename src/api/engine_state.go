@@ -11,6 +11,7 @@ type EngineState struct {
 	Params    *ParametersState `msgpack:"parameters"`
 	TablePlot *TablePlotState  `msgpack:"tablePlot"`
 	Metrics   *MetricsState    `msgpack:"metrics"`
+	Fft       *FftState        `msgpack:"fft"`
 }
 
 type EngineStateNoPreview struct {
@@ -21,6 +22,7 @@ type EngineStateNoPreview struct {
 	Params    *ParametersState `msgpack:"parameters"`
 	TablePlot *TablePlotState  `msgpack:"tablePlot"`
 	Metrics   *MetricsState    `msgpack:"metrics"`
+	Fft       *FftState        `msgpack:"fft"`
 }
 
 func initEngineStateAPI(e *echo.Group, ws *WebSocketManager) *EngineState {
@@ -33,6 +35,7 @@ func initEngineStateAPI(e *echo.Group, ws *WebSocketManager) *EngineState {
 		Params:    initParameterAPI(e, ws),
 		TablePlot: initTablePlotAPI(e, ws),
 		Metrics:   initMetricsAPI(e, ws),
+		Fft:       initFftAPI(e, ws),
 	}
 }
 
@@ -45,6 +48,7 @@ func (es *EngineState) Update() {
 	es.Params.Update()
 	es.TablePlot.Update()
 	es.Metrics.Update()
+	es.Fft.Update()
 }
 
 func (es *EngineState) UpdateWithoutPreview() {
@@ -55,6 +59,7 @@ func (es *EngineState) UpdateWithoutPreview() {
 	es.Params.Update()
 	es.TablePlot.Update()
 	es.Metrics.Update()
+	es.Fft.Update()
 }
 
 func (es *EngineState) WithoutPreview() *EngineStateNoPreview {
@@ -66,5 +71,6 @@ func (es *EngineState) WithoutPreview() *EngineStateNoPreview {
 		Params:    es.Params,
 		TablePlot: es.TablePlot,
 		Metrics:   es.Metrics,
+		Fft:       es.Fft,
 	}
 }
