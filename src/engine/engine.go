@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/timer"
 )
@@ -31,6 +32,11 @@ func CleanExit() {
 	drainOutput()
 	log.Log.Info("**************** Simulation Ended ****************** //")
 	Table.Flush()
+	if StorageFormat == StorageFormatHDF5 {
+		Table.FlushFinalHDF5()
+	}
+	SaveAllTimestampsHDF5()
+	amuhdf5.CloseGlobal()
 	if SyncAndLog {
 		timer.Print(os.Stdout)
 	}

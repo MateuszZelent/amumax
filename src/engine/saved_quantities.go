@@ -13,6 +13,7 @@ import (
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
 	"github.com/MathieuMoalic/amumax/src/fsutil"
+	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/zarr"
 )
@@ -37,6 +38,10 @@ func (sq *savedQuantity) needSave() bool {
 
 // SaveAttrs updates the .zattrs file with the times data.
 func (sq *savedQuantity) SaveAttrs() {
+	if StorageFormat == StorageFormatHDF5 {
+		// HDF5: timestamps are buffered in sq.times and saved at CleanExit
+		return
+	}
 	u, err := json.Marshal(zarr.Zattrs{Buffer: sq.times})
 	log.Log.PanicIfError(err)
 	err = fsutil.Remove(OD() + sq.name + "/.zattrs")
@@ -53,10 +58,17 @@ func (sq *savedQuantity) Save() {
 	defer cuda.Recycle(buffer)
 	dataSlice := buffer.HostCopy()
 	tstep := len(sq.times) - 1
-	queOutput(func() {
-		err := syncSave(dataSlice, sq.name, tstep, sq.chunks)
-		log.Log.PanicIfError(err)
-	})
+	if StorageFormat == StorageFormatHDF5 {
+		queOutput(func() {
+			err := syncSaveHDF5(dataSlice, sq.name, tstep)
+			log.Log.PanicIfError(err)
+		})
+	} else {
+		queOutput(func() {
+			err := syncSave(dataSlice, sq.name, tstep, sq.chunks)
+			log.Log.PanicIfError(err)
+		})
+	}
 }
 
 var savedQuantities savedQuantitiesType
@@ -85,6 +97,7 @@ func (sqs *savedQuantitiesType) savedQuandtityExists(name string) bool {
 }
 
 func (sqs *savedQuantitiesType) createSavedQuantity(q Quantity, name string, rchunks requestedChunking, period float64) *savedQuantity {
+	// Create directory for this quantity (both Zarr and HDF5 use per-quantity folders)
 	if fsutil.Exists(OD() + name) {
 		err := fsutil.Remove(OD() + name)
 		log.Log.PanicIfError(err)
@@ -300,5 +313,32 @@ func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
 		return err
 	default:
 		return nil
+	}
+}
+
+// syncSaveHDF5 saves array data to the global HDF5 file.
+func syncSaveHDF5(array *data.Slice, qname string, step int) error {
+	if amuhdf5.GlobalWriter == nil {
+		return fmt.Errorf("hdf5: global writer not initialized")
+	}
+	data4 := array.Tensors()
+	size := array.Size()
+	ncomp := array.NComp()
+	return amuhdf5.GlobalWriter.SaveArray(qname, step, data4, size, ncomp)
+}
+
+// SaveAllTimestampsHDF5 writes all buffered timestamps for every saved quantity.
+// Called at shutdown from CleanExit.
+func SaveAllTimestampsHDF5() {
+	if amuhdf5.GlobalWriter == nil {
+		return
+	}
+	for _, sq := range savedQuantities.Quantities {
+		if len(sq.times) > 0 {
+			err := amuhdf5.GlobalWriter.SaveTimestamps(sq.name, sq.times)
+			if err != nil {
+				log.Log.Err("HDF5 save timestamps %s: %v", sq.name, err)
+			}
+		}
 	}
 }

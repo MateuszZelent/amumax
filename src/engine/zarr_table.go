@@ -7,6 +7,7 @@ import (
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
 	"github.com/MathieuMoalic/amumax/src/fsutil"
+	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/script"
 	"github.com/MathieuMoalic/amumax/src/zarr"
@@ -61,6 +62,12 @@ func (ts *tableStruct) WriteToBuffer() {
 }
 
 func (ts *tableStruct) Flush() {
+	if StorageFormat == StorageFormatHDF5 {
+		// HDF5: data is kept in ts.Data map (in memory).
+		// Final write happens in FlushFinalHDF5() called from CleanExit.
+		// We skip periodic flushes because HDF5 can't overwrite datasets.
+		return
+	}
 	for i := range ts.Columns {
 		_, err := ts.Columns[i].io.Write(ts.Columns[i].buffer)
 		log.Log.PanicIfError(err)
@@ -70,6 +77,24 @@ func (ts *tableStruct) Flush() {
 		zarr.SaveFileTableZarray(OD()+"table/"+ts.Columns[i].Name, ts.Step)
 		err = ts.Columns[i].io.Flush()
 		log.Log.PanicIfError(err)
+	}
+}
+
+// FlushFinalHDF5 writes all accumulated table data to HDF5 at shutdown.
+func (ts *tableStruct) FlushFinalHDF5() {
+	if amuhdf5.GlobalWriter == nil {
+		return
+	}
+	ts.Mu.Lock()
+	defer ts.Mu.Unlock()
+
+	for _, col := range ts.Columns {
+		if colData, ok := ts.Data[col.Name]; ok && len(colData) > 0 {
+			err := amuhdf5.GlobalWriter.SaveTableColumn(col.Name, colData)
+			if err != nil {
+				log.Log.Err("HDF5 table write %s: %v", col.Name, err)
+			}
+		}
 	}
 }
 
@@ -96,17 +121,24 @@ func (ts *tableStruct) Exists(q Quantity, name string) bool {
 }
 
 func (ts *tableStruct) AddColumn(name, unit string) {
-	err := fsutil.Mkdir(OD() + "table/" + name)
-	log.Log.PanicIfError(err)
-	f, err := fsutil.Create(OD() + "table/" + name + "/0")
-	log.Log.PanicIfError(err)
-	ts.Columns = append(ts.Columns, column{Name: name, Unit: unit, buffer: []byte{}, io: f})
+	if StorageFormat != StorageFormatHDF5 {
+		// Zarr: create directory and file for this column
+		err := fsutil.Mkdir(OD() + "table/" + name)
+		log.Log.PanicIfError(err)
+		f, err := fsutil.Create(OD() + "table/" + name + "/0")
+		log.Log.PanicIfError(err)
+		ts.Columns = append(ts.Columns, column{Name: name, Unit: unit, buffer: []byte{}, io: f})
+	} else {
+		ts.Columns = append(ts.Columns, column{Name: name, Unit: unit, buffer: []byte{}})
+	}
 }
 
 func tableInit() {
-	err := fsutil.Remove(OD() + "table")
-	log.Log.PanicIfError(err)
-	zarr.InitZgroup("table", OD())
+	if StorageFormat != StorageFormatHDF5 {
+		err := fsutil.Remove(OD() + "table")
+		log.Log.PanicIfError(err)
+		zarr.InitZgroup("table", OD())
+	}
 	Table.AddColumn("step", "")
 	Table.AddColumn("t", "s")
 	tableAdd(&NormMag)

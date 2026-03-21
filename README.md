@@ -16,6 +16,7 @@ Solvers and results are unchanged, but there are many quality-of-life improvemen
 - [Building from Source](#building-from-source)
 - [Contribution](#contribution)
 - [Advantages of Using Zarr Format over OVF Format](#advantages-of-using-zarr-format-over-ovf-format)
+- [HDF5 Output Format](#hdf5-output-format)
 
 
 ## Installation
@@ -75,6 +76,7 @@ Usage: `amumax [options] [mx3 paths...]`
 - `--progress`: Show progress bar (default: true).
 - `-t`, `--tunnel <host>`: Tunnel the web interface through SSH using the given host from your SSH config. An empty string disables tunneling.
 - `--insecure`: Allows running shell commands.
+- `--storage-format <format>`: Storage format for saved data: `zarr` (default) or `h5`. When set to `h5`, all simulation data is saved to a single HDF5 file instead of a Zarr directory with many small files.
 
 **Web Interface Options:**
 
@@ -526,20 +528,27 @@ Amumax provides built-in **sponge layers** — regionless Absorbing Boundary Con
 
 This means the sponge is physical — it modifies effective damping consistently across all interactions.
 
+The current ABC implementation supports:
+- symmetric legacy directions: `"x"`, `"y"`, `"xy"`
+- side-specific directions: `"x-"`, `"x+"`, `"y-"`, `"y+"`
+- comma-separated combinations such as `"x-,x+"`, `"x+,y-"`, `"x-,y+"`
+- four ramp profiles: `"linear"`, `"power"`, `"tanh"`, `"smootherstep"`
+- both a simple single-ramp mode and an advanced **ramp + plateau** mode
+
 #### 1. Manual Setup: `ext_SetAbsorbingBoundary`
 
 ```go
 ext_SetAbsorbingBoundary(width, maxAlpha, direction, profile, param)
 ```
 
-Creates a smooth damping profile near boundaries on both sides of the specified axes.
+Creates a smooth damping profile near boundaries. This is the backward-compatible wrapper where the whole `width` is used as the ramp width.
 
 | Argument    | Type     | Description |
 |-------------|----------|-------------|
-| `width`     | `float`  | Thickness of the absorbing layer in meters (applied symmetrically on each side) |
+| `width`     | `float`  | Total sponge width in meters |
 | `maxAlpha`  | `float`  | Peak damping value at the simulation edge (added to material `Alpha`) |
-| `direction` | `string` | Axes to apply: `"x"`, `"y"`, or `"xy"` (both axes simultaneously) |
-| `profile`   | `string` | Shape of the damping ramp: `"linear"`, `"power"`, or `"tanh"` |
+| `direction` | `string` | Boundaries to apply: `"x"`, `"y"`, `"xy"`, `"x-"`, `"x+"`, `"y-"`, `"y+"`, or comma-separated combinations |
+| `profile`   | `string` | Shape of the damping ramp: `"linear"`, `"power"`, `"tanh"`, or `"smootherstep"` |
 | `param`     | `float`  | Profile-specific parameter (see below) |
 
 **Damping profiles:**
@@ -549,6 +558,7 @@ Creates a smooth damping profile near boundaries on both sides of the specified 
 | `"linear"` | ignored         | Damping grows linearly from 0 to `maxAlpha` |
 | `"power"`  | exponent *n*    | Damping grows as *t^n* (e.g., `2` = quadratic, `3` = cubic). Higher values keep damping low in most of the sponge and ramp up sharply at the boundary |
 | `"tanh"`   | steepness *s*   | S-shaped curve. `1–2`: gentle, almost linear. `4–6`: clear sigmoid. `8+`: sharp, step-like onset. **Recommended: 4–6** for a good balance between gradual onset and effective absorption |
+| `"smootherstep"` | ignored   | Quintic smoothstep profile with zero slope and zero curvature at both ends. Usually the safest default for low-reflection matching |
 
 **Examples:**
 
@@ -559,13 +569,44 @@ ext_SetAbsorbingBoundary(100e-9, 1.0, "x", "tanh", 6)
 // Quadratic profile along both X and Y
 ext_SetAbsorbingBoundary(200e-9, 0.5, "xy", "power", 2)
 
-// Linear ramp along Y only
-ext_SetAbsorbingBoundary(150e-9, 1.0, "y", "linear", 0)
+// Smootherstep profile on the left X boundary only
+ext_SetAbsorbingBoundary(150e-9, 0.8, "x-", "smootherstep", 0)
 ```
 
 > **Note:** Calling `ext_SetAbsorbingBoundary` again **replaces** the previous ABC (does not stack). You can also set `SpongeAlpha` directly for full manual control. The ABC profile is visible in the web UI under the **SpongeAlpha** quantity.
 
-#### 2. Remove ABC: `ext_ClearAbsorbingBoundary`
+#### 2. Advanced Manual Setup: `ext_SetAbsorbingBoundaryAdvanced`
+
+```go
+ext_SetAbsorbingBoundaryAdvanced(totalWidth, rampWidth, maxAlpha, direction, profile, param)
+```
+
+This variant splits the ABC into:
+- an inner **matching ramp** of width `rampWidth`
+- an outer **plateau** of width `totalWidth - rampWidth` with constant `alpha = maxAlpha`
+
+This is often more effective than a single ramp that extends all the way to the hard boundary.
+
+| Argument     | Type    | Description |
+|--------------|---------|-------------|
+| `totalWidth` | `float` | Total ABC width in meters |
+| `rampWidth`  | `float` | Width of the smooth matching section in meters |
+| `maxAlpha`   | `float` | Peak extra damping at the outer edge |
+| `direction`  | `string`| Same direction syntax as `ext_SetAbsorbingBoundary` |
+| `profile`    | `string`| Same profile choices as `ext_SetAbsorbingBoundary` |
+| `param`      | `float` | Profile-specific parameter |
+
+**Recommended manual defaults:**
+
+```go
+// 200 nm total ABC, 80 nm smooth ramp, plateau at the edge
+ext_SetAbsorbingBoundaryAdvanced(200e-9, 80e-9, 0.8, "x-,x+", "smootherstep", 0)
+
+// Power-law ramp with exponent 2
+ext_SetAbsorbingBoundaryAdvanced(250e-9, 100e-9, 0.8, "x+,y-", "power", 2)
+```
+
+#### 3. Remove ABC: `ext_ClearAbsorbingBoundary`
 
 ```go
 ext_ClearAbsorbingBoundary()
@@ -573,9 +614,9 @@ ext_ClearAbsorbingBoundary()
 
 Removes all absorbing boundary conditions, resetting `SpongeAlpha` to zero everywhere.
 
-#### 3. Automatic Configuration: `ext_AutoAbsorbingBoundary`
+#### 4. Legacy Automatic Configuration: `ext_AutoAbsorbingBoundary`
 
-Instead of manually choosing the sponge width, `ext_AutoAbsorbingBoundary` **automatically computes it** from the material parameters and the maximum spin wave frequency you want to absorb.
+This function is kept as a quick-start heuristic. It estimates the sponge width from the **shortest propagating wavelength** at `maxFreqGHz` and applies a `tanh(4)` profile.
 
 ```go
 ext_AutoAbsorbingBoundary(maxFreqGHz, direction, maxAlpha, nWavelengths)
@@ -584,28 +625,14 @@ ext_AutoAbsorbingBoundary(maxFreqGHz, direction, maxAlpha, nWavelengths)
 | Argument       | Type     | Description |
 |----------------|----------|-------------|
 | `maxFreqGHz`   | `float`  | Maximum spin wave frequency to absorb (in GHz) |
-| `direction`    | `string` | Axes to apply: `"x"`, `"y"`, or `"xy"` |
+| `direction`    | `string` | Same direction syntax as manual ABC, including side-specific forms |
 | `maxAlpha`     | `float`  | Peak damping at the boundary edge |
 | `nWavelengths` | `float`  | Number of shortest wavelengths to span the sponge width (3–5 recommended) |
 
-**How it works:**
-
-1. Reads `Msat`, `Aex`, `Alpha`, `B_ext`, and film thickness from the current simulation (region 0)
-2. Uses the **Kalinikos-Slavin dispersion relation** (Damon-Eshbach mode) to find the wave vector *k_max* at the target frequency:
-
-   *ω² = (γμ₀)² · (H + D·k²) · (H + D·k² + Mₛ·(1 − P(kd)))*
-
-   where *D = 2Aₑₓ/(μ₀Mₛ)* and *P(kd) = 1 − (1−e^(−kd))/(kd)*.
-3. Computes the shortest wavelength: *λ_min = 2π / k_max*
-4. Sets the sponge width to: *width = nWavelengths × λ_min*
-5. Applies a **tanh profile** with steepness 4
-
-**Safety checks:**
-- Minimum width is clamped to **10 cells** (warns if computed width is smaller)
-- Maximum width is clamped to **95% of half the domain** (warns if computed width exceeds this)
-- Exits with error if `Msat` or `Aex` are zero (material parameters must be set first)
-
-**Prerequisites:** Set material parameters (`Msat`, `Aex`) and external field (`B_ext`) **before** calling this function.
+This mode is convenient, but it does **not** explicitly optimize:
+- long-wavelength / small-`k` matching
+- separate ramp and plateau lengths
+- side asymmetry beyond using side-specific directions
 
 **Example:**
 
@@ -614,37 +641,140 @@ Msat = 800e3
 Aex  = 13e-12
 B_ext = Vector(0, 0, 0.1)
 
-// Auto-configure ABC for waves up to 30 GHz along X, α_max = 1.0, 3 wavelengths
-ext_AutoAbsorbingBoundary(30, "x", 1.0, 3)
+// Legacy heuristic on the left X boundary only
+ext_AutoAbsorbingBoundary(30, "x-", 1.0, 3)
 ```
 
-The function logs detailed diagnostics:
+#### 5. Physics-Based Automatic Configuration: `ext_AutoAbsorbingBoundaryAdvanced`
+
+```go
+ext_AutoAbsorbingBoundaryAdvanced(
+    fMinGHz, fMaxGHz,
+    direction,
+    mode,
+    maxAlpha,
+    targetRLdB,
+    targetEdgeAmpdB,
+    thetaDeg,
+    ku1Jm3,
+    dmiJm2,
+)
+```
+
+This is the production-oriented ABC mode. It designs:
+- the **ramp width** from an adiabatic matching condition
+- the **plateau width** from the total attenuation required before the boundary
+
+It reads from **region 0**:
+- `Msat`
+- `Aex`
+- `Alpha`
+- `|B_ext|`
+
+and uses the explicit inputs:
+- `ku1Jm3` for the anisotropy correction
+- `dmiJm2` for the interfacial DMI correction
+
+| Argument           | Type    | Description |
+|--------------------|---------|-------------|
+| `fMinGHz`          | `float` | Lower frequency bound of the target band |
+| `fMaxGHz`          | `float` | Upper frequency bound of the target band |
+| `direction`        | `string`| Same direction syntax as manual ABC |
+| `mode`             | `string`| Dispersion model: `"BV"`, `"FV"`, `"DV"`, `"MSSW"`, `"DE"` |
+| `maxAlpha`         | `float` | Maximum extra damping in the sponge |
+| `targetRLdB`       | `float` | Target reflection level in dB for ramp design |
+| `targetEdgeAmpdB`  | `float` | Target amplitude drop in dB before the hard boundary |
+| `thetaDeg`         | `float` | Propagation angle relative to the boundary normal |
+| `ku1Jm3`           | `float` | Uniaxial anisotropy constant used for `H_K ≈ 2Ku1/(μ0Ms)` |
+| `dmiJm2`           | `float` | Interfacial DMI strength used as a linear `k`-shift |
+
+**Mode aliases:**
+- `DV` is treated as `FV`
+- `DE` is treated as `MSSW`
+
+**Recommended example:**
+
+```go
+Msat = 800e3
+Aex = 13e-12
+alpha = 0.01
+B_ext = vector(0.15, 0, 0)
+
+ext_AutoAbsorbingBoundaryAdvanced(
+    6,          // fMinGHz
+    30,         // fMaxGHz
+    "x-,x+",    // absorbing sides
+    "MSSW",     // mode
+    0.8,        // maxAlpha
+    30,         // targetRLdB
+    40,         // targetEdgeAmpdB
+    0,          // thetaDeg
+    2e5,        // Ku1 in J/m^3
+    0.8e-3,     // Dind in J/m^2
+)
+```
+
+The function logs per-side diagnostics and a summary, for example:
 
 ```
-┌─ ABC Auto-Configuration ──────────────────
-│ Material:  Msat = 8.000e+05 A/m, Aex = 1.300e-11 J/m, α = 0.0080
-│ B_ext:     (0.0000, 0.0000, 0.1000) T  → |H| = 7.958e+04 A/m
-│ Film thickness:  d = 20.00 nm
-│ Max frequency:   f = 30.00 GHz  (ω = 1.885e+11 rad/s)
-│ KS dispersion:   k_max = 1.234e+08 rad/m
-│ Shortest λ:      λ_min = 50.91 nm
-│ ABC width:       152.73 nm  (3.0 × λ_min)
-│ Max damping:     α_sponge = 1.00
-│ Direction:       x
-│ Profile:         tanh (steepness=4)
+┌─ ABC Physics-Based Auto-Configuration ────
+│ x-: λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
+│ x+: λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
+│ Material: Msat = 8.000e+05 A/m, Aex = 1.300e-11 J/m, α = 0.0100
+│ |B_ext| = 0.1500 T  → H_ext = 1.194e+05 A/m
+│ Ku1 input = 2.000e+05 J/m^3 → H_K ≈ 3.979e+05 A/m
+│ H_eff used = 5.173e+05 A/m
+│ Profile = smootherstep, maxAlpha = 0.800
 └────────────────────────────────────────────
+```
+
+#### 6. Zero-Input Advanced Auto Mode: `ext_AutoAbsorbingBoundaryAdvancedFromRegion0`
+
+```go
+ext_AutoAbsorbingBoundaryAdvancedFromRegion0(
+    fMinGHz, fMaxGHz,
+    direction,
+    mode,
+    maxAlpha,
+    targetRLdB,
+    targetEdgeAmpdB,
+    thetaDeg,
+)
+```
+
+This is a convenience wrapper around `ext_AutoAbsorbingBoundaryAdvanced(...)`. It reads the remaining material inputs directly from **region 0**:
+- `Ku1`
+- `Dind`
+
+Use this if your script already stores those values in the engine and you want a fully zero-input advanced ABC setup.
+
+```go
+Ku1 = 2e5
+Dind = 0.8e-3
+
+ext_AutoAbsorbingBoundaryAdvancedFromRegion0(
+    6, 30,
+    "x-,x+",
+    "MSSW",
+    0.8,
+    30,
+    40,
+    0,
+)
 ```
 
 #### Practical Recommendations
 
 | Parameter      | Typical value | Notes |
 |----------------|---------------|-------|
-| `maxAlpha`     | 0.5 – 1.0    | Higher values absorb more aggressively but may cause residual reflections at the sponge interface if the profile is too steep |
-| `nWavelengths` | 3 – 5        | Wider sponge = better absorption, but consumes more simulation domain. 3 is a reasonable default |
-| `profile`      | `"tanh"`      | Recommended for most cases: gradual onset avoids abrupt impedance mismatch |
-| `param` (tanh) | 4 – 6        | Good balance between smoothness and compactness |
+| `maxAlpha`         | `0.5 – 1.0`        | Higher values absorb more strongly but require a sufficiently smooth ramp |
+| `profile`          | `"smootherstep"`   | Recommended default for manual setups |
+| `power` exponent   | `2`                | Good alternative manual profile |
+| `targetRLdB`       | `30`               | Sensible default for advanced auto |
+| `targetEdgeAmpdB`  | `40`               | Good default amplitude decay target |
+| `nWavelengths`     | `3 – 5`            | Still a reasonable range for legacy auto |
 
-> **Tip:** For FMR-type simulations where the excited frequency range is known, use `ext_AutoAbsorbingBoundary` to let amumax compute the optimal sponge width automatically.
+> **Tip:** Use `ext_AutoAbsorbingBoundaryAdvanced...` when you know the propagating frequency band and want better matching than the legacy shortest-wavelength heuristic. Use `ext_SetAbsorbingBoundaryAdvanced(...)` when you already know the geometry and want direct control over ramp and plateau lengths.
 
 ### Other Changes
 
@@ -669,6 +799,7 @@ The function logs detailed diagnostics:
 - Save compressed arrays (Zstandard) by default.
 - `ext_makegrains` now also takes a new argument `minRegion`. `ext_makegrains(grainsize, minRegion, maxRegion, seed)`
 - Added colors for terminal logs.
+- Added HDF5 output format as alternative to Zarr (`StorageFormat = HDF5` or `--storage-format h5`).
 
 ## Building from Source
 
@@ -733,5 +864,84 @@ Saving data in the Zarr format offers several advantages over the traditional OV
 - **Organized Data Structures**: Zarr can organize arrays into hierarchies via groups, similar to directories and files, making it easier to manage complex datasets.
 
 In contrast, the OVF format lacks native support for chunking, compression, and parallel I/O operations, which can lead to inefficiencies when dealing with large datasets. OVF files often require loading the entire dataset into memory for processing, making it less suitable for large-scale simulations or when only specific portions of the data are needed. Additionally, OVF's integration with modern data analysis tools and workflows is more limited compared to Zarr.
+
+---
+
+## HDF5 Output Format
+
+Amumax supports writing simulation data to a **single HDF5 file** instead of the default Zarr directory structure. This eliminates the thousands of small files generated by Zarr, which can cause performance issues on network filesystems and HPC clusters.
+
+### Enabling HDF5 Output
+
+**Via CLI flag:**
+
+```bash
+amumax --storage-format h5 simulation.mx3
+```
+
+**Via .mx3 script:**
+
+```go
+StorageFormat = HDF5
+```
+
+To switch back to Zarr:
+
+```go
+StorageFormat = ZARR
+```
+
+### Output Structure
+
+When using HDF5, the output directory is still a `.zarr` folder (same as default). The HDF5 file `output.h5` is placed inside alongside metadata and logs:
+
+```
+v1.zarr/                    ← same output folder
+├── output.h5               ← all simulation data in HDF5
+├── .zattrs                 ← simulation metadata (JSON)
+├── .zgroup                 ← Zarr group marker
+└── log.txt                 ← simulation log
+```
+
+Compare with default Zarr output:
+
+```
+v1.zarr/
+├── m/                      ← magnetization chunks
+│   ├── .zarray
+│   ├── .zattrs
+│   └── 0.0.0.0.0, ...
+├── table/                  ← table data
+├── .zattrs
+├── .zgroup
+└── log.txt
+```
+
+### Reading HDF5 Data in Python
+
+```python
+import h5py
+
+f = h5py.File("simulation.zarr/output.h5", "r")
+
+# Read magnetization at step 100
+m = f["m/100"][:]           # shape: (Nz, Ny, Nx, 3)
+
+# Random access — single layer, single component
+mx_top = f["m/50"][-1, :, :, 0]  # top layer, mx component
+
+# Timestamps
+t = f["m/t"][:]
+
+# Table data
+mx_avg = f["table/mx"][:]
+```
+
+### Notes
+
+- All existing `Save`, `AutoSave`, `SaveAs`, `AutoSaveAs`, and chunking functions work identically — only the storage backend changes.
+- `LoadFile()` does **not** currently support loading from HDF5 files.
+- The HDF5 file uses contiguous layout (not chunked), which means no per-chunk compression. File sizes may be slightly larger than Zarr with Zstandard compression.
+- Timestamps are written at the end of the simulation. If the simulation crashes, timestamps may be lost (but data arrays are preserved).
 
 ---

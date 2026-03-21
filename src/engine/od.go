@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/MathieuMoalic/amumax/src/fsutil"
+	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/zarr"
 )
@@ -66,5 +67,9 @@ func InitIO(mx3Path, od, cachedir string, skipexists, forceclean, hideprogressba
 	} else {
 		log.Log.PanicIfError(fsutil.Mkdir(od))
 	}
-	zarr.InitZgroup("", OD())
+	if StorageFormat == StorageFormatHDF5 {
+		amuhdf5.InitMultiWriter(od)
+	} else {
+		zarr.InitZgroup("", OD())
+	}
 }

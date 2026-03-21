@@ -47,3 +47,8 @@ src/engine_old/api_old/static
 src/api/static
 frontend/dist
 result
+*.h5
+*.md
+hdf5_proto/hdf5_proto
+
+

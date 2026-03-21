@@ -46,6 +46,9 @@ func Entrypoint(cmd *cobra.Command, args []string, flags *flags.Flags) {
 
 	engine.Insecure = flags.Insecure
 	engine.FftEnabled = flags.Fft
+	if flags.StorageFormat == "h5" || flags.StorageFormat == "hdf5" {
+		engine.StorageFormat = engine.StorageFormatHDF5
+	}
 
 	defer engine.CleanExit() // flushes pending output, if any
 

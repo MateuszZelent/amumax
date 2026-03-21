@@ -10,6 +10,7 @@ import (
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
 	"github.com/MathieuMoalic/amumax/src/fsutil"
+	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/oommf"
 	"github.com/MathieuMoalic/amumax/src/zarr"
@@ -68,6 +69,21 @@ func fprintln(filename string, msg ...any) {
 }
 
 func loadFile(fname string) *data.Slice {
+	// Check if this is an HDF5 path: "path/to/output.h5:/dataset/path"
+	if idx := strings.Index(fname, ".h5:"); idx != -1 {
+		h5File := fname[:idx+3]
+		dsPath := fname[idx+3:] // includes leading ":"
+		if len(dsPath) > 0 && dsPath[0] == ':' {
+			dsPath = dsPath[1:] // remove ":"
+		}
+		if !path.IsAbs(h5File) {
+			h5File = path.Join(path.Dir(OD()), h5File)
+		}
+		s, err := amuhdf5.ReadArray(h5File, dsPath)
+		log.Log.PanicIfError(err)
+		return s
+	}
+	// Default: Zarr reader
 	var s *data.Slice
 	s, err := zarr.Read(fname, OD())
 	log.Log.PanicIfError(err)

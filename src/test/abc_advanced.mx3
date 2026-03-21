@@ -1,0 +1,22 @@
+/*
+	Test the advanced manual absorbing boundary condition.
+*/
+
+Nx = 8
+Ny = 1
+Nz = 1
+dx = 1e-9
+dy = 1e-9
+dz = 1e-9
+
+tol := 1e-6
+
+ext_setabsorbingboundaryadvanced(4e-9, 2e-9, 1.0, "x-", "linear", 0)
+
+expect("plateau", cropx(SpongeAlpha, 0, 2).average()[0], 1.0, tol)
+expect("ramp", cropx(SpongeAlpha, 2, 4).average()[0], 0.5, tol)
+expect("bulk", cropx(SpongeAlpha, 4, 8).average()[0], 0.0, tol)
+expect("whole", SpongeAlpha.average(), 0.375, tol)
+
+ext_clearabsorbingboundary()
+expect("clear", SpongeAlpha.average(), 0.0, tol)

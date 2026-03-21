@@ -1,0 +1,41 @@
+/*
+	Test advanced auto ABC in explicit-arg and zero-input modes,
+	and smoke-test legacy auto with side-specific directions.
+*/
+
+Nx = 256
+Ny = 1
+Nz = 2
+dx = 5e-9
+dy = 5e-9
+dz = 1e-9
+
+Msat = 800e3
+Aex = 13e-12
+alpha = 0.01
+B_ext = vector(0.15, 0, 0)
+Ku1 = 2e5
+Dind = 0.8e-3
+
+tol := 1e-6
+
+ext_autoabsorbingboundaryadvanced(6, 18, "x-", "FV", 0.8, 30, 40, 0, 2e5, 0.8e-3)
+
+avgExplicit := SpongeAlpha.average()
+leftExplicit := cropx(SpongeAlpha, 0, 16).average()[0]
+rampExplicit := cropx(SpongeAlpha, 16, 32).average()[0]
+
+expect("explicit avg positive", sign(avgExplicit), 1, 0)
+
+ext_clearabsorbingboundary()
+ext_autoabsorbingboundaryadvancedfromregion0(6, 18, "x-", "FV", 0.8, 30, 40, 0)
+
+expect("region0 avg", SpongeAlpha.average(), avgExplicit, tol)
+expect("region0 left", cropx(SpongeAlpha, 0, 16).average()[0], leftExplicit, tol)
+expect("region0 ramp", cropx(SpongeAlpha, 16, 32).average()[0], rampExplicit, tol)
+
+ext_clearabsorbingboundary()
+ext_autoabsorbingboundary(18, "x-", 0.8, 3)
+
+expect("legacy left positive", sign(cropx(SpongeAlpha, 0, 16).average()[0]), 1, 0)
+expect("legacy right zero", cropx(SpongeAlpha, 240, 256).average()[0], 0.0, tol)
