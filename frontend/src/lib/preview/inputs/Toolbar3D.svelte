@@ -13,15 +13,22 @@
 		setVoxelOpacity,
 		setVoxelSampling,
 		setVoxelThreshold,
+		setTopoEnabled,
+		setTopoComponent,
+		setTopoMultiplier,
 		voxelColorMode,
 		voxelGap,
 		voxelOpacity,
 		voxelSampling,
 		voxelThreshold,
+		topoEnabled,
+		topoComponent,
+		topoMultiplier,
 		type Preview3DRenderMode,
 		type QualityLevel,
 		type VoxelColorMode,
-		type VoxelSampling
+		type VoxelSampling,
+		type TopoComponent
 	} from '$lib/preview/preview3D';
 
 	let expanded = false;
@@ -34,6 +41,7 @@
 	$: opacityVal = $voxelOpacity;
 	$: gapVal = $voxelGap;
 	$: thresholdVal = $voxelThreshold;
+	$: topoMulVal = $topoMultiplier;
 
 	const qualityLevels: { key: QualityLevel; label: string }[] = [
 		{ key: 'low', label: 'LOW' },
@@ -57,6 +65,12 @@
 		{ key: 1, label: '1X' },
 		{ key: 2, label: '2X' },
 		{ key: 4, label: '4X' }
+	];
+
+	const topoComponents: { key: TopoComponent; label: string }[] = [
+		{ key: 'x', label: 'X' },
+		{ key: 'y', label: 'Y' },
+		{ key: 'z', label: 'Z' }
 	];
 
 	$: isVisible = $p.nComp === 3 && $p.type === '3D';
@@ -198,6 +212,54 @@
 					</div>
 				{/if}
 
+				<div class="divider"></div>
+
+				<!-- Topography -->
+				<div class="control-group">
+					<div class="control-label">Topography</div>
+					<button
+						class="action-btn"
+						class:action-btn--topo-active={$topoEnabled}
+						onclick={() => setTopoEnabled(!$topoEnabled)}
+					>
+						{$topoEnabled ? '⛰ ON' : 'OFF'}
+					</button>
+				</div>
+
+				{#if $topoEnabled}
+					<div class="control-group">
+						<div class="control-label">Displace by</div>
+						<div class="btn-group btn-group--wide">
+							{#each topoComponents as { key, label }}
+								<button
+									class="seg-btn"
+									class:active={$topoComponent === key}
+									onclick={() => setTopoComponent(key)}
+								>
+									m{label}
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<div class="control-group">
+						<div class="control-label">
+							Amplitude
+							<span class="control-value">{topoMulVal.toFixed(1)}×</span>
+						</div>
+						<input
+							aria-label="Topography amplitude"
+							type="range"
+							min="0.5"
+							max="50"
+							step="0.5"
+							value={topoMulVal}
+							oninput={(event) => setTopoMultiplier(parseFloat(event.currentTarget.value))}
+							class="slider"
+						/>
+					</div>
+				{/if}
+
 				<button class="action-btn" onclick={resetCamera}>Reset Camera</button>
 			</div>
 		{/if}
@@ -240,20 +302,24 @@
 		background: linear-gradient(180deg, rgba(12, 18, 31, 0.92), rgba(8, 12, 22, 0.92));
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
-		padding: var(--space-md);
-		min-width: 220px;
-		max-width: 240px;
+		padding: var(--space-sm);
+		min-width: 200px;
+		max-width: 220px;
+		max-height: 360px;
+		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-md);
+		gap: var(--space-sm);
 		backdrop-filter: blur(14px);
 		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+		scrollbar-width: thin;
+		scrollbar-color: rgba(107, 167, 255, 0.3) transparent;
 	}
 
 	.control-group {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-xs);
+		gap: 3px;
 	}
 
 	.control-label {
@@ -332,6 +398,18 @@
 	.seg-btn.active {
 		background: linear-gradient(135deg, rgba(87, 200, 182, 0.92), rgba(56, 178, 162, 0.92));
 		color: #08101d;
+	}
+
+	.action-btn--topo-active {
+		background: linear-gradient(135deg, rgba(52, 211, 153, 0.85), rgba(16, 185, 129, 0.85)) !important;
+		color: #08101d !important;
+		border-color: rgba(52, 211, 153, 0.5) !important;
+	}
+
+	.divider {
+		height: 1px;
+		background: var(--border);
+		margin: 2px 0;
 	}
 
 	.action-btn {

@@ -23,6 +23,32 @@ func Sum(in *data.Slice) float32 {
 	return copyback(out)
 }
 
+// SumComponents returns the sum of each component with a single stream sync.
+// This is substantially cheaper than calling Sum() repeatedly because it avoids
+// a full host/device synchronization for every component.
+func SumComponents(in *data.Slice) []float32 {
+	nComp := in.NComp()
+	results := make([]float32, nComp)
+	if nComp == 0 {
+		return results
+	}
+
+	buffers := make([]unsafe.Pointer, nComp)
+	for c := 0; c < nComp; c++ {
+		buf := reduceBuf(0)
+		kReducesumAsync(in.DevPtr(c), buf, 0, in.Len(), reducecfg)
+		buffers[c] = buf
+	}
+
+	Sync()
+	for c, buf := range buffers {
+		cu.MemcpyDtoH(unsafe.Pointer(&results[c]), cu.DevicePtr(uintptr(buf)), cu.SIZEOF_FLOAT32)
+		reduceBuffers <- buf
+	}
+
+	return results
+}
+
 // Dot product.
 func Dot(a, b *data.Slice) float32 {
 	nComp := a.NComp()

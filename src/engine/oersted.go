@@ -81,7 +81,20 @@ func addOerstedField(dst *data.Slice) {
 	if !EnableOersted {
 		return
 	}
-	if JOersted.isZero() {
+
+	// Check if J_oersted evaluates to zero (not just structurally zero).
+	// isZero() can give false positives for time-dependent expressions
+	// like vector(0,0, Jdc + 0*sinc(t)) where the LUT is overwritten
+	// by the dynamic updater, even though the actual value is non-zero.
+	avg := JOersted.average()
+	allZero := true
+	for _, v := range avg {
+		if v != 0 {
+			allZero = false
+			break
+		}
+	}
+	if allZero && JOersted.isZero() {
 		if !oerstedWarnedNoJ {
 			log.Log.Warn("EnableOersted=true but J_oersted is zero. Set J_oersted explicitly (e.g. J_oersted = J).")
 			oerstedWarnedNoJ = true

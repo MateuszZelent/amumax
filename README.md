@@ -514,14 +514,46 @@ my_top_layer = job.m_chunked[0, -1,:,:,1]
 - **Avoid Too Small or Too Large Chunks**: Very small chunks (<1MB) can lead to overhead, while very large chunks may negate the benefits of chunking.
 - **Monitor Performance**: Experiment with different chunking strategies to find the optimal configuration for your specific use case.
 
-### Absorbing Boundary Conditions (ABC)
+### Absorbing Boundary Conditions (ABC) — Sponge Layers
 
-Amumax supports regionless Absorbing Boundary Conditions via a per-cell `SpongeAlpha` damping field. This avoids consuming limited region slots when setting up smooth damping layers near simulation boundaries to absorb spin waves.
+Amumax provides built-in **sponge layers** — regionless Absorbing Boundary Conditions (ABC) that suppress spurious spin wave reflections from simulation edges. Instead of consuming limited region slots, a per-cell `SpongeAlpha` damping field is added on top of the material `Alpha`. The extra damping smoothly increases from zero in the bulk toward a maximum at the boundary, gradually attenuating spin waves entering the sponge region.
 
-#### Quick Setup
+`SpongeAlpha` is integrated into all relevant CUDA kernels:
+- **LLG torque** (Landau-Lifshitz-Gilbert dynamics)
+- **Slonczewski STT** (spin-transfer torque)
+- **Zhang-Li STT** (current-driven torque)
+- **Thermal noise** (fluctuation–dissipation scaling)
+
+This means the sponge is physical — it modifies effective damping consistently across all interactions.
+
+#### 1. Manual Setup: `ext_SetAbsorbingBoundary`
 
 ```go
-// tanh profile along X boundaries, 100nm wide, max damping 1.0, steepness 6
+ext_SetAbsorbingBoundary(width, maxAlpha, direction, profile, param)
+```
+
+Creates a smooth damping profile near boundaries on both sides of the specified axes.
+
+| Argument    | Type     | Description |
+|-------------|----------|-------------|
+| `width`     | `float`  | Thickness of the absorbing layer in meters (applied symmetrically on each side) |
+| `maxAlpha`  | `float`  | Peak damping value at the simulation edge (added to material `Alpha`) |
+| `direction` | `string` | Axes to apply: `"x"`, `"y"`, or `"xy"` (both axes simultaneously) |
+| `profile`   | `string` | Shape of the damping ramp: `"linear"`, `"power"`, or `"tanh"` |
+| `param`     | `float`  | Profile-specific parameter (see below) |
+
+**Damping profiles:**
+
+| Profile    | `param` meaning | Behavior |
+|------------|-----------------|----------|
+| `"linear"` | ignored         | Damping grows linearly from 0 to `maxAlpha` |
+| `"power"`  | exponent *n*    | Damping grows as *t^n* (e.g., `2` = quadratic, `3` = cubic). Higher values keep damping low in most of the sponge and ramp up sharply at the boundary |
+| `"tanh"`   | steepness *s*   | S-shaped curve. `1–2`: gentle, almost linear. `4–6`: clear sigmoid. `8+`: sharp, step-like onset. **Recommended: 4–6** for a good balance between gradual onset and effective absorption |
+
+**Examples:**
+
+```go
+// tanh profile along X boundaries, 100 nm wide, max damping 1.0, steepness 6
 ext_SetAbsorbingBoundary(100e-9, 1.0, "x", "tanh", 6)
 
 // Quadratic profile along both X and Y
@@ -529,42 +561,90 @@ ext_SetAbsorbingBoundary(200e-9, 0.5, "xy", "power", 2)
 
 // Linear ramp along Y only
 ext_SetAbsorbingBoundary(150e-9, 1.0, "y", "linear", 0)
+```
 
-// Remove ABC
+> **Note:** Calling `ext_SetAbsorbingBoundary` again **replaces** the previous ABC (does not stack). You can also set `SpongeAlpha` directly for full manual control. The ABC profile is visible in the web UI under the **SpongeAlpha** quantity.
+
+#### 2. Remove ABC: `ext_ClearAbsorbingBoundary`
+
+```go
 ext_ClearAbsorbingBoundary()
 ```
 
-**Arguments:** `ext_SetAbsorbingBoundary(width, maxAlpha, direction, profile, param)`
+Removes all absorbing boundary conditions, resetting `SpongeAlpha` to zero everywhere.
 
-| Argument    | Description |
-|-------------|-------------|
-| `width`     | Thickness of the absorbing layer (m) |
-| `maxAlpha`  | Peak damping value at the simulation edge |
-| `direction` | `"x"`, `"y"`, or `"xy"` |
-| `profile`   | `"linear"`, `"power"`, or `"tanh"` |
-| `param`     | Profile parameter: steepness for `tanh` (e.g. 4–10), exponent for `power` (e.g. 2), ignored for `linear` |
+#### 3. Automatic Configuration: `ext_AutoAbsorbingBoundary`
 
-Calling `ext_SetAbsorbingBoundary` again **replaces** the previous ABC (does not stack). You can also set `SpongeAlpha` directly for full manual control. The ABC profile is visible in the web UI under the `SpongeAlpha` quantity.
-
-#### Automatic Configuration
-
-`ext_AutoAbsorbingBoundary` uses the **Kalinikos-Slavin dispersion relation** (DE mode) to compute the shortest spin wave wavelength at a given frequency, then automatically sets the ABC width:
+Instead of manually choosing the sponge width, `ext_AutoAbsorbingBoundary` **automatically computes it** from the material parameters and the maximum spin wave frequency you want to absorb.
 
 ```go
-// Auto-configure ABC for waves up to 30 GHz along X, with α_max=1.0 and 3 wavelengths width
+ext_AutoAbsorbingBoundary(maxFreqGHz, direction, maxAlpha, nWavelengths)
+```
+
+| Argument       | Type     | Description |
+|----------------|----------|-------------|
+| `maxFreqGHz`   | `float`  | Maximum spin wave frequency to absorb (in GHz) |
+| `direction`    | `string` | Axes to apply: `"x"`, `"y"`, or `"xy"` |
+| `maxAlpha`     | `float`  | Peak damping at the boundary edge |
+| `nWavelengths` | `float`  | Number of shortest wavelengths to span the sponge width (3–5 recommended) |
+
+**How it works:**
+
+1. Reads `Msat`, `Aex`, `Alpha`, `B_ext`, and film thickness from the current simulation (region 0)
+2. Uses the **Kalinikos-Slavin dispersion relation** (Damon-Eshbach mode) to find the wave vector *k_max* at the target frequency:
+
+   *ω² = (γμ₀)² · (H + D·k²) · (H + D·k² + Mₛ·(1 − P(kd)))*
+
+   where *D = 2Aₑₓ/(μ₀Mₛ)* and *P(kd) = 1 − (1−e^(−kd))/(kd)*.
+3. Computes the shortest wavelength: *λ_min = 2π / k_max*
+4. Sets the sponge width to: *width = nWavelengths × λ_min*
+5. Applies a **tanh profile** with steepness 4
+
+**Safety checks:**
+- Minimum width is clamped to **10 cells** (warns if computed width is smaller)
+- Maximum width is clamped to **95% of half the domain** (warns if computed width exceeds this)
+- Exits with error if `Msat` or `Aex` are zero (material parameters must be set first)
+
+**Prerequisites:** Set material parameters (`Msat`, `Aex`) and external field (`B_ext`) **before** calling this function.
+
+**Example:**
+
+```go
+Msat = 800e3
+Aex  = 13e-12
+B_ext = Vector(0, 0, 0.1)
+
+// Auto-configure ABC for waves up to 30 GHz along X, α_max = 1.0, 3 wavelengths
 ext_AutoAbsorbingBoundary(30, "x", 1.0, 3)
 ```
 
-**Arguments:** `ext_AutoAbsorbingBoundary(maxFreqGHz, direction, maxAlpha, nWavelengths)`
+The function logs detailed diagnostics:
 
-| Argument       | Description |
-|----------------|-------------|
-| `maxFreqGHz`   | Maximum spin wave frequency to absorb (GHz) |
-| `direction`    | `"x"`, `"y"`, or `"xy"` |
-| `maxAlpha`     | Peak damping at boundary |
-| `nWavelengths` | Number of shortest wavelengths for sponge width (3–5 recommended) |
+```
+┌─ ABC Auto-Configuration ──────────────────
+│ Material:  Msat = 8.000e+05 A/m, Aex = 1.300e-11 J/m, α = 0.0080
+│ B_ext:     (0.0000, 0.0000, 0.1000) T  → |H| = 7.958e+04 A/m
+│ Film thickness:  d = 20.00 nm
+│ Max frequency:   f = 30.00 GHz  (ω = 1.885e+11 rad/s)
+│ KS dispersion:   k_max = 1.234e+08 rad/m
+│ Shortest λ:      λ_min = 50.91 nm
+│ ABC width:       152.73 nm  (3.0 × λ_min)
+│ Max damping:     α_sponge = 1.00
+│ Direction:       x
+│ Profile:         tanh (steepness=4)
+└────────────────────────────────────────────
+```
 
-The function reads `Msat`, `Aex`, and film thickness from the current simulation, solves for k_max, and logs all computed values.
+#### Practical Recommendations
+
+| Parameter      | Typical value | Notes |
+|----------------|---------------|-------|
+| `maxAlpha`     | 0.5 – 1.0    | Higher values absorb more aggressively but may cause residual reflections at the sponge interface if the profile is too steep |
+| `nWavelengths` | 3 – 5        | Wider sponge = better absorption, but consumes more simulation domain. 3 is a reasonable default |
+| `profile`      | `"tanh"`      | Recommended for most cases: gradual onset avoids abrupt impedance mismatch |
+| `param` (tanh) | 4 – 6        | Good balance between smoothness and compactness |
+
+> **Tip:** For FMR-type simulations where the excited frequency range is known, use `ext_AutoAbsorbingBoundary` to let amumax compute the optimal sponge width automatically.
 
 ### Other Changes
 

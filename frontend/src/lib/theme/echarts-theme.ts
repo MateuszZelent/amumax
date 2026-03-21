@@ -1,5 +1,5 @@
 import { use, init, registerTheme, type ECharts } from 'echarts/core';
-import { HeatmapChart, LineChart } from 'echarts/charts';
+import { HeatmapChart, LineChart, ScatterChart } from 'echarts/charts';
 import {
 	AxisPointerComponent,
 	DataZoomInsideComponent,
@@ -13,6 +13,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 
 use([
 	LineChart,
+	ScatterChart,
 	HeatmapChart,
 	GridComponent,
 	TooltipComponent,

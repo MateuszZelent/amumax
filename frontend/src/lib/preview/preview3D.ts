@@ -6,12 +6,14 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 import { get, writable } from 'svelte/store';
 import { disposePreview2D } from './preview2D';
+import { resolveVoxelTopography } from './voxelTopography';
 import { THEME } from '$lib/theme/echarts-theme';
 
 export type QualityLevel = 'low' | 'high' | 'ultra';
 export type Preview3DRenderMode = 'glyph' | 'voxel';
 export type VoxelColorMode = 'orientation' | 'x' | 'y' | 'z';
 export type VoxelSampling = 1 | 2 | 4;
+export type TopoComponent = 'x' | 'y' | 'z';
 
 interface QualityConfig {
 	segments: number;
@@ -62,7 +64,10 @@ const STORAGE_KEYS = {
 	voxelGap: 'preview3d_voxel_gap',
 	voxelThreshold: 'preview3d_voxel_threshold',
 	voxelColorMode: 'preview3d_voxel_color_mode',
-	voxelSampling: 'preview3d_voxel_sampling'
+	voxelSampling: 'preview3d_voxel_sampling',
+	topoEnabled: 'preview3d_topo_enabled',
+	topoComponent: 'preview3d_topo_component',
+	topoMultiplier: 'preview3d_topo_multiplier'
 } as const;
 
 const COMPONENT_NEGATIVE = new THREE.Color('#2f6caa');
@@ -77,14 +82,23 @@ const _color = new THREE.Color();
 export const brightness = writable<number>(loadBrightness());
 export const qualityLevel = writable<QualityLevel>(loadQuality());
 export const renderMode = writable<Preview3DRenderMode>(loadRenderMode());
-export const voxelOpacity = writable<number>(loadClampedNumber(STORAGE_KEYS.voxelOpacity, 0.5, 0.15, 0.95));
-export const voxelGap = writable<number>(loadClampedNumber(STORAGE_KEYS.voxelGap, 0.14, 0.02, 0.42));
+export const voxelOpacity = writable<number>(
+	loadClampedNumber(STORAGE_KEYS.voxelOpacity, 0.5, 0.15, 0.95)
+);
+export const voxelGap = writable<number>(
+	loadClampedNumber(STORAGE_KEYS.voxelGap, 0.14, 0.02, 0.42)
+);
 export const voxelThreshold = writable<number>(
 	loadClampedNumber(STORAGE_KEYS.voxelThreshold, 0.08, 0, 0.95)
 );
 export const voxelColorMode = writable<VoxelColorMode>(loadVoxelColorMode());
 export const voxelSampling = writable<VoxelSampling>(loadVoxelSampling());
 export const threeDPreview = writable<ThreeDPreview | null>(null);
+export const topoEnabled = writable<boolean>(loadTopoEnabled());
+export const topoComponent = writable<TopoComponent>(loadTopoComponent());
+export const topoMultiplier = writable<number>(
+	loadClampedNumber(STORAGE_KEYS.topoMultiplier, 5, 0.5, 50)
+);
 
 let animationFrameId: number | null = null;
 let resizeObserver: ResizeObserver | null = null;
@@ -147,6 +161,18 @@ function loadVoxelSampling(): VoxelSampling {
 
 	const stored = Number.parseInt(window.localStorage.getItem(STORAGE_KEYS.voxelSampling) || '', 10);
 	return stored === 2 || stored === 4 ? stored : 1;
+}
+
+function loadTopoEnabled(): boolean {
+	if (!browser) return false;
+	return window.localStorage.getItem(STORAGE_KEYS.topoEnabled) === 'true';
+}
+
+function loadTopoComponent(): TopoComponent {
+	if (!browser) return 'z';
+	const stored = window.localStorage.getItem(STORAGE_KEYS.topoComponent);
+	if (stored === 'x' || stored === 'y' || stored === 'z') return stored;
+	return 'z';
 }
 
 function persistSetting(key: string, value: string | number) {
@@ -287,7 +313,10 @@ function createMesh(): THREE.InstancedMesh {
 	mesh.frustumCulled = false;
 	mesh.renderOrder = mode === 'voxel' ? 2 : 1;
 	mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-	mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(count, 1) * 3), 3);
+	mesh.instanceColor = new THREE.InstancedBufferAttribute(
+		new Float32Array(Math.max(count, 1) * 3),
+		3
+	);
 
 	return mesh;
 }
@@ -333,7 +362,11 @@ function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 	controls.dynamicDampingFactor = 1;
 	controls.panSpeed = 0.8;
 	controls.rotateSpeed = 1;
-	controls.target.set(get(previewState).xChosenSize / 2, get(previewState).yChosenSize / 2, depthCells / 2);
+	controls.target.set(
+		get(previewState).xChosenSize / 2,
+		get(previewState).yChosenSize / 2,
+		depthCells / 2
+	);
 	controls.update();
 
 	return controls;
@@ -481,20 +514,34 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 	const depthScale = get(previewState).allLayers ? baseScale : Math.max(0.22, baseScale * 0.42);
 	const threshold = get(voxelThreshold);
 	const colorMode = get(voxelColorMode);
+	const topo = get(topoEnabled);
+	const topoComp = get(topoComponent);
+	const topoMul = get(topoMultiplier);
 
 	for (let i = 0; i < count; i++) {
 		const vector = values[i];
 		const position = positions[i];
 		const metric =
-			colorMode === 'orientation' ? vectorMagnitude(vector) : Math.abs(componentValue(vector, colorMode));
+			colorMode === 'orientation'
+				? vectorMagnitude(vector)
+				: Math.abs(componentValue(vector, colorMode));
 
-		_dummy.position.set(position.x, position.y, position.z);
+		let pz = position.z;
+		let voxelDepth = depthScale;
+		if (topo) {
+			const topoDisplacement = componentValue(vector, topoComp) * topoMul;
+			const topography = resolveVoxelTopography(position.z, depthScale, topoDisplacement);
+			pz = topography.centerZ;
+			voxelDepth = topography.depthScale;
+		}
+
+		_dummy.position.set(position.x, position.y, pz);
 		_dummy.quaternion.identity();
 
 		if (!isSampledPosition(position) || metric < threshold) {
 			_dummy.scale.set(0, 0, 0);
 		} else {
-			_dummy.scale.set(baseScale, baseScale, depthScale);
+			_dummy.scale.set(baseScale, baseScale, voxelDepth);
 		}
 
 		applyVoxelColor(vector, _color);
@@ -717,6 +764,31 @@ export function setVoxelSampling(value: VoxelSampling) {
 	persistSetting(STORAGE_KEYS.voxelSampling, value);
 	voxelSampling.set(value);
 	if (get(renderMode) === 'voxel') {
+		update();
+	}
+}
+
+export function setTopoEnabled(value: boolean) {
+	persistSetting(STORAGE_KEYS.topoEnabled, String(value));
+	topoEnabled.set(value);
+	if (get(renderMode) === 'voxel') {
+		update();
+	}
+}
+
+export function setTopoComponent(comp: TopoComponent) {
+	persistSetting(STORAGE_KEYS.topoComponent, comp);
+	topoComponent.set(comp);
+	if (get(renderMode) === 'voxel' && get(topoEnabled)) {
+		update();
+	}
+}
+
+export function setTopoMultiplier(value: number) {
+	const clamped = Math.max(0.5, Math.min(50, value));
+	persistSetting(STORAGE_KEYS.topoMultiplier, clamped);
+	topoMultiplier.set(clamped);
+	if (get(renderMode) === 'voxel' && get(topoEnabled)) {
 		update();
 	}
 }

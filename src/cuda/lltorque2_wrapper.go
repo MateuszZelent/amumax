@@ -139,7 +139,7 @@ const (
 	ld.param.u64 	%rd8, [lltorque2_param_7];
 	ld.param.u64 	%rd9, [lltorque2_param_8];
 	ld.param.u64 	%rd10, [lltorque2_param_9];
-	ld.param.f32 	%f42, [lltorque2_param_10];
+	ld.param.f32 	%f43, [lltorque2_param_10];
 	ld.param.u64 	%rd11, [lltorque2_param_11];
 	ld.param.u32 	%r2, [lltorque2_param_12];
 	mov.u32 	%r3, %nctaid.x;
@@ -171,22 +171,22 @@ const (
 	cvta.to.global.u64 	%rd23, %rd9;
 	add.s64 	%rd24, %rd23, %rd13;
 	ld.global.nc.f32 	%f6, [%rd24];
-	setp.eq.s64	%p2, %rd10, 0;
+	setp.eq.s64	%p2, %rd11, 0;
+	mov.f32 	%f42, 0f00000000;
 	@%p2 bra 	BB0_3;
 
-	cvta.to.global.u64 	%rd25, %rd10;
+	cvta.to.global.u64 	%rd25, %rd11;
 	add.s64 	%rd27, %rd25, %rd13;
-	ld.global.nc.f32 	%f12, [%rd27];
-	mul.f32 	%f42, %f12, %f42;
+	ld.global.nc.f32 	%f42, [%rd27];
 
 BB0_3:
-	setp.eq.s64	%p3, %rd11, 0;
-	mov.f32 	%f43, 0f3F800000;
+	setp.eq.s64	%p3, %rd10, 0;
 	@%p3 bra 	BB0_5;
 
-	cvta.to.global.u64 	%rd28, %rd11;
+	cvta.to.global.u64 	%rd28, %rd10;
 	add.s64 	%rd30, %rd28, %rd13;
-	ld.global.nc.f32 	%f43, [%rd30];
+	ld.global.nc.f32 	%f13, [%rd30];
+	mul.f32 	%f43, %f13, %f43;
 
 BB0_5:
 	mul.f32 	%f14, %f3, %f5;

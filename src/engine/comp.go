@@ -33,6 +33,7 @@ func (q *component) Slice() (*data.Slice, bool) {
 	src := ValueOf(p)
 	defer cuda.Recycle(src)
 	c := cuda.Buffer(1, src.Size())
+	data.Copy(c, src.Comp(q.comp))
 	return c, true
 }
 

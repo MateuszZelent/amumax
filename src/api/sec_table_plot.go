@@ -24,6 +24,7 @@ type TablePlotState struct {
 	YMax             float64     `msgpack:"ymax"`
 	MaxPoints        int         `msgpack:"maxPoints"`
 	Step             int         `msgpack:"step"`
+	CorePos          [][]float64 `msgpack:"corePos"`
 }
 
 func initTablePlotAPI(e *echo.Group, ws *WebSocketManager) *TablePlotState {
@@ -50,6 +51,7 @@ func (t *TablePlotState) Update() {
 	t.YColumnUnit = t.GetUnit(t.YColumn)
 	t.GetTablePlotData()
 	t.GetMinMaxXY()
+	t.GetCorePosData()
 }
 
 func (t *TablePlotState) GetTablePlotData() {
@@ -98,6 +100,34 @@ func (t *TablePlotState) GetMinMaxXY() {
 	t.YMax = ymax
 	t.XMin = xmin
 	t.XMax = xmax
+}
+
+func (t *TablePlotState) GetCorePosData() {
+	if !t.ColumnExists("ext_coreposx") || !t.ColumnExists("ext_coreposy") || !t.ColumnExists("t") {
+		t.CorePos = nil
+		return
+	}
+	tData := t.GetColumnData("t")
+	xData := t.GetColumnData("ext_coreposx")
+	yData := t.GetColumnData("ext_coreposy")
+	n := len(tData)
+	if n > len(xData) {
+		n = len(xData)
+	}
+	if n > len(yData) {
+		n = len(yData)
+	}
+	if n > t.MaxPoints {
+		tData = tData[n-t.MaxPoints:]
+		xData = xData[n-t.MaxPoints:]
+		yData = yData[n-t.MaxPoints:]
+		n = t.MaxPoints
+	}
+	data := make([][]float64, n)
+	for i := 0; i < n; i++ {
+		data[i] = []float64{tData[i], xData[i], yData[i]}
+	}
+	t.CorePos = data
 }
 
 func (t *TablePlotState) GetColumnData(column string) []float64 {

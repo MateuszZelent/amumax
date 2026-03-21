@@ -14,7 +14,8 @@ settemperature2(float* __restrict__  B,      float* __restrict__ noise, float kB
     if (i < N) {
         float invMs = inv_Msat(Ms_, Ms_mul, i);
         float temp = amul(temp_, temp_mul, i);
-        float alpha = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
+        float sponge_val = (sponge_ != NULL) ? sponge_[i] : 0.0f;
+        float alpha = amul(alpha_, alpha_mul, i) + sponge_val;
         B[i] = noise[i] * sqrtf((kB2_VgammaDt * alpha * temp * invMs ));
     }
 }

@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"fmt"
 	"math"
+	"os"
+	"sort"
 	"sync"
 
 	"github.com/MathieuMoalic/amumax/src/log"
@@ -15,8 +18,8 @@ type fftTracker struct {
 	mu sync.Mutex
 
 	quantities []Quantity // tracked quantities
-	labels     []string  // component labels (e.g., "mx", "my", "mz")
-	nComp      int       // total components across all quantities
+	labels     []string   // component labels (e.g., "mx", "my", "mz")
+	nComp      int        // total components across all quantities
 
 	minFreq float64 // Hz
 	maxFreq float64 // Hz
@@ -45,13 +48,19 @@ type fftTracker struct {
 
 	// Subsampling: don't compute FFT every step, accumulate signal history
 	// and batch-process periodically
-	stepCounter   int     // counts steps since last FFT batch
-	stepsPerBatch int     // how many steps to accumulate before NUDFT batch
+	stepCounter   int              // counts steps since last FFT batch
+	stepsPerBatch int              // how many steps to accumulate before NUDFT batch
 	signalBuf     [][]signalSample // [component][] buffered (t, signal, dt) samples
 
 	// Baseline subtraction: subtract static m(t0) to isolate dynamics
-	baseline     []float64 // [component] captured at first step
-	baselineSet  bool      // whether baseline has been captured
+	baseline    []float64 // [component] captured at first step
+	baselineSet bool      // whether baseline has been captured
+
+	// Segment sample tracking
+	segSampleCount   int // number of samples accumulated in current segment
+	totalSampleCount int // number of dynamic time samples accumulated since last reset
+	lastSampleTime   float64
+	sampleInterval   float64 // seconds, derived from Nyquist for current maxFreq
 
 	initialized bool
 }
@@ -66,7 +75,7 @@ type signalSample struct {
 // globalFft is the singleton FFT tracker instance.
 var globalFft = &fftTracker{
 	spectrogramMaxLen: 200,
-	spectrogramComp:   1, // default to my (y-component)
+	spectrogramComp:   1,  // default to my (y-component)
 	stepsPerBatch:     10, // process NUDFT every N steps
 }
 
@@ -74,6 +83,10 @@ func init() {
 	DeclFunc("FftTrack", FftTrack,
 		`Track a quantity for real-time FFT. Args: quantity, minFreqGHz, maxFreqGHz, dFreqGHz.
          Example: FftTrack(m, 0, 30, 0.1)`)
+	DeclFunc("FftSave", FftSave,
+		`Save FFT spectrum data to CSV file in the output directory.`)
+	DeclFunc("FftSavePerCell", FftSavePerCell,
+		`(Placeholder) Save full magnetization field for post-processing FFT. Use SaveAs(m, "m_snapshot") with AutoSaveAs instead.`)
 }
 
 // FftTrack registers a quantity for NUDFT tracking.
@@ -107,6 +120,9 @@ func FftTrack(q Quantity, minFreqGHz, maxFreqGHz, dFreqGHz float64) {
 
 	if globalFft.dFreq <= 0 {
 		log.Log.ErrAndExit("FftTrack: dFreqGHz must be > 0")
+	}
+	if globalFft.maxFreq <= globalFft.minFreq {
+		log.Log.ErrAndExit("FftTrack: maxFreqGHz must be > minFreqGHz")
 	}
 
 	globalFft.nFreqs = int((globalFft.maxFreq-globalFft.minFreq)/globalFft.dFreq) + 1
@@ -143,6 +159,10 @@ func FftTrack(q Quantity, minFreqGHz, maxFreqGHz, dFreqGHz float64) {
 	globalFft.segStart = Time
 	globalFft.startTime = Time
 	globalFft.stepCounter = 0
+	globalFft.segSampleCount = 0
+	globalFft.totalSampleCount = 0
+	globalFft.lastSampleTime = Time
+	globalFft.sampleInterval = 1 / (2 * globalFft.maxFreq)
 	globalFft.spectrogramHistory = nil
 	globalFft.spectrogramTimes = nil
 
@@ -152,6 +172,7 @@ func FftTrack(q Quantity, minFreqGHz, maxFreqGHz, dFreqGHz float64) {
 	log.Log.Info("│ Quantity:    %s (%d components)", name, nComp)
 	log.Log.Info("│ Freq range:  %.2f – %.2f GHz", minFreqGHz, maxFreqGHz)
 	log.Log.Info("│ Resolution:  %.3f GHz (%d bins)", dFreqGHz, globalFft.nFreqs)
+	log.Log.Info("│ Sample every: %.3f ns (Nyquist for %.2f GHz)", globalFft.sampleInterval*1e9, maxFreqGHz)
 	log.Log.Info("│ Batch size:  %d steps", globalFft.stepsPerBatch)
 	log.Log.Info("│ Spectrogram segment: %.2f ns", globalFft.segDuration*1e9)
 	log.Log.Info("└────────────────────────────────────────────")
@@ -160,10 +181,10 @@ func FftTrack(q Quantity, minFreqGHz, maxFreqGHz, dFreqGHz float64) {
 // doFftStep is called from step() in run.go. No-op when FFT is disabled.
 //
 // Performance strategy:
-//   1. Every step: collect spatially-averaged signal (cheap — GPU already
-//      computed it, we just read 3 floats). Buffer the (t, signal, dt) tuple.
-//   2. Every N steps: batch-process all buffered samples through the NUDFT
-//      inner loop. This amortizes the sin/cos cost over N steps.
+//  1. Every step: collect spatially-averaged signal (cheap — GPU already
+//     computed it, we just read 3 floats). Buffer the (t, signal, dt) tuple.
+//  2. Every N steps: batch-process all buffered samples through the NUDFT
+//     inner loop. This amortizes the sin/cos cost over N steps.
 func doFftStep() {
 	if !FftEnabled || !globalFft.initialized {
 		return
@@ -173,29 +194,47 @@ func doFftStep() {
 	defer globalFft.mu.Unlock()
 
 	t := Time
-	dt := DtSi
+	if !globalFft.baselineSet {
+		// Capture the static baseline immediately, then wait until the Nyquist
+		// sampling interval has elapsed before recording the first dynamic sample.
+		compIdx := 0
+		for _, q := range globalFft.quantities {
+			avg := qAverageUniverse(q)
+			for c := 0; c < q.NComp(); c++ {
+				globalFft.baseline[compIdx] = avg[c]
+				compIdx++
+			}
+		}
+		globalFft.baselineSet = true
+		globalFft.lastSampleTime = t
+		return
+	}
 
-	// Step 1: Buffer the signal and capture baseline on first step
+	if globalFft.sampleInterval > 0 && t-globalFft.lastSampleTime < globalFft.sampleInterval {
+		return
+	}
+
+	sampleDt := t - globalFft.lastSampleTime
+	if sampleDt <= 0 {
+		sampleDt = DtSi
+	}
+
+	// Step 1: Buffer the sampled signal.
 	compIdx := 0
 	for _, q := range globalFft.quantities {
 		avg := qAverageUniverse(q)
 		for c := 0; c < q.NComp(); c++ {
-			// Capture baseline (static configuration) on first step
-			if !globalFft.baselineSet {
-				globalFft.baseline[compIdx] = avg[c]
-			}
-
 			globalFft.signalBuf[compIdx] = append(globalFft.signalBuf[compIdx], signalSample{
 				t:      t,
 				signal: avg[c],
-				dt:     dt,
+				dt:     sampleDt,
 			})
 			compIdx++
 		}
 	}
-	if !globalFft.baselineSet {
-		globalFft.baselineSet = true
-	}
+	globalFft.segSampleCount++
+	globalFft.totalSampleCount++
+	globalFft.lastSampleTime = t
 	globalFft.stepCounter++
 
 	// Step 2: Batch-process when we have enough samples
@@ -279,6 +318,7 @@ func processFftBatch() {
 			}
 		}
 		globalFft.segStart = t
+		globalFft.segSampleCount = 0
 	}
 }
 
@@ -295,6 +335,9 @@ func GetFftSpectrum() [][]float64 {
 	if globalFft.stepCounter > 0 {
 		processFftBatch()
 		globalFft.stepCounter = 0
+	}
+	if globalFft.totalSampleCount == 0 {
+		return nil
 	}
 
 	totalT := Time - globalFft.startTime
@@ -364,6 +407,26 @@ func GetFftSegmentProgress() (float64, float64, float64, int) {
 	return progress, globalFft.segDuration * 1e9, elapsed * 1e9, len(globalFft.spectrogramHistory)
 }
 
+// GetFftMaxFreqGHz returns the current maximum tracked frequency in GHz.
+func GetFftMaxFreqGHz() float64 {
+	globalFft.mu.Lock()
+	defer globalFft.mu.Unlock()
+	if !globalFft.initialized {
+		return 0
+	}
+	return globalFft.maxFreq / 1e9
+}
+
+// GetFftSampleIntervalNs returns the current sampling interval in ns.
+func GetFftSampleIntervalNs() float64 {
+	globalFft.mu.Lock()
+	defer globalFft.mu.Unlock()
+	if !globalFft.initialized {
+		return 0
+	}
+	return globalFft.sampleInterval * 1e9
+}
+
 // SetFftSpectrogramComponent sets which component to use for spectrogram.
 func SetFftSpectrogramComponent(c int) {
 	globalFft.mu.Lock()
@@ -373,25 +436,201 @@ func SetFftSpectrogramComponent(c int) {
 	globalFft.spectrogramTimes = nil
 }
 
+func resizeFftBuffersLocked() {
+	globalFft.accumReal = make([][]float64, globalFft.nComp)
+	globalFft.accumImag = make([][]float64, globalFft.nComp)
+	globalFft.segReal = make([][]float64, globalFft.nComp)
+	globalFft.segImag = make([][]float64, globalFft.nComp)
+	if len(globalFft.signalBuf) != globalFft.nComp {
+		globalFft.signalBuf = make([][]signalSample, globalFft.nComp)
+	}
+	if len(globalFft.baseline) != globalFft.nComp {
+		globalFft.baseline = make([]float64, globalFft.nComp)
+	}
+	for c := 0; c < globalFft.nComp; c++ {
+		globalFft.accumReal[c] = make([]float64, globalFft.nFreqs)
+		globalFft.accumImag[c] = make([]float64, globalFft.nFreqs)
+		globalFft.segReal[c] = make([]float64, globalFft.nFreqs)
+		globalFft.segImag[c] = make([]float64, globalFft.nFreqs)
+		globalFft.signalBuf[c] = globalFft.signalBuf[c][:0]
+		globalFft.baseline[c] = 0
+	}
+}
+
+func resetFftDataLocked() {
+	resizeFftBuffersLocked()
+	globalFft.baselineSet = false
+	globalFft.startTime = Time
+	globalFft.segStart = Time
+	globalFft.stepCounter = 0
+	globalFft.segSampleCount = 0
+	globalFft.totalSampleCount = 0
+	globalFft.lastSampleTime = Time
+	globalFft.spectrogramHistory = nil
+	globalFft.spectrogramTimes = nil
+}
+
+// SetFftMaxFreqGHz updates the tracked maximum frequency and resets FFT data.
+func SetFftMaxFreqGHz(maxFreqGHz float64) error {
+	globalFft.mu.Lock()
+	defer globalFft.mu.Unlock()
+
+	if !globalFft.initialized {
+		return fmt.Errorf("FFT tracking is not initialized")
+	}
+
+	maxFreq := maxFreqGHz * 1e9
+	if maxFreq <= globalFft.minFreq {
+		return fmt.Errorf("maxFreqGHz must be > %.6g", globalFft.minFreq/1e9)
+	}
+	if maxFreq == globalFft.maxFreq {
+		return nil
+	}
+
+	globalFft.maxFreq = maxFreq
+	globalFft.nFreqs = int((globalFft.maxFreq-globalFft.minFreq)/globalFft.dFreq) + 1
+	globalFft.freqs = make([]float64, globalFft.nFreqs)
+	for fi := 0; fi < globalFft.nFreqs; fi++ {
+		globalFft.freqs[fi] = globalFft.minFreq + float64(fi)*globalFft.dFreq
+	}
+	globalFft.sampleInterval = 1 / (2 * globalFft.maxFreq)
+	resetFftDataLocked()
+	log.Log.Info("FFT max frequency updated to %.2f GHz, sampling every %.3f ns; FFT data reset", maxFreqGHz, globalFft.sampleInterval*1e9)
+	return nil
+}
+
 // ClearFft resets all FFT accumulators.
 func ClearFft() {
 	globalFft.mu.Lock()
 	defer globalFft.mu.Unlock()
 
-	for c := 0; c < globalFft.nComp; c++ {
-		for fi := range globalFft.accumReal[c] {
-			globalFft.accumReal[c][fi] = 0
-			globalFft.accumImag[c][fi] = 0
-			globalFft.segReal[c][fi] = 0
-			globalFft.segImag[c][fi] = 0
-		}
-		globalFft.signalBuf[c] = globalFft.signalBuf[c][:0]
-		globalFft.baseline[c] = 0
+	resetFftDataLocked()
+}
+
+// -------- Item 6: Peak Detection --------
+
+// FftPeak represents a detected resonance peak.
+type FftPeak struct {
+	FreqGHz   float64
+	Amplitude float64
+	Component int
+}
+
+// GetFftPeaks finds local maxima in the spectrum above a threshold.
+func GetFftPeaks() []FftPeak {
+	globalFft.mu.Lock()
+	defer globalFft.mu.Unlock()
+
+	if !globalFft.initialized {
+		return nil
 	}
-	globalFft.baselineSet = false
-	globalFft.startTime = Time
-	globalFft.segStart = Time
-	globalFft.stepCounter = 0
-	globalFft.spectrogramHistory = nil
-	globalFft.spectrogramTimes = nil
+	if globalFft.stepCounter > 0 {
+		processFftBatch()
+		globalFft.stepCounter = 0
+	}
+	if globalFft.totalSampleCount == 0 {
+		return nil
+	}
+
+	totalT := Time - globalFft.startTime
+	if totalT <= 0 {
+		return nil
+	}
+
+	var peaks []FftPeak
+
+	for c := 0; c < globalFft.nComp; c++ {
+		// Compute magnitudes
+		nf := globalFft.nFreqs
+		mag := make([]float64, nf)
+		for fi := 0; fi < nf; fi++ {
+			re := globalFft.accumReal[c][fi]
+			im := globalFft.accumImag[c][fi]
+			mag[fi] = math.Sqrt(re*re+im*im) / totalT
+		}
+
+		// Compute median for threshold
+		sorted := make([]float64, nf)
+		copy(sorted, mag)
+		sort.Float64s(sorted)
+		median := sorted[nf/2]
+		threshold := median * 3.0
+		if threshold <= 0 {
+			continue
+		}
+
+		// Find local maxima above threshold (skip first and last bins)
+		for fi := 2; fi < nf-2; fi++ {
+			if mag[fi] > threshold &&
+				mag[fi] > mag[fi-1] && mag[fi] > mag[fi-2] &&
+				mag[fi] > mag[fi+1] && mag[fi] > mag[fi+2] {
+				peaks = append(peaks, FftPeak{
+					FreqGHz:   globalFft.freqs[fi] / 1e9,
+					Amplitude: mag[fi],
+					Component: c,
+				})
+			}
+		}
+	}
+
+	// Sort by amplitude descending, keep top 20
+	sort.Slice(peaks, func(i, j int) bool {
+		return peaks[i].Amplitude > peaks[j].Amplitude
+	})
+	if len(peaks) > 20 {
+		peaks = peaks[:20]
+	}
+
+	return peaks
+}
+
+// -------- Item 7: FftSave --------
+
+// FftSave writes the FFT spectrum to a CSV file in the output directory.
+func FftSave() {
+	spectrum := GetFftSpectrum()
+	freqAxis := GetFftFreqAxis()
+	labels := GetFftLabels()
+
+	if spectrum == nil || freqAxis == nil {
+		log.Log.Warn("FftSave: no FFT data to save")
+		return
+	}
+
+	fname := OD() + "fft_spectrum.csv"
+	f, err := os.Create(fname)
+	if err != nil {
+		log.Log.Err("FftSave: %v", err)
+		return
+	}
+	defer f.Close()
+
+	// Header
+	header := "freq_GHz"
+	for _, l := range labels {
+		header += "," + l
+	}
+	fmt.Fprintln(f, header)
+
+	// Data
+	nf := len(freqAxis)
+	for fi := 0; fi < nf; fi++ {
+		line := fmt.Sprintf("%.6f", freqAxis[fi])
+		for c := 0; c < len(spectrum); c++ {
+			line += fmt.Sprintf(",%.8e", spectrum[c][fi])
+		}
+		fmt.Fprintln(f, line)
+	}
+
+	log.Log.Info("FFT spectrum saved to %s", fname)
+}
+
+// -------- Item 8: FftSavePerCell (placeholder) --------
+
+// FftSavePerCell is a convenience placeholder.
+// For spatially-resolved FFT, use AutoSaveAs(m, "m_timeseries", period) to save
+// full magnetization snapshots, then post-process with numpy/scipy FFT.
+func FftSavePerCell() {
+	log.Log.Info("FftSavePerCell: For per-cell FFT, save m snapshots with AutoSaveAs(m, \"m_timeseries\", period)")
+	log.Log.Info("Then post-process: fft = np.fft.fft(m_data, axis=0) along the time axis.")
 }

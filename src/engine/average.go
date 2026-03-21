@@ -9,6 +9,16 @@ import (
 
 // average of quantity over universe
 func qAverageUniverse(q Quantity) []float64 {
+	if s, ok := q.(interface {
+		Slice() (*data.Slice, bool)
+	}); ok {
+		slice, recycle := s.Slice()
+		if recycle {
+			defer cuda.Recycle(slice)
+		}
+		return sAverageUniverse(slice)
+	}
+
 	s := ValueOf(q)
 	defer cuda.Recycle(s)
 	return sAverageUniverse(s)
@@ -17,9 +27,24 @@ func qAverageUniverse(q Quantity) []float64 {
 // average of slice over universe
 func sAverageUniverse(s *data.Slice) []float64 {
 	nCell := float64(prod(s.Size()))
-	avg := make([]float64, s.NComp())
-	for i := range avg {
-		avg[i] = float64(cuda.Sum(s.Comp(i))) / nCell
+	if !s.GPUAccess() {
+		host := s.Host()
+		avg := make([]float64, len(host))
+		for c, values := range host {
+			var sum float64
+			for _, v := range values {
+				sum += float64(v)
+			}
+			avg[c] = sum / nCell
+			checkNaN1(avg[c])
+		}
+		return avg
+	}
+
+	sums := cuda.SumComponents(s)
+	avg := make([]float64, len(sums))
+	for i, sum := range sums {
+		avg[i] = float64(sum) / nCell
 		checkNaN1(avg[i])
 	}
 	return avg

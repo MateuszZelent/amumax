@@ -206,7 +206,7 @@ const (
 	ld.param.u64 	%rd10, [addzhanglitorque2_param_12];
 	ld.param.f32 	%f144, [addzhanglitorque2_param_13];
 	ld.param.u64 	%rd11, [addzhanglitorque2_param_14];
-	ld.param.f32 	%f136, [addzhanglitorque2_param_15];
+	ld.param.f32 	%f137, [addzhanglitorque2_param_15];
 	ld.param.u64 	%rd12, [addzhanglitorque2_param_16];
 	ld.param.u64 	%rd13, [addzhanglitorque2_param_17];
 	ld.param.f32 	%f138, [addzhanglitorque2_param_18];
@@ -245,24 +245,24 @@ const (
 	add.s32 	%r79, %r4, %r2;
 	mul.lo.s32 	%r5, %r79, %r67;
 	add.s32 	%r6, %r5, %r1;
-	setp.eq.s64	%p6, %rd11, 0;
+	setp.eq.s64	%p6, %rd12, 0;
+	mov.f32 	%f136, 0f00000000;
 	@%p6 bra 	BB0_3;
 
-	cvta.to.global.u64 	%rd18, %rd11;
+	cvta.to.global.u64 	%rd18, %rd12;
 	mul.wide.s32 	%rd19, %r6, 4;
 	add.s64 	%rd20, %rd18, %rd19;
-	ld.global.nc.f32 	%f70, [%rd20];
-	mul.f32 	%f136, %f70, %f136;
+	ld.global.nc.f32 	%f136, [%rd20];
 
 BB0_3:
-	setp.eq.s64	%p7, %rd12, 0;
-	mov.f32 	%f137, 0f3F800000;
+	setp.eq.s64	%p7, %rd11, 0;
 	@%p7 bra 	BB0_5;
 
-	cvta.to.global.u64 	%rd21, %rd12;
+	cvta.to.global.u64 	%rd21, %rd11;
 	mul.wide.s32 	%rd22, %r6, 4;
 	add.s64 	%rd23, %rd21, %rd22;
-	ld.global.nc.f32 	%f137, [%rd23];
+	ld.global.nc.f32 	%f71, [%rd23];
+	mul.f32 	%f137, %f71, %f137;
 
 BB0_5:
 	setp.eq.s64	%p8, %rd13, 0;

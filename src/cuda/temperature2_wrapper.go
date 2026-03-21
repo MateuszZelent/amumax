@@ -129,7 +129,7 @@ const (
 	ld.param.u64 	%rd4, [settemperature2_param_5];
 	ld.param.f32 	%f29, [settemperature2_param_6];
 	ld.param.u64 	%rd5, [settemperature2_param_7];
-	ld.param.f32 	%f30, [settemperature2_param_8];
+	ld.param.f32 	%f31, [settemperature2_param_8];
 	ld.param.u64 	%rd6, [settemperature2_param_9];
 	ld.param.u32 	%r2, [settemperature2_param_10];
 	mov.u32 	%r3, %nctaid.x;
@@ -169,24 +169,24 @@ BB0_5:
 	mul.f32 	%f29, %f17, %f29;
 
 BB0_7:
-	setp.eq.s64	%p5, %rd5, 0;
+	setp.eq.s64	%p5, %rd6, 0;
+	mov.f32 	%f30, 0f00000000;
 	@%p5 bra 	BB0_9;
 
-	cvta.to.global.u64 	%rd13, %rd5;
+	cvta.to.global.u64 	%rd13, %rd6;
 	mul.wide.s32 	%rd14, %r1, 4;
 	add.s64 	%rd15, %rd13, %rd14;
-	ld.global.nc.f32 	%f18, [%rd15];
-	mul.f32 	%f30, %f18, %f30;
+	ld.global.nc.f32 	%f30, [%rd15];
 
 BB0_9:
-	setp.eq.s64	%p6, %rd6, 0;
-	mov.f32 	%f31, 0f3F800000;
+	setp.eq.s64	%p6, %rd5, 0;
 	@%p6 bra 	BB0_11;
 
-	cvta.to.global.u64 	%rd16, %rd6;
+	cvta.to.global.u64 	%rd16, %rd5;
 	mul.wide.s32 	%rd17, %r1, 4;
 	add.s64 	%rd18, %rd16, %rd17;
-	ld.global.nc.f32 	%f31, [%rd18];
+	ld.global.nc.f32 	%f19, [%rd18];
+	mul.f32 	%f31, %f19, %f31;
 
 BB0_11:
 	cvta.to.global.u64 	%rd19, %rd1;

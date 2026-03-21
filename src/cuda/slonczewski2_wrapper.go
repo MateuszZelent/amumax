@@ -215,7 +215,7 @@ const (
 	ld.param.u64 	%rd11, [addslonczewskitorque2_param_14];
 	ld.param.f32 	%f116, [addslonczewskitorque2_param_15];
 	ld.param.u64 	%rd12, [addslonczewskitorque2_param_16];
-	ld.param.f32 	%f119, [addslonczewskitorque2_param_17];
+	ld.param.f32 	%f120, [addslonczewskitorque2_param_17];
 	ld.param.u64 	%rd13, [addslonczewskitorque2_param_18];
 	ld.param.u64 	%rd14, [addslonczewskitorque2_param_19];
 	ld.param.f32 	%f121, [addslonczewskitorque2_param_20];
@@ -307,22 +307,22 @@ BB0_11:
 	mul.f32 	%f118, %f53, %f118;
 
 BB0_13:
-	setp.eq.s64	%p8, %rd12, 0;
+	setp.eq.s64	%p8, %rd13, 0;
+	mov.f32 	%f119, 0f00000000;
 	@%p8 bra 	BB0_15;
 
-	cvta.to.global.u64 	%rd40, %rd12;
+	cvta.to.global.u64 	%rd40, %rd13;
 	add.s64 	%rd42, %rd40, %rd19;
-	ld.global.nc.f32 	%f54, [%rd42];
-	mul.f32 	%f119, %f54, %f119;
+	ld.global.nc.f32 	%f119, [%rd42];
 
 BB0_15:
-	setp.eq.s64	%p9, %rd13, 0;
-	mov.f32 	%f120, 0f3F800000;
+	setp.eq.s64	%p9, %rd12, 0;
 	@%p9 bra 	BB0_17;
 
-	cvta.to.global.u64 	%rd43, %rd13;
+	cvta.to.global.u64 	%rd43, %rd12;
 	add.s64 	%rd45, %rd43, %rd19;
-	ld.global.nc.f32 	%f120, [%rd45];
+	ld.global.nc.f32 	%f55, [%rd45];
+	mul.f32 	%f120, %f55, %f120;
 
 BB0_17:
 	add.f32 	%f24, %f119, %f120;

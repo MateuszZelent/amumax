@@ -35,7 +35,8 @@ addzhanglitorque2(float* __restrict__ tx, float* __restrict__ ty, float* __restr
 
     int i = idx(ix, iy, iz);
 
-    float alpha = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
+    float sponge_val = (sponge_ != NULL) ? sponge_[i] : 0.0f;
+    float alpha = amul(alpha_, alpha_mul, i) + sponge_val;
     float xi    = amul(xi_, xi_mul, i);
     float pol   = amul(pol_, pol_mul, i);
     float invMs = inv_Msat(Ms_, Ms_mul, i);

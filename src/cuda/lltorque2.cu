@@ -15,7 +15,8 @@ lltorque2(float* __restrict__  tx, float* __restrict__  ty, float* __restrict__ 
 
         float3 m = {mx[i], my[i], mz[i]};
         float3 H = {hx[i], hy[i], hz[i]};
-        float alpha = amul(alpha_, alpha_mul, i) + amul(sponge_, 1.0f, i);
+        float sponge_val = (sponge_ != NULL) ? sponge_[i] : 0.0f;
+        float alpha = amul(alpha_, alpha_mul, i) + sponge_val;
 
         float3 mxH = cross(m, H);
         float gilb = -1.0f / (1.0f + alpha * alpha);
