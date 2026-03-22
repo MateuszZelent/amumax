@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"time"
@@ -17,6 +18,9 @@ type PreviewState struct {
 	ws                   *WebSocketManager
 	globalQuantities     []string
 	layerMask            [][]float32
+	maskXSize            int
+	maskYSize            int
+	maskLayer            int
 	Quantity             string       `msgpack:"quantity"`
 	Unit                 string       `msgpack:"unit"`
 	Component            string       `msgpack:"component"`
@@ -31,12 +35,17 @@ type PreviewState struct {
 	Refresh              bool         `msgpack:"refresh"`
 	NComp                int          `msgpack:"nComp"`
 
-	MaxPoints       int   `msgpack:"maxPoints"`
-	DataPointsCount int   `msgpack:"dataPointsCount"`
-	XPossibleSizes  []int `msgpack:"xPossibleSizes"`
-	YPossibleSizes  []int `msgpack:"yPossibleSizes"`
-	XChosenSize     int   `msgpack:"xChosenSize"`
-	YChosenSize     int   `msgpack:"yChosenSize"`
+	MaxPoints             int    `msgpack:"maxPoints"`
+	DataPointsCount       int    `msgpack:"dataPointsCount"`
+	XPossibleSizes        []int  `msgpack:"xPossibleSizes"`
+	YPossibleSizes        []int  `msgpack:"yPossibleSizes"`
+	XChosenSize           int    `msgpack:"xChosenSize"`
+	YChosenSize           int    `msgpack:"yChosenSize"`
+	AppliedXChosenSize    int    `msgpack:"appliedXChosenSize"`
+	AppliedYChosenSize    int    `msgpack:"appliedYChosenSize"`
+	AppliedLayerStride    int    `msgpack:"appliedLayerStride"`
+	AutoDownscaled        bool   `msgpack:"autoDownscaled"`
+	AutoDownscaleMessage  string `msgpack:"autoDownscaleMessage"`
 }
 
 type Vector3f struct {
@@ -57,7 +66,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		Component:            "3D",
 		Layer:                0,
 		AllLayers:            false,
-		MaxPoints:            8192,
+		MaxPoints:            131072,
 		Type:                 "3D",
 		VectorFieldValues:    nil,
 		VectorFieldPositions: nil,
@@ -75,6 +84,9 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		globalQuantities:     []string{"B_demag", "B_ext", "B_eff", "B_oersted", "Edens_demag", "Edens_ext", "Edens_eff", "geom", "SpongeAlpha"},
 	}
 	previewState.addPossibleDownscaleSizes()
+	previewState.AppliedXChosenSize = previewState.XChosenSize
+	previewState.AppliedYChosenSize = previewState.YChosenSize
+	previewState.AppliedLayerStride = 1
 	e.POST("/api/preview/component", previewState.postPreviewComponent)
 	e.POST("/api/preview/quantity", previewState.postPreviewQuantity)
 	e.POST("/api/preview/layer", previewState.postPreviewLayer)
@@ -103,6 +115,19 @@ func (s *PreviewState) Update() {
 	engine.InjectAndWait(s.UpdateQuantityBuffer)
 }
 
+type previewSizing struct {
+	RequestedX         int
+	RequestedY         int
+	AppliedX           int
+	AppliedY           int
+	RequestedDepth     int
+	AppliedDepth       int
+	LayerStride        int
+	RequestedPoints    int
+	AppliedPoints      int
+	AutoDownscaled     bool
+}
+
 func (s *PreviewState) UpdateQuantityBuffer() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -110,15 +135,15 @@ func (s *PreviewState) UpdateQuantityBuffer() {
 			s.ScalarField = nil
 			s.VectorFieldPositions = nil
 			s.VectorFieldValues = nil
+			s.DataPointsCount = 0
 		}
 	}()
-	if s.layerMask == nil {
-		s.updateMask()
-	}
+
 	if s.XChosenSize == 0 || s.YChosenSize == 0 {
 		log.Log.Debug("XChosenSize or YChosenSize is 0")
 		return
 	}
+
 	componentCount := 1
 	if s.Type == "3D" {
 		componentCount = 3
@@ -126,8 +151,20 @@ func (s *PreviewState) UpdateQuantityBuffer() {
 	GPUIn := engine.ValueOf(s.getQuantity())
 	defer cuda.Recycle(GPUIn)
 
+	depthLayers := 1
 	if s.AllLayers && s.Type == "3D" {
-		s.updateAllLayers(GPUIn, componentCount)
+		depthLayers = maxInt(GPUIn.Size()[2], 1)
+	}
+	sizing := s.resolvePreviewSizing(depthLayers)
+	s.applyResolvedSizing(sizing)
+
+	if sizing.AppliedX == 0 || sizing.AppliedY == 0 {
+		log.Log.Debug("Applied preview size is 0")
+		return
+	}
+
+	if s.AllLayers && s.Type == "3D" {
+		s.updateAllLayers(GPUIn, componentCount, sizing.LayerStride)
 		return
 	}
 
@@ -136,8 +173,8 @@ func (s *PreviewState) UpdateQuantityBuffer() {
 		return
 	}
 
-	CPUOut := data.NewSlice(componentCount, [3]int{s.XChosenSize, s.YChosenSize, 1})
-	GPUOut := cuda.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	CPUOut := data.NewSlice(componentCount, [3]int{sizing.AppliedX, sizing.AppliedY, 1})
+	GPUOut := cuda.NewSlice(1, [3]int{sizing.AppliedX, sizing.AppliedY, 1})
 	defer GPUOut.Free()
 
 	if s.Type == "3D" {
@@ -147,33 +184,36 @@ func (s *PreviewState) UpdateQuantityBuffer() {
 		}
 		s.normalizeVectors(CPUOut)
 		s.UpdateVectorField(CPUOut.Vectors())
-	} else {
-		if s.getQuantity().NComp() > 1 {
-			cuda.Resize(GPUOut, GPUIn.Comp(s.getComponent()), s.Layer)
-			data.Copy(CPUOut.Comp(0), GPUOut)
-		} else {
-			cuda.Resize(GPUOut, GPUIn.Comp(0), s.Layer)
-			data.Copy(CPUOut.Comp(0), GPUOut)
-		}
-		s.UpdateScalarField(CPUOut.Scalars())
+		return
 	}
+
+	s.ensureMask(sizing.AppliedX, sizing.AppliedY)
+	if s.getQuantity().NComp() > 1 {
+		cuda.Resize(GPUOut, GPUIn.Comp(s.getComponent()), s.Layer)
+		data.Copy(CPUOut.Comp(0), GPUOut)
+	} else {
+		cuda.Resize(GPUOut, GPUIn.Comp(0), s.Layer)
+		data.Copy(CPUOut.Comp(0), GPUOut)
+	}
+	s.UpdateScalarField(CPUOut.Scalars())
 }
 
 func (s *PreviewState) normalizeVectors(f *data.Slice) {
 	a := f.Vectors()
-	maxnorm := 0.
+	maxnorm := 0.0
 	for i := range a[0] {
 		for j := range a[0][i] {
 			for k := range a[0][i][j] {
-
 				x, y, z := a[0][i][j][k], a[1][i][j][k], a[2][i][j][k]
 				norm := math.Sqrt(float64(x*x + y*y + z*z))
 				if norm > maxnorm {
 					maxnorm = norm
 				}
-
 			}
 		}
+	}
+	if maxnorm == 0 {
+		return
 	}
 	factor := float32(1 / maxnorm)
 
@@ -183,22 +223,164 @@ func (s *PreviewState) normalizeVectors(f *data.Slice) {
 				a[0][i][j][k] *= factor
 				a[1][i][j][k] *= factor
 				a[2][i][j][k] *= factor
-
 			}
 		}
 	}
 }
 
-func (s *PreviewState) updateAllLayers(GPUIn *data.Slice, componentCount int) {
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func ceilDiv(n, d int) int {
+	if d <= 0 {
+		return 0
+	}
+	return (n + d - 1) / d
+}
+
+func floorAllowedSize(arr []int, target int) int {
+	if target <= 1 || len(arr) == 0 {
+		return maxInt(target, 1)
+	}
+	best := 1
+	for _, value := range arr {
+		if value > target {
+			break
+		}
+		best = value
+	}
+	return best
+}
+
+func previousAllowedSize(arr []int, current int) int {
+	if current <= 1 || len(arr) == 0 {
+		return 1
+	}
+	prev := 1
+	for _, value := range arr {
+		if value >= current {
+			break
+		}
+		prev = value
+	}
+	return prev
+}
+
+func (s *PreviewState) resolvePreviewSizing(depthLayers int) previewSizing {
+	requestedX := maxInt(s.XChosenSize, 1)
+	requestedY := maxInt(s.YChosenSize, 1)
+	if len(s.XPossibleSizes) > 0 && !containsInt(s.XPossibleSizes, requestedX) {
+		requestedX = closestInArray(s.XPossibleSizes, requestedX)
+	}
+	if len(s.YPossibleSizes) > 0 && !containsInt(s.YPossibleSizes, requestedY) {
+		requestedY = closestInArray(s.YPossibleSizes, requestedY)
+	}
+
+	sizing := previewSizing{
+		RequestedX:     requestedX,
+		RequestedY:     requestedY,
+		AppliedX:       requestedX,
+		AppliedY:       requestedY,
+		RequestedDepth: maxInt(depthLayers, 1),
+		AppliedDepth:   maxInt(depthLayers, 1),
+		LayerStride:    1,
+	}
+	sizing.RequestedPoints = sizing.RequestedX * sizing.RequestedY * sizing.RequestedDepth
+
+	maxPoints := maxInt(s.MaxPoints, 8)
+	if sizing.RequestedPoints <= maxPoints {
+		sizing.AppliedPoints = sizing.RequestedPoints
+		return sizing
+	}
+
+	scale := math.Sqrt(float64(maxPoints) / float64(sizing.RequestedPoints))
+	targetX := maxInt(1, int(math.Floor(float64(sizing.RequestedX)*scale)))
+	targetY := maxInt(1, int(math.Floor(float64(sizing.RequestedY)*scale)))
+	sizing.AppliedX = floorAllowedSize(s.XPossibleSizes, targetX)
+	sizing.AppliedY = floorAllowedSize(s.YPossibleSizes, targetY)
+	if sizing.AppliedX > sizing.RequestedX {
+		sizing.AppliedX = sizing.RequestedX
+	}
+	if sizing.AppliedY > sizing.RequestedY {
+		sizing.AppliedY = sizing.RequestedY
+	}
+
+	for {
+		sizing.AppliedDepth = ceilDiv(sizing.RequestedDepth, sizing.LayerStride)
+		sizing.AppliedPoints = sizing.AppliedX * sizing.AppliedY * sizing.AppliedDepth
+		if sizing.AppliedPoints <= maxPoints {
+			break
+		}
+
+		reduced := false
+		if sizing.AppliedX >= sizing.AppliedY && sizing.AppliedX > 1 {
+			next := previousAllowedSize(s.XPossibleSizes, sizing.AppliedX)
+			if next < sizing.AppliedX {
+				sizing.AppliedX = next
+				reduced = true
+			}
+		}
+		if !reduced && sizing.AppliedY > 1 {
+			next := previousAllowedSize(s.YPossibleSizes, sizing.AppliedY)
+			if next < sizing.AppliedY {
+				sizing.AppliedY = next
+				reduced = true
+			}
+		}
+		if !reduced && sizing.RequestedDepth > 1 && sizing.AppliedDepth > 1 {
+			sizing.LayerStride++
+			reduced = true
+		}
+		if !reduced {
+			break
+		}
+	}
+
+	sizing.AppliedDepth = ceilDiv(sizing.RequestedDepth, sizing.LayerStride)
+	sizing.AppliedPoints = sizing.AppliedX * sizing.AppliedY * sizing.AppliedDepth
+	sizing.AutoDownscaled = sizing.AppliedX != sizing.RequestedX || sizing.AppliedY != sizing.RequestedY || sizing.LayerStride != 1
+	return sizing
+}
+
+func (s *PreviewState) applyResolvedSizing(sizing previewSizing) {
+	s.AppliedXChosenSize = sizing.AppliedX
+	s.AppliedYChosenSize = sizing.AppliedY
+	s.AppliedLayerStride = sizing.LayerStride
+	s.AutoDownscaled = sizing.AutoDownscaled
+	if !sizing.AutoDownscaled {
+		s.AutoDownscaleMessage = ""
+		return
+	}
+
+	requestedShape := fmt.Sprintf("%dx%d", sizing.RequestedX, sizing.RequestedY)
+	appliedShape := fmt.Sprintf("%dx%d", sizing.AppliedX, sizing.AppliedY)
+	if sizing.RequestedDepth > 1 {
+		requestedShape = fmt.Sprintf("%s x %d", requestedShape, sizing.RequestedDepth)
+		appliedShape = fmt.Sprintf("%s x %d", appliedShape, sizing.AppliedDepth)
+	}
+	message := fmt.Sprintf("Preview auto-scaled from %s to %s to stay within %d points", requestedShape, appliedShape, maxInt(s.MaxPoints, 8))
+	if sizing.LayerStride > 1 {
+		message = fmt.Sprintf("%s (sampling every %d layer)", message, sizing.LayerStride)
+	}
+	s.AutoDownscaleMessage = message
+}
+
+func (s *PreviewState) updateAllLayers(GPUIn *data.Slice, componentCount int, layerStride int) {
 	nz := GPUIn.Size()[2]
 	valArray := make([]Vector3f, 0)
 	posArray := make([]Vector3i, 0)
 
-	CPUOut := data.NewSlice(componentCount, [3]int{s.XChosenSize, s.YChosenSize, 1})
-	GPUOut := cuda.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	xSize := maxInt(s.AppliedXChosenSize, 1)
+	ySize := maxInt(s.AppliedYChosenSize, 1)
+	CPUOut := data.NewSlice(componentCount, [3]int{xSize, ySize, 1})
+	GPUOut := cuda.NewSlice(1, [3]int{xSize, ySize, 1})
 	defer GPUOut.Free()
 
-	for layer := 0; layer < nz; layer++ {
+	for layer := 0; layer < nz; layer += maxInt(layerStride, 1) {
 		for c := 0; c < componentCount; c++ {
 			cuda.Resize(GPUOut, GPUIn.Comp(c), layer)
 			data.Copy(CPUOut.Comp(c), GPUOut)
@@ -220,7 +402,6 @@ func (s *PreviewState) updateAllLayers(GPUIn *data.Slice, componentCount int) {
 		}
 	}
 
-	// Normalize all vectors
 	maxnorm := float64(0)
 	for _, v := range valArray {
 		norm := math.Sqrt(float64(v.X*v.X + v.Y*v.Y + v.Z*v.Z))
@@ -243,16 +424,11 @@ func (s *PreviewState) updateAllLayers(GPUIn *data.Slice, componentCount int) {
 	s.DataPointsCount = len(valArray)
 }
 
-// updateAllLayersScalar projects all Z layers into a single 2D heatmap.
-// For each (x,y) cell, the value with the largest absolute magnitude across
-// all Z layers is kept (max-abs projection). This lets the user see the
-// complete 3D structure flattened into a 2D scalar plot.
 func (s *PreviewState) updateAllLayersScalar(GPUIn *data.Slice) {
 	nz := GPUIn.Size()[2]
-	xSize := s.XChosenSize
-	ySize := s.YChosenSize
+	xSize := maxInt(s.AppliedXChosenSize, 1)
+	ySize := maxInt(s.AppliedYChosenSize, 1)
 
-	// Accumulator: best value per (y, x) — keep value with max |val|
 	acc := make([][]float32, ySize)
 	for y := 0; y < ySize; y++ {
 		acc[y] = make([]float32, xSize)
@@ -285,17 +461,13 @@ func (s *PreviewState) updateAllLayersScalar(GPUIn *data.Slice) {
 				if !hasValue[posy][posx] {
 					acc[posy][posx] = val
 					hasValue[posy][posx] = true
-				} else {
-					// Max-abs projection: keep value with larger magnitude
-					if math.Abs(float64(val)) > math.Abs(float64(acc[posy][posx])) {
-						acc[posy][posx] = val
-					}
+				} else if math.Abs(float64(val)) > math.Abs(float64(acc[posy][posx])) {
+					acc[posy][posx] = val
 				}
 			}
 		}
 	}
 
-	// Build the scalar field output (same format as UpdateScalarField)
 	var min, max float32
 	minMaxSet := false
 	valArray := make([][3]float32, 0, xSize*ySize)
@@ -340,12 +512,10 @@ func (s *PreviewState) updateAllLayersScalar(GPUIn *data.Slice) {
 }
 
 func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
-	// Calculate the total number of elements
 	yLen := len(vectorField[0][0])
 	xLen := len(vectorField[0][0][0])
 	maxCount := xLen * yLen
 
-	// Create a slice to hold the array of {x, y, z} objects
 	valArray := make([]Vector3f, 0, maxCount)
 	posArray := make([]Vector3i, 0, maxCount)
 	for posx := 0; posx < xLen; posx++ {
@@ -353,19 +523,11 @@ func (s *PreviewState) UpdateVectorField(vectorField [3][][][]float32) {
 			valx := vectorField[0][0][posy][posx]
 			valy := vectorField[1][0][posy][posx]
 			valz := vectorField[2][0][posy][posx]
-			if (valx == 0 && valy == 0 && valz == 0) || (math.IsNaN(float64(valx))) {
+			if (valx == 0 && valy == 0 && valz == 0) || math.IsNaN(float64(valx)) {
 				continue
 			}
-			posArray = append(posArray, Vector3i{
-				X: posx,
-				Y: posy,
-				Z: 0,
-			})
-			valArray = append(valArray, Vector3f{
-				X: valx,
-				Y: valy,
-				Z: valz,
-			})
+			posArray = append(posArray, Vector3i{X: posx, Y: posy, Z: 0})
+			valArray = append(valArray, Vector3f{X: valx, Y: valy, Z: valz})
 		}
 	}
 	s.VectorFieldPositions = posArray
@@ -383,14 +545,8 @@ func (s *PreviewState) UpdateScalarField(scalarField [][][]float32) {
 	valArray := make([][3]float32, 0, xLen*yLen)
 	for posx := 0; posx < xLen; posx++ {
 		for posy := 0; posy < yLen; posy++ {
-			// Some quantities exist where the magnetic materials are not present
-			// and we don't want to filter them out
-			if !contains(s.globalQuantities, s.Quantity) {
-				if s.layerMask != nil {
-					if s.layerMask[posy][posx] == 0 {
-						continue
-					}
-				}
+			if !contains(s.globalQuantities, s.Quantity) && s.layerMask != nil && s.layerMask[posy][posx] == 0 {
+				continue
 			}
 			val := scalarField[0][posy][posx]
 			if !hasValue {
@@ -426,37 +582,49 @@ func (s *PreviewState) UpdateScalarField(scalarField [][][]float32) {
 	s.DataPointsCount = len(valArray)
 }
 
+func (s *PreviewState) ensureMask(xSize, ySize int) {
+	if s.layerMask != nil && s.maskXSize == xSize && s.maskYSize == ySize && s.maskLayer == s.Layer {
+		return
+	}
+	s.updateMaskForSize(xSize, ySize)
+}
+
 func (s *PreviewState) updateMask() {
+	s.updateMaskForSize(s.XChosenSize, s.YChosenSize)
+}
+
+func (s *PreviewState) updateMaskForSize(xSize, ySize int) {
 	defer func() {
 		if r := recover(); r != nil {
-			// Handle the panic, possibly log the error
 			log.Log.Warn("Recovered from panic in updateMask: %v", r)
-			// Optionally, reset s.layerMask or handle it appropriately
 			s.layerMask = nil
+			s.maskXSize = 0
+			s.maskYSize = 0
+			s.maskLayer = 0
 		}
 	}()
-	if s.XChosenSize == 0 || s.YChosenSize == 0 {
+	if xSize == 0 || ySize == 0 {
 		log.Log.Debug("XChosenSize or YChosenSize is 0")
 		return
 	}
-	// cuda full size geom
+
 	geom := engine.Geometry
 	GPUFullsize := cuda.Buffer(geom.NComp(), geom.Buffer.Size())
 	geom.EvalTo(GPUFullsize)
 	defer cuda.Recycle(GPUFullsize)
 
-	// resize geom in GPU
-	GPUResized := cuda.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	GPUResized := cuda.NewSlice(1, [3]int{xSize, ySize, 1})
 	defer GPUResized.Free()
 	cuda.Resize(GPUResized, GPUFullsize.Comp(0), s.Layer)
 
-	// copy resized geom from GPU to CPU
-	CPUOut := data.NewSlice(1, [3]int{s.XChosenSize, s.YChosenSize, 1})
+	CPUOut := data.NewSlice(1, [3]int{xSize, ySize, 1})
 	defer CPUOut.Free()
 	data.Copy(CPUOut.Comp(0), GPUResized)
 
-	// extract mask from CPU slice
 	s.layerMask = CPUOut.Scalars()[0]
+	s.maskXSize = xSize
+	s.maskYSize = ySize
+	s.maskLayer = s.Layer
 }
 
 func contains(arr []string, val string) bool {

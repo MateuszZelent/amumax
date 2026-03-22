@@ -44,13 +44,14 @@ func sinWaveguide(length, width, height, period, sinAmp float64) shape {
 	halfWidth := width / 2
 	halfHeight := height / 2
 	k := 2 * math.Pi / period
+	halfDz := GetMesh().CellSize()[Z] / 2
 
 	return func(x, y, z float64) bool {
 		if math.Abs(x) > halfLength || math.Abs(y) > halfWidth {
 			return false
 		}
 		zCenter := sinAmp * math.Sin(k*x)
-		return math.Abs(z-zCenter) <= halfHeight
+		return z >= zCenter-halfHeight+halfDz && z <= zCenter+halfHeight-halfDz
 	}
 }
 
@@ -82,13 +83,14 @@ func sinWaveguide2(length, width, height, period, centerAmp, phase, z0 float64) 
 	halfW := width / 2
 	halfH := height / 2
 	k := 2 * math.Pi / period
+	halfDz := GetMesh().CellSize()[Z] / 2
 
 	return func(x, y, z float64) bool {
 		if x < -halfL || x > halfL || y < -halfW || y > halfW {
 			return false
 		}
 		zCenter := z0 + centerAmp*math.Sin(k*x+phase)
-		return z >= zCenter-halfH && z <= zCenter+halfH
+		return z >= zCenter-halfH+halfDz && z <= zCenter+halfH-halfDz
 	}
 }
 
@@ -115,6 +117,7 @@ func archWaveguide(length, width, height, archHeight, z0 float64) shape {
 	halfL := length / 2
 	halfW := width / 2
 	halfH := height / 2
+	halfDz := GetMesh().CellSize()[Z] / 2
 
 	return func(x, y, z float64) bool {
 		if x < -halfL || x > halfL || y < -halfW || y > halfW {
@@ -123,7 +126,7 @@ func archWaveguide(length, width, height, archHeight, z0 float64) shape {
 		// half-sine: 0 at x=-halfL, peaks at x=0, back to 0 at x=+halfL
 		t := (x + halfL) / length // t ∈ [0,1]
 		zCenter := z0 + archHeight*math.Sin(math.Pi*t)
-		return z >= zCenter-halfH && z <= zCenter+halfH
+		return z >= zCenter-halfH+halfDz && z <= zCenter+halfH-halfDz
 	}
 }
 

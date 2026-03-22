@@ -3,19 +3,41 @@
 	import Panel from '$lib/ui/Panel.svelte';
 	import ReadonlyField from '$lib/ui/ReadonlyField.svelte';
 
+	const SI_PREFIXES: { threshold: number; divisor: number; unit: string }[] = [
+		{ threshold: 1, divisor: 1, unit: 'm' },
+		{ threshold: 1e-3, divisor: 1e-3, unit: 'mm' },
+		{ threshold: 1e-6, divisor: 1e-6, unit: 'µm' },
+		{ threshold: 1e-9, divisor: 1e-9, unit: 'nm' },
+		{ threshold: 0, divisor: 1e-12, unit: 'pm' }
+	];
+
+	function formatSI(meters: number): { value: string; unit: string } {
+		if (meters === 0) return { value: '0', unit: 'm' };
+		const abs = Math.abs(meters);
+		for (const { threshold, divisor, unit } of SI_PREFIXES) {
+			if (abs >= threshold) {
+				const scaled = meters / divisor;
+				const decimals = abs >= 1 ? 3 : Math.max(0, 4 - Math.floor(Math.log10(Math.abs(scaled)) + 1));
+				return { value: scaled.toFixed(decimals), unit };
+			}
+		}
+		const last = SI_PREFIXES[SI_PREFIXES.length - 1];
+		return { value: (meters / last.divisor).toFixed(3), unit: last.unit };
+	}
+
 	const dimensions = $derived([
-		{ label: 'dx', value: $mesh.dx.toPrecision(8), unit: 'm', group: 'Cell size' },
-		{ label: 'dy', value: $mesh.dy.toPrecision(8), unit: 'm', group: 'Cell size' },
-		{ label: 'dz', value: $mesh.dz.toPrecision(8), unit: 'm', group: 'Cell size' },
-		{ label: 'Nx', value: `${$mesh.Nx}`, group: 'Grid' },
-		{ label: 'Ny', value: `${$mesh.Ny}`, group: 'Grid' },
-		{ label: 'Nz', value: `${$mesh.Nz}`, group: 'Grid' },
-		{ label: 'Tx', value: $mesh.Tx.toExponential(6), unit: 'm', group: 'Size' },
-		{ label: 'Ty', value: $mesh.Ty.toExponential(6), unit: 'm', group: 'Size' },
-		{ label: 'Tz', value: $mesh.Tz.toExponential(6), unit: 'm', group: 'Size' },
-		{ label: 'PBCx', value: `${$mesh.PBCx}`, group: 'Boundaries' },
-		{ label: 'PBCy', value: `${$mesh.PBCy}`, group: 'Boundaries' },
-		{ label: 'PBCz', value: `${$mesh.PBCz}`, group: 'Boundaries' }
+		{ label: 'dx', ...formatSI($mesh.dx), group: 'Cell size' },
+		{ label: 'dy', ...formatSI($mesh.dy), group: 'Cell size' },
+		{ label: 'dz', ...formatSI($mesh.dz), group: 'Cell size' },
+		{ label: 'Nx', value: `${$mesh.Nx}`, unit: '', group: 'Grid' },
+		{ label: 'Ny', value: `${$mesh.Ny}`, unit: '', group: 'Grid' },
+		{ label: 'Nz', value: `${$mesh.Nz}`, unit: '', group: 'Grid' },
+		{ label: 'Tx', ...formatSI($mesh.Tx), group: 'Size' },
+		{ label: 'Ty', ...formatSI($mesh.Ty), group: 'Size' },
+		{ label: 'Tz', ...formatSI($mesh.Tz), group: 'Size' },
+		{ label: 'PBCx', value: `${$mesh.PBCx}`, unit: '', group: 'Boundaries' },
+		{ label: 'PBCy', value: `${$mesh.PBCy}`, unit: '', group: 'Boundaries' },
+		{ label: 'PBCz', value: `${$mesh.PBCz}`, unit: '', group: 'Boundaries' }
 	]);
 
 	const grouped = $derived(
