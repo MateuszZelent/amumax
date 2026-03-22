@@ -13,11 +13,19 @@ import (
 
 func init() {
 	Geometry.init()
+	GeomThicknessZ = newScalarField("geom_thickness_z", "m", "Numerical material thickness obtained by summing cell fill fractions along z", setGeomThicknessZ)
+	GeomFaceX = newScalarField("geom_face_x", "", "Average x-face fill fraction (0..1)", setGeomFaceX)
+	GeomFaceY = newScalarField("geom_face_y", "", "Average y-face fill fraction (0..1)", setGeomFaceY)
+	GeomFaceZ = newScalarField("geom_face_z", "", "Average z-face fill fraction (0..1)", setGeomFaceZ)
 }
 
 var (
-	Geometry   geom
-	edgeSmooth int = 0 // disabled by default
+	Geometry       geom
+	edgeSmooth     int = 0 // disabled by default
+	GeomThicknessZ ScalarField
+	GeomFaceX      ScalarField
+	GeomFaceY      ScalarField
+	GeomFaceZ      ScalarField
 )
 
 type geom struct {
@@ -73,6 +81,58 @@ func (g *geom) average() []float64 {
 }
 
 func (g *geom) Average() float64 { return g.average()[0] }
+
+func setGeomThicknessZ(dst *data.Slice) {
+	geom, recycle := Geometry.Slice()
+	if recycle {
+		defer cuda.Recycle(geom)
+	}
+
+	hostGeom := geom.HostCopy()
+	geomValues := hostGeom.Scalars()
+	hostDst := data.NewSlice(1, dst.Size())
+	thicknessValues := hostDst.Scalars()
+	n := Geometry.Mesh().Size()
+	dz := float32(Geometry.Mesh().CellSize()[Z])
+
+	for iy := 0; iy < n[Y]; iy++ {
+		for ix := 0; ix < n[X]; ix++ {
+			var thickness float32
+			for iz := 0; iz < n[Z]; iz++ {
+				thickness += geomValues[iz][iy][ix] * dz
+			}
+			for iz := 0; iz < n[Z]; iz++ {
+				thicknessValues[iz][iy][ix] = thickness
+			}
+		}
+	}
+
+	data.Copy(dst, hostDst)
+}
+
+func setGeomFaceX(dst *data.Slice) { setGeomFaceAxis(dst, 0, 1) }
+func setGeomFaceY(dst *data.Slice) { setGeomFaceAxis(dst, 2, 3) }
+func setGeomFaceZ(dst *data.Slice) { setGeomFaceAxis(dst, 4, 5) }
+
+func setGeomFaceAxis(dst *data.Slice, negativeComp, positiveComp int) {
+	faces, recycle := Geometry.FaceSlice()
+	if recycle {
+		defer cuda.Recycle(faces)
+	}
+
+	hostFaces := faces.HostCopy()
+	faceValues := hostFaces.Host()
+	hostDst := data.NewSlice(1, dst.Size())
+	avgValues := hostDst.Host()[0]
+	negative := faceValues[negativeComp]
+	positive := faceValues[positiveComp]
+
+	for i := range avgValues {
+		avgValues[i] = 0.5 * (negative[i] + positive[i])
+	}
+
+	data.Copy(dst, hostDst)
+}
 
 func (g *geom) setGeom(s shape) {
 	setBusy(true)
