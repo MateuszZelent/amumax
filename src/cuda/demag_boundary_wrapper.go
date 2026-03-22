@@ -130,6 +130,7 @@ const (
 	.reg .pred 	%p<39>;
 	.reg .f32 	%f<272>;
 	.reg .b32 	%r<46>;
+	.reg .f64 	%fd<24>;
 	.reg .b64 	%rd<96>;
 
 
@@ -233,7 +234,11 @@ $L__BB0_7:
 	setp.eq.f32 	%p10, %f8, 0f00000000;
 	@%p10 bra 	$L__BB0_12;
 
-	mul.f32 	%f95, %f4, %f8;
+	cvt.f64.f32 	%fd2, %f4;
+	mul.f64 	%fd3, %fd2, 0d3EB515370F99F6CB;
+	cvt.f64.f32 	%fd4, %f8;
+	mul.f64 	%fd5, %fd3, %fd4;
+	cvt.rn.f32.f64 	%f95, %fd5;
 	mul.f32 	%f96, %f5, %f95;
 	mul.f32 	%f97, %f6, %f95;
 	mul.f32 	%f98, %f7, %f95;
@@ -286,7 +291,11 @@ $L__BB0_12:
 	setp.eq.f32 	%p14, %f19, 0f00000000;
 	@%p14 bra 	$L__BB0_17;
 
-	mul.f32 	%f118, %f15, %f19;
+	cvt.f64.f32 	%fd6, %f15;
+	mul.f64 	%fd7, %fd6, 0d3EB515370F99F6CB;
+	cvt.f64.f32 	%fd8, %f19;
+	mul.f64 	%fd9, %fd7, %fd8;
+	cvt.rn.f32.f64 	%f118, %fd9;
 	mul.f32 	%f119, %f16, %f118;
 	mul.f32 	%f120, %f17, %f118;
 	mul.f32 	%f121, %f18, %f118;
@@ -351,7 +360,11 @@ $L__BB0_18:
 	setp.eq.f32 	%p20, %f36, 0f00000000;
 	@%p20 bra 	$L__BB0_40;
 
-	mul.f32 	%f141, %f32, %f36;
+	cvt.f64.f32 	%fd10, %f32;
+	mul.f64 	%fd11, %fd10, 0d3EB515370F99F6CB;
+	cvt.f64.f32 	%fd12, %f36;
+	mul.f64 	%fd13, %fd11, %fd12;
+	cvt.rn.f32.f64 	%f141, %fd13;
 	mul.f32 	%f142, %f33, %f141;
 	mul.f32 	%f143, %f34, %f141;
 	mul.f32 	%f144, %f35, %f141;
@@ -387,6 +400,7 @@ $L__BB0_24:
 	@%p21 bra 	$L__BB0_35;
 
 	sub.s32 	%r44, %r18, %r3;
+	cvt.f64.f32 	%fd1, %f79;
 	mov.f32 	%f271, 0f00000000;
 	mov.u32 	%r45, 0;
 
@@ -422,7 +436,10 @@ $L__BB0_26:
 	or.pred  	%p26, %p25, %p24;
 	@%p26 bra 	$L__BB0_30;
 
-	mul.f32 	%f170, %f43, %f79;
+	cvt.f64.f32 	%fd14, %f43;
+	mul.f64 	%fd15, %fd14, 0d3EB515370F99F6CB;
+	mul.f64 	%fd16, %fd15, %fd1;
+	cvt.rn.f32.f64 	%f170, %fd16;
 	mul.f32 	%f171, %f44, %f170;
 	mul.f32 	%f172, %f45, %f170;
 	mul.f32 	%f173, %f46, %f170;
@@ -471,7 +488,10 @@ $L__BB0_30:
 	or.pred  	%p31, %p30, %p29;
 	@%p31 bra 	$L__BB0_34;
 
-	mul.f32 	%f192, %f53, %f79;
+	cvt.f64.f32 	%fd17, %f53;
+	mul.f64 	%fd18, %fd17, 0d3EB515370F99F6CB;
+	mul.f64 	%fd19, %fd18, %fd1;
+	cvt.rn.f32.f64 	%f192, %fd19;
 	mul.f32 	%f193, %f54, %f192;
 	mul.f32 	%f194, %f55, %f192;
 	mul.f32 	%f195, %f56, %f192;
@@ -532,7 +552,11 @@ $L__BB0_35:
 	or.pred  	%p38, %p36, %p37;
 	@%p38 bra 	$L__BB0_40;
 
-	mul.f32 	%f214, %f69, %f79;
+	cvt.f64.f32 	%fd20, %f69;
+	mul.f64 	%fd21, %fd20, 0d3EB515370F99F6CB;
+	cvt.f64.f32 	%fd22, %f79;
+	mul.f64 	%fd23, %fd21, %fd22;
+	cvt.rn.f32.f64 	%f214, %fd23;
 	mul.f32 	%f215, %f70, %f214;
 	mul.f32 	%f216, %f71, %f214;
 	mul.f32 	%f217, %f72, %f214;

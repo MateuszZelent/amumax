@@ -32,6 +32,7 @@ func init() {
 	declVar("DemagBoundaryRefine", &DemagBoundaryRefine, "Refinement factor used for local subgrid demag boundary correction precomputation inside boundary-shell cells.")
 	declVar("DemagBoundaryHalo", &DemagBoundaryHalo, "Halo size used to dilate the demag boundary shell around partial/cut cells.")
 	declVar("DemagBoundaryTol", &DemagBoundaryTol, "Reserved tolerance parameter for future higher-order local demag boundary correction precomputation.")
+	declVar("DemagBoundaryPhiFloor", &DemagBoundaryPhiFloor, "Minimum cut-cell volume fraction allowed to participate in local demag boundary correction. Cells below this threshold are excluded to avoid unstable self-demag in pathological sliver cells. The effective floor is max(DemagBoundaryPhiFloor, GeomPhiFloor).")
 
 	declVar("step", &NSteps, "Total number of time steps taken")
 	declVar("MinDt", &MinDt, "Minimum time step the solver can take (s)")

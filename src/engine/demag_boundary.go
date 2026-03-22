@@ -3,19 +3,22 @@ package engine
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/mag"
+	"github.com/MathieuMoalic/amumax/src/progressbar"
 )
 
 var (
-	DemagBoundaryCorr   = false
-	DemagBoundaryRadius = 1
-	DemagBoundaryRefine = 4
-	DemagBoundaryHalo   = 1
-	DemagBoundaryTol    = 1e-3
+	DemagBoundaryCorr     = false
+	DemagBoundaryRadius   = 1
+	DemagBoundaryRefine   = 4
+	DemagBoundaryHalo     = 1
+	DemagBoundaryTol      = 1e-3
+	DemagBoundaryPhiFloor = 0.0
 
 	DemagBoundaryShell       ScalarField
 	DemagBoundaryTargetCount *ScalarValue
@@ -57,10 +60,12 @@ type demagBoundaryConfig struct {
 	halo     int
 	radius   int
 	refine   int
+	phiFloor float64
 	revision uint64
 }
 
 const demagBoundaryEps = 1e-4
+const demagBoundaryWarnRefinedPairOps int64 = 500_000_000
 
 func invalidateDemagBoundaryPlan() {
 	demagBoundaryCache.mu.Lock()
@@ -131,17 +136,34 @@ func currentDemagBoundaryConfig() demagBoundaryConfig {
 	if refine < 1 {
 		refine = 1
 	}
+	phiFloor := effectiveDemagBoundaryPhiFloor()
 	return demagBoundaryConfig{
 		mesh:     Geometry.Mesh().Size(),
 		halo:     halo,
 		radius:   radius,
 		refine:   refine,
+		phiFloor: phiFloor,
 		revision: atomic.LoadUint64(&demagBoundaryRevision),
 	}
 }
 
+func effectiveDemagBoundaryPhiFloor() float64 {
+	phiFloor := DemagBoundaryPhiFloor
+	if GeomPhiFloor > phiFloor {
+		phiFloor = GeomPhiFloor
+	}
+	if phiFloor < 0 {
+		return 0
+	}
+	if phiFloor > 1-demagBoundaryEps {
+		return 1 - demagBoundaryEps
+	}
+	return phiFloor
+}
+
 func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	cfg := currentDemagBoundaryConfig()
+	start := time.Now()
 	hostMask := data.NewSlice(1, Geometry.Mesh().Size())
 
 	geom, recycleGeom := Geometry.Slice()
@@ -163,6 +185,7 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	cell := Geometry.Mesh().CellSize()
 	base := make([]bool, len(maskValues))
 	active := make([]bool, len(maskValues))
+	lowPhiSkipped := 0
 	plan := demagBoundaryPlan{
 		mask:    hostMask,
 		stencil: buildDemagStencil(cfg.radius),
@@ -175,6 +198,10 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 
 	for idx, phi := range geomValues {
 		if phi <= demagBoundaryEps {
+			continue
+		}
+		if float64(phi) <= cfg.phiFloor {
+			lowPhiSkipped++
 			continue
 		}
 		active[idx] = true
@@ -220,6 +247,17 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 		return plan
 	}
 
+	if lowPhiSkipped > 0 {
+		log.Log.Warn("DemagBoundaryCorr: excluding %d cells with phi <= %g from local demag correction to avoid unstable sliver-cell self terms", lowPhiSkipped, cfg.phiFloor)
+	}
+
+	maxSubcells := int64(cfg.refine * cfg.refine * cfg.refine)
+	estimatedPairOps := int64(len(plan.targetIdx)) * int64(len(plan.stencil)) * maxSubcells * maxSubcells
+	log.Log.Info("DemagBoundaryCorr: building local correction plan for %d shell targets, stencil=%d, refine=%d (worst-case refined pair evaluations ~ %d)", len(plan.targetIdx), len(plan.stencil), cfg.refine, estimatedPairOps)
+	if estimatedPairOps > demagBoundaryWarnRefinedPairOps {
+		log.Log.Warn("DemagBoundaryCorr precompute is very expensive for this geometry. Current settings may take a very long time before the first time step. Consider smaller values such as DemagBoundaryRadius=0, DemagBoundaryHalo=0, DemagBoundaryRefine=2 for validation runs.")
+	}
+
 	if pbc[X] != 0 || pbc[Y] != 0 || pbc[Z] != 0 {
 		log.Log.Warn("DemagBoundaryCorr currently supports only non-periodic meshes; skipping local demag correction for PBC != 0")
 		plan.maskGPU = cuda.GPUCopy(hostMask)
@@ -258,7 +296,7 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	refinedCells := make(map[int]refinedCellWeights, len(support))
 	for idx := range support {
 		ix, iy, iz := demagLinearToCoord(idx, n)
-		refinedCells[idx] = buildRefinedCellWeights(boundsFromIndex(ix, iy, iz), float64(geomValues[idx]), cfg.refine)
+		refinedCells[idx] = buildRefinedCellWeights(boundsFromIndex(ix, iy, iz), float64(geomValues[idx]), cfg.refine, cfg.phiFloor)
 	}
 
 	targetHost := make([]int32, len(plan.targetIdx))
@@ -268,9 +306,11 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	}
 	tensorHost := data.NewSlice(1, [3]int{len(plan.targetIdx) * len(plan.stencil) * 6, 1, 1})
 	tensorValues := tensorHost.Host()[0]
+	progressBar := progressbar.NewProgressBar(0, float64(len(plan.targetIdx)), "🧲", HideProgresBar)
 
 	for t, targetIdx := range plan.targetIdx {
 		targetHost[t] = int32(targetIdx)
+		progressBar.Update(float64(t))
 		targetWeights := refinedCells[targetIdx]
 		if targetWeights.total <= demagBoundaryEps {
 			continue
@@ -294,6 +334,7 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 			}
 		}
 	}
+	progressBar.Finish()
 
 	plan.maskGPU = cuda.GPUCopy(hostMask)
 	plan.targetIdxGPU = cuda.NewInt32s(len(targetHost))
@@ -301,6 +342,7 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	plan.sourceIdxGPU = cuda.NewInt32s(len(sourceHost))
 	plan.sourceIdxGPU.Upload(sourceHost)
 	plan.tensorGPU = cuda.GPUCopy(tensorHost)
+	log.Log.Info("DemagBoundaryCorr: local correction plan built in %s", time.Since(start))
 	return plan
 }
 
@@ -360,6 +402,7 @@ func applyDemagBoundaryCorrection(dst, vol *data.Slice, ms cuda.MSlice) {
 	plan := getDemagBoundaryPlan()
 	demagBoundaryWarnOnce.Do(func() {
 		log.Log.Warn("DemagBoundaryCorr uses an experimental sparse GPU-side local demag boundary correction on the boundary shell. It precomputes a refined local correction tensor (including self terms) per shell target and applies it after the FFT demag field.")
+		log.Log.Info("DemagBoundaryCorr: cells with phi <= %g are excluded from local correction (effective floor is max(DemagBoundaryPhiFloor, GeomPhiFloor))", effectiveDemagBoundaryPhiFloor())
 		log.Log.Info("Demag boundary shell currently covers %d cells", len(plan.targetIdx))
 	})
 	if len(plan.targetIdx) == 0 || len(plan.stencil) == 0 {
@@ -477,8 +520,8 @@ func subcellBounds(bounds cellBounds, rx, ry, rz, refine int) cellBounds {
 	return cellBounds{xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax, zMin: zMin, zMax: zMax}
 }
 
-func buildRefinedCellWeights(bounds cellBounds, coarsePhi float64, refine int) refinedCellWeights {
-	if coarsePhi <= demagBoundaryEps || refine < 1 {
+func buildRefinedCellWeights(bounds cellBounds, coarsePhi float64, refine int, phiFloor float64) refinedCellWeights {
+	if coarsePhi <= demagBoundaryEps || coarsePhi <= phiFloor || refine < 1 {
 		return refinedCellWeights{}
 	}
 

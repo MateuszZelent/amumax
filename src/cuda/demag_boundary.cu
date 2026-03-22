@@ -1,5 +1,6 @@
 #include "float3.h"
 #include "amul.h"
+#include "constants.h"
 
 extern "C" __global__ void
 add_demag_boundary_corr(float* __restrict__ Bx, float* __restrict__ By, float* __restrict__ Bz,
@@ -52,7 +53,7 @@ add_demag_boundary_corr(float* __restrict__ Bx, float* __restrict__ By, float* _
             continue;
         }
 
-        float3 src = (phiJ * msJ) * mJ;
+        float3 src = (MU0 * phiJ * msJ) * mJ;
         int k = tensorBase + s * 6;
 
         float xx = tensor[k + 0];
