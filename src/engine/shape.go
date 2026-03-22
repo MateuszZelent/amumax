@@ -454,9 +454,9 @@ func (s shape) Transl(dx, dy, dz float64) shape {
 // A period of 0 or infinity means no repetition.
 
 func (s shape) Repeat(periodX, periodY, periodZ float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		return s.contains(fmod(x, periodX), fmod(y, periodY), fmod(z, periodZ))
-	})
+	}, nil)
 }
 
 func fmod(a, b float64) float64 {
@@ -484,69 +484,69 @@ func (s shape) Scale(sx, sy, sz float64) shape {
 func (s shape) RotZ(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		xOut := x*cos + y*sin
 		yOut := -x*sin + y*cos
 		return s.contains(xOut, yOut, z)
-	})
+	}, nil)
 }
 
 // RotY Rotates the shape around the Y-axis, over θ radians.
 func (s shape) RotY(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		xOut := x*cos - z*sin
 		zOut := x*sin + z*cos
 		return s.contains(xOut, y, zOut)
-	})
+	}, nil)
 }
 
 // RotX Rotates the shape around the X-axis, over θ radians.
 func (s shape) RotX(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		yOut := y*cos + z*sin
 		zOut := -y*sin + z*cos
 		return s.contains(x, yOut, zOut)
-	})
+	}, nil)
 }
 
 // Add Union of shapes a and b (logical OR).
 func (s shape) Add(b shape) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		return s.contains(x, y, z) || b.contains(x, y, z)
-	})
+	}, nil)
 }
 
 // Intersect Intersection of shapes a and b (logical AND).
 func (s shape) Intersect(b shape) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		return s.contains(x, y, z) && b.contains(x, y, z)
-	})
+	}, nil)
 }
 
 // Inverse (outside) of shape (logical NOT).
 func (s shape) Inverse() shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		return !s.contains(x, y, z)
-	})
+	}, nil)
 }
 
 // Sub Removes b from a (logical a AND NOT b)
 func (s shape) Sub(b shape) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		return s.contains(x, y, z) && !b.contains(x, y, z)
-	})
+	}, nil)
 }
 
 // Xor Logical XOR of shapes a and b
 func (s shape) Xor(b shape) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newDerivedShape(func(x, y, z float64) bool {
 		A, B := s.contains(x, y, z), b.contains(x, y, z)
 		return (A || B) && (!A || !B)
-	})
+	}, nil)
 }
 
 func sqr64(x float64) float64 { return x * x }

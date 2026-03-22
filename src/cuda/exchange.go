@@ -31,6 +31,23 @@ func AddExchange(B, m *data.Slice, AexRed SymmLUT, Msat MSlice, geom, faces *dat
 		wx, wy, wz, phiFloor, N[X], N[Y], N[Z], pbc, cfg)
 }
 
+func AddExchangeCutCell(B, m, phi *data.Slice, AexRed SymmLUT, Msat MSlice, regions, linkX, linkY, linkZ *Bytes, mesh mesh.MeshLike, phiFloor float32) {
+	c := mesh.CellSize()
+	wx := float32(2 / (c[X] * c[X]))
+	wy := float32(2 / (c[Y] * c[Y]))
+	wz := float32(2 / (c[Z] * c[Z]))
+	N := mesh.Size()
+	pbc := mesh.PBCCode()
+	cfg := make3DConf(N)
+	kAddexchangeCutcellAsync(B.DevPtr(X), B.DevPtr(Y), B.DevPtr(Z),
+		m.DevPtr(X), m.DevPtr(Y), m.DevPtr(Z),
+		phi.DevPtr(0),
+		Msat.DevPtr(0), Msat.Mul(0),
+		unsafe.Pointer(AexRed), regions.Ptr,
+		linkX.Ptr, linkY.Ptr, linkZ.Ptr,
+		wx, wy, wz, phiFloor, N[X], N[Y], N[Z], pbc, cfg)
+}
+
 // ExchangeDecode Finds the average exchange strength around each cell, for debugging.
 func ExchangeDecode(dst *data.Slice, AexRed SymmLUT, regions *Bytes, mesh mesh.MeshLike) {
 	c := mesh.CellSize()

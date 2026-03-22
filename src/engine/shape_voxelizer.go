@@ -8,6 +8,18 @@ type shapeVoxelizer interface {
 	cellMetrics(bounds cellBounds) geomCellMetrics
 }
 
+type sampledShapeVoxelizer struct {
+	inside func(x, y, z float64) bool
+}
+
+type sampledBoundsClass uint8
+
+const (
+	sampledBoundsEmpty sampledBoundsClass = iota
+	sampledBoundsFull
+	sampledBoundsAmbiguous
+)
+
 type cellBounds struct {
 	xMin float64
 	xMax float64
@@ -18,8 +30,11 @@ type cellBounds struct {
 }
 
 func newDerivedShape(inside func(x, y, z float64) bool, voxelizer shapeVoxelizer) shape {
+	if inside == nil {
+		return newShape(nil)
+	}
 	if voxelizer == nil {
-		return newShape(inside)
+		voxelizer = sampledShapeVoxelizer{inside: inside}
 	}
 	return newVoxelizedShape(inside, voxelizer)
 }
@@ -136,6 +151,249 @@ func faceEpsilon(span float64) float64 {
 		return 1e-12
 	}
 	return eps
+}
+
+func sampledLeafSamples() int {
+	return 2
+}
+
+func sampledSnapUnit(v float64) float64 {
+	if v <= GeomTol {
+		return 0
+	}
+	if 1-v <= GeomTol {
+		return 1
+	}
+	return v
+}
+
+func interiorCoord(min, max, t float64) float64 {
+	if max <= min {
+		return min
+	}
+	eps := faceEpsilon(max - min)
+	lo := min + eps
+	hi := max - eps
+	if hi < lo {
+		return (min + max) / 2
+	}
+	return lo + (hi-lo)*t
+}
+
+func (b cellBounds) midpoint() (float64, float64, float64) {
+	return (b.xMin + b.xMax) / 2, (b.yMin + b.yMax) / 2, (b.zMin + b.zMax) / 2
+}
+
+func (b cellBounds) samplePoint(tx, ty, tz float64) (float64, float64, float64) {
+	return interiorCoord(b.xMin, b.xMax, tx), interiorCoord(b.yMin, b.yMax, ty), interiorCoord(b.zMin, b.zMax, tz)
+}
+
+func (b cellBounds) subdivide() [8]cellBounds {
+	xMid, yMid, zMid := b.midpoint()
+	return [8]cellBounds{
+		{xMin: b.xMin, xMax: xMid, yMin: b.yMin, yMax: yMid, zMin: b.zMin, zMax: zMid},
+		{xMin: xMid, xMax: b.xMax, yMin: b.yMin, yMax: yMid, zMin: b.zMin, zMax: zMid},
+		{xMin: b.xMin, xMax: xMid, yMin: yMid, yMax: b.yMax, zMin: b.zMin, zMax: zMid},
+		{xMin: xMid, xMax: b.xMax, yMin: yMid, yMax: b.yMax, zMin: b.zMin, zMax: zMid},
+		{xMin: b.xMin, xMax: xMid, yMin: b.yMin, yMax: yMid, zMin: zMid, zMax: b.zMax},
+		{xMin: xMid, xMax: b.xMax, yMin: b.yMin, yMax: yMid, zMin: zMid, zMax: b.zMax},
+		{xMin: b.xMin, xMax: xMid, yMin: yMid, yMax: b.yMax, zMin: zMid, zMax: b.zMax},
+		{xMin: xMid, xMax: b.xMax, yMin: yMid, yMax: b.yMax, zMin: zMid, zMax: b.zMax},
+	}
+}
+
+type faceBounds struct {
+	axis       int
+	coord      float64
+	uMin, uMax float64
+	vMin, vMax float64
+}
+
+func newFaceBounds(bounds cellBounds, axis int, positive bool) faceBounds {
+	switch axis {
+	case X:
+		x := bounds.xMin + faceEpsilon(bounds.xMax-bounds.xMin)
+		if positive {
+			x = bounds.xMax - faceEpsilon(bounds.xMax-bounds.xMin)
+		}
+		return faceBounds{axis: axis, coord: x, uMin: bounds.yMin, uMax: bounds.yMax, vMin: bounds.zMin, vMax: bounds.zMax}
+	case Y:
+		y := bounds.yMin + faceEpsilon(bounds.yMax-bounds.yMin)
+		if positive {
+			y = bounds.yMax - faceEpsilon(bounds.yMax-bounds.yMin)
+		}
+		return faceBounds{axis: axis, coord: y, uMin: bounds.xMin, uMax: bounds.xMax, vMin: bounds.zMin, vMax: bounds.zMax}
+	case Z:
+		z := bounds.zMin + faceEpsilon(bounds.zMax-bounds.zMin)
+		if positive {
+			z = bounds.zMax - faceEpsilon(bounds.zMax-bounds.zMin)
+		}
+		return faceBounds{axis: axis, coord: z, uMin: bounds.xMin, uMax: bounds.xMax, vMin: bounds.yMin, vMax: bounds.yMax}
+	default:
+		return faceBounds{}
+	}
+}
+
+func (f faceBounds) samplePoint(tu, tv float64) (float64, float64, float64) {
+	u := interiorCoord(f.uMin, f.uMax, tu)
+	v := interiorCoord(f.vMin, f.vMax, tv)
+	switch f.axis {
+	case X:
+		return f.coord, u, v
+	case Y:
+		return u, f.coord, v
+	case Z:
+		return u, v, f.coord
+	default:
+		return 0, 0, 0
+	}
+}
+
+func (f faceBounds) subdivide() [4]faceBounds {
+	uMid := (f.uMin + f.uMax) / 2
+	vMid := (f.vMin + f.vMax) / 2
+	return [4]faceBounds{
+		{axis: f.axis, coord: f.coord, uMin: f.uMin, uMax: uMid, vMin: f.vMin, vMax: vMid},
+		{axis: f.axis, coord: f.coord, uMin: uMid, uMax: f.uMax, vMin: f.vMin, vMax: vMid},
+		{axis: f.axis, coord: f.coord, uMin: f.uMin, uMax: uMid, vMin: vMid, vMax: f.vMax},
+		{axis: f.axis, coord: f.coord, uMin: uMid, uMax: f.uMax, vMin: vMid, vMax: f.vMax},
+	}
+}
+
+func (v sampledShapeVoxelizer) cellMetrics(bounds cellBounds) geomCellMetrics {
+	var faces [6]float32
+	faces[0] = float32(v.faceFraction(newFaceBounds(bounds, X, false), 0))
+	faces[1] = float32(v.faceFraction(newFaceBounds(bounds, X, true), 0))
+	faces[2] = float32(v.faceFraction(newFaceBounds(bounds, Y, false), 0))
+	faces[3] = float32(v.faceFraction(newFaceBounds(bounds, Y, true), 0))
+	faces[4] = float32(v.faceFraction(newFaceBounds(bounds, Z, false), 0))
+	faces[5] = float32(v.faceFraction(newFaceBounds(bounds, Z, true), 0))
+	return newGeomCellMetrics(float32(v.volumeFraction(bounds, 0)), faces)
+}
+
+func (v sampledShapeVoxelizer) volumeFraction(bounds cellBounds, depth int) float64 {
+	switch v.classifyBounds(bounds) {
+	case sampledBoundsEmpty:
+		return 0
+	case sampledBoundsFull:
+		return 1
+	}
+	if depth >= GeomMaxDepth {
+		return sampledSnapUnit(v.sampleVolume(bounds))
+	}
+	children := bounds.subdivide()
+	var sum float64
+	for _, child := range children {
+		sum += v.volumeFraction(child, depth+1)
+	}
+	return sampledSnapUnit(sum / float64(len(children)))
+}
+
+func (v sampledShapeVoxelizer) faceFraction(face faceBounds, depth int) float64 {
+	switch v.classifyFace(face) {
+	case sampledBoundsEmpty:
+		return 0
+	case sampledBoundsFull:
+		return 1
+	}
+	if depth >= GeomMaxDepth {
+		return sampledSnapUnit(v.sampleFace(face))
+	}
+	children := face.subdivide()
+	var sum float64
+	for _, child := range children {
+		sum += v.faceFraction(child, depth+1)
+	}
+	return sampledSnapUnit(sum / float64(len(children)))
+}
+
+func (v sampledShapeVoxelizer) classifyBounds(bounds cellBounds) sampledBoundsClass {
+	samples := [][3]float64{
+		{0, 0, 0},
+		{1, 0, 0},
+		{0, 1, 0},
+		{1, 1, 0},
+		{0, 0, 1},
+		{1, 0, 1},
+		{0, 1, 1},
+		{1, 1, 1},
+		{0.5, 0.5, 0.5},
+	}
+	var insideCount int
+	for _, sample := range samples {
+		x, y, z := bounds.samplePoint(sample[0], sample[1], sample[2])
+		if v.inside(x, y, z) {
+			insideCount++
+		}
+	}
+	switch {
+	case insideCount == 0:
+		return sampledBoundsEmpty
+	case insideCount == len(samples):
+		return sampledBoundsFull
+	default:
+		return sampledBoundsAmbiguous
+	}
+}
+
+func (v sampledShapeVoxelizer) classifyFace(face faceBounds) sampledBoundsClass {
+	samples := [][2]float64{
+		{0, 0},
+		{1, 0},
+		{0, 1},
+		{1, 1},
+		{0.5, 0.5},
+	}
+	var insideCount int
+	for _, sample := range samples {
+		x, y, z := face.samplePoint(sample[0], sample[1])
+		if v.inside(x, y, z) {
+			insideCount++
+		}
+	}
+	switch {
+	case insideCount == 0:
+		return sampledBoundsEmpty
+	case insideCount == len(samples):
+		return sampledBoundsFull
+	default:
+		return sampledBoundsAmbiguous
+	}
+}
+
+func (v sampledShapeVoxelizer) sampleVolume(bounds cellBounds) float64 {
+	n := sampledLeafSamples()
+	var insideCount int
+	for ix := 0; ix < n; ix++ {
+		tx := (float64(ix) + 0.5) / float64(n)
+		for iy := 0; iy < n; iy++ {
+			ty := (float64(iy) + 0.5) / float64(n)
+			for iz := 0; iz < n; iz++ {
+				tz := (float64(iz) + 0.5) / float64(n)
+				x, y, z := bounds.samplePoint(tx, ty, tz)
+				if v.inside(x, y, z) {
+					insideCount++
+				}
+			}
+		}
+	}
+	return float64(insideCount) / float64(n*n*n)
+}
+
+func (v sampledShapeVoxelizer) sampleFace(face faceBounds) float64 {
+	n := sampledLeafSamples()
+	var insideCount int
+	for iu := 0; iu < n; iu++ {
+		tu := (float64(iu) + 0.5) / float64(n)
+		for iv := 0; iv < n; iv++ {
+			tv := (float64(iv) + 0.5) / float64(n)
+			x, y, z := face.samplePoint(tu, tv)
+			if v.inside(x, y, z) {
+				insideCount++
+			}
+		}
+	}
+	return float64(insideCount) / float64(n*n)
 }
 
 type translatedShapeVoxelizer struct {

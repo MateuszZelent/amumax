@@ -51,17 +51,27 @@ func addExchangeField(dst *data.Slice) {
 	if recycleGeom {
 		defer cuda.Recycle(geom)
 	}
-	faces, recycleFaces := Geometry.FaceSlice()
-	if recycleFaces {
-		defer cuda.Recycle(faces)
-	}
 
 	switch {
+	case !inter && !bulk && Geometry.HasLinks():
+		cuda.AddExchangeCutCell(dst, NormMag.Buffer(), geom, lex2.Gpu(), ms, Regions.Gpu(), Geometry.LinkX, Geometry.LinkY, Geometry.LinkZ, NormMag.Mesh(), float32(GeomPhiFloor))
 	case !inter && !bulk:
+		faces, recycleFaces := Geometry.FaceSlice()
+		if recycleFaces {
+			defer cuda.Recycle(faces)
+		}
 		cuda.AddExchange(dst, NormMag.Buffer(), lex2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), float32(GeomPhiFloor))
 	case inter && !bulk:
+		faces, recycleFaces := Geometry.FaceSlice()
+		if recycleFaces {
+			defer cuda.Recycle(faces)
+		}
 		cuda.AddDMI(dst, NormMag.Buffer(), lex2.Gpu(), din2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC, float32(GeomPhiFloor)) // dmi+exchange
 	case bulk && !inter:
+		faces, recycleFaces := Geometry.FaceSlice()
+		if recycleFaces {
+			defer cuda.Recycle(faces)
+		}
 		cuda.AddDMIBulk(dst, NormMag.Buffer(), lex2.Gpu(), dbulk2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC, float32(GeomPhiFloor)) // dmi+exchange
 		// TODO: add ScaleInterDbulk and InterDbulk
 	case inter && bulk:

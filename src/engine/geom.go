@@ -19,6 +19,9 @@ func init() {
 	GeomFx = newScalarField("geom_fx", "", "Positive x-face fill fraction between a cell and its +x neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 1) })
 	GeomFy = newScalarField("geom_fy", "", "Positive y-face fill fraction between a cell and its +y neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 3) })
 	GeomFz = newScalarField("geom_fz", "", "Positive z-face fill fraction between a cell and its +z neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 5) })
+	GeomLinkX = newScalarField("geom_link_x", "", "Shared x-interface fraction used by cut-cell exchange between a cell and its +x neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkX) })
+	GeomLinkY = newScalarField("geom_link_y", "", "Shared y-interface fraction used by cut-cell exchange between a cell and its +y neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkY) })
+	GeomLinkZ = newScalarField("geom_link_z", "", "Shared z-interface fraction used by cut-cell exchange between a cell and its +z neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkZ) })
 	GeomFaceX = newScalarField("geom_face_x", "", "Average x-face fill fraction (0..1)", setGeomFaceX)
 	GeomFaceY = newScalarField("geom_face_y", "", "Average y-face fill fraction (0..1)", setGeomFaceY)
 	GeomFaceZ = newScalarField("geom_face_z", "", "Average z-face fill fraction (0..1)", setGeomFaceZ)
@@ -36,6 +39,9 @@ var (
 	GeomFx         ScalarField
 	GeomFy         ScalarField
 	GeomFz         ScalarField
+	GeomLinkX      ScalarField
+	GeomLinkY      ScalarField
+	GeomLinkZ      ScalarField
 	GeomFaceX      ScalarField
 	GeomFaceY      ScalarField
 	GeomFaceZ      ScalarField
@@ -52,7 +58,11 @@ func normalizedGeomMode() string {
 func geomUsesCutCell(s shape) bool {
 	switch normalizedGeomMode() {
 	case "cutcell":
-		return s.voxelizer != nil
+		if s.voxelizer == nil {
+			log.Log.Warn("GeomMode=cutcell requested, but shape has no voxelizer; falling back to legacy geometry")
+			return false
+		}
+		return true
 	case "legacy":
 		return false
 	default:
@@ -69,14 +79,39 @@ type geom struct {
 	info
 	Buffer     *data.Slice
 	FaceBuffer *data.Slice
+	LinkX      *cuda.Bytes
+	LinkY      *cuda.Bytes
+	LinkZ      *cuda.Bytes
 	shape      shape
 }
 
 func (g *geom) init() {
 	g.Buffer = nil
 	g.FaceBuffer = nil
+	g.LinkX = nil
+	g.LinkY = nil
+	g.LinkZ = nil
 	g.info = info{1, "geom", ""}
 	declROnly("geom", g, "Cell fill fraction (0..1)")
+}
+
+func (g *geom) HasLinks() bool {
+	return g.LinkX != nil && g.LinkY != nil && g.LinkZ != nil
+}
+
+func (g *geom) ClearLinks() {
+	if g.LinkX != nil {
+		g.LinkX.Free()
+		g.LinkX = nil
+	}
+	if g.LinkY != nil {
+		g.LinkY.Free()
+		g.LinkY = nil
+	}
+	if g.LinkZ != nil {
+		g.LinkZ.Free()
+		g.LinkZ = nil
+	}
 }
 
 func (g *geom) Gpu() *data.Slice {
@@ -133,6 +168,22 @@ func setGeomPositiveFace(dst *data.Slice, comp int) {
 	faceValues := hostFaces.Host()[comp]
 	hostDst := data.NewSlice(1, dst.Size())
 	copy(hostDst.Host()[0], faceValues)
+	data.Copy(dst, hostDst)
+}
+
+func setGeomLink(dst *data.Slice, link *cuda.Bytes) {
+	hostDst := data.NewSlice(1, dst.Size())
+	if link == nil || link.Len == 0 {
+		data.Copy(dst, hostDst)
+		return
+	}
+
+	values := make([]byte, link.Len)
+	link.Download(values)
+	dstValues := hostDst.Host()[0]
+	for i, value := range values {
+		dstValues[i] = float32(value) / 255
+	}
 	data.Copy(dst, hostDst)
 }
 
@@ -203,6 +254,9 @@ func (g *geom) setGeom(s shape) {
 	}
 	if g.FaceBuffer == nil || g.FaceBuffer.IsNil() || g.FaceBuffer.Size() != g.Mesh().Size() {
 		g.FaceBuffer = cuda.NewSlice(6, g.Mesh().Size())
+	}
+	if !geomUsesCutCell(s) {
+		g.ClearLinks()
 	}
 
 	host := data.NewSlice(1, g.Gpu().Size())
@@ -505,6 +559,7 @@ func (g *geom) rebuildFaceBuffer() {
 			}
 		}
 		data.Copy(g.FaceBuffer, host)
+		g.rebuildLinks(host)
 		return
 	}
 
@@ -558,6 +613,90 @@ func (g *geom) rebuildFaceBuffer() {
 	}
 
 	data.Copy(g.FaceBuffer, host)
+	g.rebuildLinks(host)
+}
+
+func quantizeLinkFraction(v float32) byte {
+	switch {
+	case v <= 0:
+		return 0
+	case v >= 1:
+		return 255
+	default:
+		return byte(v*255 + 0.5)
+	}
+}
+
+func minFloat32(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (g *geom) ensureLinkBuffer(dst **cuda.Bytes, size int) {
+	if *dst != nil && (*dst).Len == size {
+		return
+	}
+	if *dst != nil {
+		(*dst).Free()
+	}
+	*dst = cuda.NewBytes(size)
+}
+
+func (g *geom) rebuildLinks(faceHost *data.Slice) {
+	if !g.usesCutCell() {
+		g.ClearLinks()
+		return
+	}
+
+	n := g.Mesh().Size()
+	total := n[X] * n[Y] * n[Z]
+	g.ensureLinkBuffer(&g.LinkX, total)
+	g.ensureLinkBuffer(&g.LinkY, total)
+	g.ensureLinkBuffer(&g.LinkZ, total)
+
+	face := faceHost.Host()
+	linkX := make([]byte, total)
+	linkY := make([]byte, total)
+	linkZ := make([]byte, total)
+	pbc := g.Mesh().PBC()
+
+	for iz := 0; iz < n[Z]; iz++ {
+		for iy := 0; iy < n[Y]; iy++ {
+			for ix := 0; ix < n[X]; ix++ {
+				idx := data.Index(n, ix, iy, iz)
+
+				if ix+1 < n[X] {
+					right := data.Index(n, ix+1, iy, iz)
+					linkX[idx] = quantizeLinkFraction(minFloat32(face[1][idx], face[0][right]))
+				} else if pbc[X] != 0 {
+					wrap := data.Index(n, 0, iy, iz)
+					linkX[idx] = quantizeLinkFraction(minFloat32(face[1][idx], face[0][wrap]))
+				}
+
+				if iy+1 < n[Y] {
+					front := data.Index(n, ix, iy+1, iz)
+					linkY[idx] = quantizeLinkFraction(minFloat32(face[3][idx], face[2][front]))
+				} else if pbc[Y] != 0 {
+					wrap := data.Index(n, ix, 0, iz)
+					linkY[idx] = quantizeLinkFraction(minFloat32(face[3][idx], face[2][wrap]))
+				}
+
+				if iz+1 < n[Z] {
+					up := data.Index(n, ix, iy, iz+1)
+					linkZ[idx] = quantizeLinkFraction(minFloat32(face[5][idx], face[4][up]))
+				} else if pbc[Z] != 0 {
+					wrap := data.Index(n, ix, iy, 0)
+					linkZ[idx] = quantizeLinkFraction(minFloat32(face[5][idx], face[4][wrap]))
+				}
+			}
+		}
+	}
+
+	g.LinkX.Upload(linkX)
+	g.LinkY.Upload(linkY)
+	g.LinkZ.Upload(linkZ)
 }
 
 func (g *geom) GetCell(ix, iy, iz int) float64 {
@@ -566,7 +705,11 @@ func (g *geom) GetCell(ix, iy, iz int) float64 {
 
 func (g *geom) shift(dx int) {
 	// empty mask, nothing to do
-	if g == nil || g.Buffer.IsNil() {
+	if g == nil || g.Buffer == nil || g.Buffer.IsNil() {
+		return
+	}
+	if g.HasLinks() {
+		g.setGeom(g.shape)
 		return
 	}
 
@@ -599,7 +742,11 @@ func (g *geom) shift(dx int) {
 
 func (g *geom) shiftY(dy int) {
 	// empty mask, nothing to do
-	if g == nil || g.Buffer.IsNil() {
+	if g == nil || g.Buffer == nil || g.Buffer.IsNil() {
+		return
+	}
+	if g.HasLinks() {
+		g.setGeom(g.shape)
 		return
 	}
 
