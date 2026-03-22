@@ -25,12 +25,12 @@
 
 	const S = 30;
 	const faces: FaceDef[] = [
-		{ cssTransform: `translateZ(${S}px)`, zones: buildZones([0,0,1],[0,1,0],[1,0,0],'Front') },
-		{ cssTransform: `rotateY(180deg) translateZ(${S}px)`, zones: buildZones([0,0,-1],[0,1,0],[-1,0,0],'Back') },
-		{ cssTransform: `rotateY(90deg) translateZ(${S}px)`, zones: buildZones([1,0,0],[0,1,0],[0,0,-1],'Right') },
-		{ cssTransform: `rotateY(-90deg) translateZ(${S}px)`, zones: buildZones([-1,0,0],[0,1,0],[0,0,1],'Left') },
-		{ cssTransform: `rotateX(90deg) translateZ(${S}px)`, zones: buildZones([0,1,0],[0,0,1],[1,0,0],'Top') },
-		{ cssTransform: `rotateX(-90deg) translateZ(${S}px)`, zones: buildZones([0,-1,0],[0,0,-1],[1,0,0],'Bot') },
+		{ cssTransform: `translateZ(${S}px)`, zones: buildZones([0,1,0],[0,0,1],[1,0,0],'+Y') },
+		{ cssTransform: `rotateY(180deg) translateZ(${S}px)`, zones: buildZones([0,-1,0],[0,0,1],[-1,0,0],'-Y') },
+		{ cssTransform: `rotateY(90deg) translateZ(${S}px)`, zones: buildZones([1,0,0],[0,0,1],[0,-1,0],'+X') },
+		{ cssTransform: `rotateY(-90deg) translateZ(${S}px)`, zones: buildZones([-1,0,0],[0,0,1],[0,1,0],'-X') },
+		{ cssTransform: `rotateX(90deg) translateZ(${S}px)`, zones: buildZones([0,0,1],[0,1,0],[1,0,0],'+Z') },
+		{ cssTransform: `rotateX(-90deg) translateZ(${S}px)`, zones: buildZones([0,0,-1],[0,-1,0],[1,0,0],'-Z') }
 	];
 
 	function buildZones(n: [number,number,number], u: [number,number,number], r: [number,number,number], label: string): FaceZone[][] {
@@ -108,14 +108,14 @@
 			<div class="ag-shaft ag-shaft--x" style="transform: rotateZ(-90deg) translateY(-18px)"></div>
 			<div class="ag-tip ag-tip--x" style="transform: translateX(26px)"></div>
 			<div class="ag-lbl ag-lbl--x" style="transform: translateX(36px)">X</div>
-			<!-- Y axis (green) — points along +Y = up in Three.js = screen up -->
-			<div class="ag-shaft ag-shaft--y" style="transform: translateY(-18px)"></div>
-			<div class="ag-tip ag-tip--y" style="transform: translateY(-26px)"></div>
-			<div class="ag-lbl ag-lbl--y" style="transform: translateY(-36px)">Y</div>
-			<!-- Z axis (blue) — points along +Z = toward viewer -->
-			<div class="ag-shaft ag-shaft--z" style="transform: rotateX(90deg) translateY(-18px)"></div>
-			<div class="ag-tip ag-tip--z" style="transform: translateZ(26px)"></div>
-			<div class="ag-lbl ag-lbl--z" style="transform: translateZ(36px)">Z</div>
+			<!-- Z axis (blue) — points along +Z = screen up -->
+			<div class="ag-shaft ag-shaft--z" style="transform: translateY(-18px)"></div>
+			<div class="ag-tip ag-tip--z" style="transform: translateY(-26px)"></div>
+			<div class="ag-lbl ag-lbl--z" style="transform: translateY(-36px)">Z</div>
+			<!-- Y axis (green) — points along +Y = toward viewer -->
+			<div class="ag-shaft ag-shaft--y" style="transform: rotateX(90deg) translateY(-18px)"></div>
+			<div class="ag-tip ag-tip--y" style="transform: translateZ(26px) rotateX(90deg)"></div>
+			<div class="ag-lbl ag-lbl--y" style="transform: translateZ(36px)">Y</div>
 		</div>
 	</div>
 {/if}

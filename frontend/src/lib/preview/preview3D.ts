@@ -80,6 +80,35 @@ const _tempVec = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
 const _color = new THREE.Color();
 
+function getWorldExtents() {
+	const xSize = getPreviewWidthCells();
+	const ySize = getPreviewHeightCells();
+	const depthCells = getDepthCells();
+	return {
+		xSize,
+		ySize,
+		depthCells,
+		centerX: xSize / 2,
+		centerY: depthCells / 2,
+		centerZ: ySize / 2,
+		orbitDistance: Math.max(xSize, ySize, depthCells) * 1.5
+	};
+}
+
+function setWorldPositionFromSimulation(
+	target: THREE.Vector3,
+	position: { x: number; y: number; z: number }
+) {
+	return target.set(position.x, position.z, position.y);
+}
+
+function setWorldDirectionFromSimulation(
+	target: THREE.Vector3,
+	direction: { x: number; y: number; z: number }
+) {
+	return target.set(direction.x, direction.z, direction.y);
+}
+
 export const brightness = writable<number>(loadBrightness());
 export const qualityLevel = writable<QualityLevel>(loadQuality());
 export const renderMode = writable<Preview3DRenderMode>(loadRenderMode());
@@ -338,10 +367,8 @@ function createCamera() {
 	const width = container?.offsetWidth || 1;
 	const height = container?.offsetHeight || 1;
 	const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-	const depthCells = getDepthCells();
-	const xSize = getPreviewWidthCells();
-	const ySize = getPreviewHeightCells();
-	camera.position.set(xSize / 2, ySize / 2, Math.max(xSize, ySize, depthCells) * 1.5);
+	const { centerX, centerY, centerZ, orbitDistance } = getWorldExtents();
+	camera.position.set(centerX, centerY, centerZ + orbitDistance);
 	return camera;
 }
 
@@ -369,12 +396,12 @@ function createRenderer() {
 
 function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) {
 	const controls = new TrackballControls(camera, renderer.domElement);
-	const depthCells = getDepthCells();
+	const { centerX, centerY, centerZ } = getWorldExtents();
 
 	controls.dynamicDampingFactor = 1;
 	controls.panSpeed = 0.8;
 	controls.rotateSpeed = 1;
-	controls.target.set(getPreviewWidthCells() / 2, getPreviewHeightCells() / 2, depthCells / 2);
+	controls.target.set(centerX, centerY, centerZ);
 	controls.update();
 
 	return controls;
@@ -485,7 +512,7 @@ function updateGlyphMesh(mesh: THREE.InstancedMesh) {
 		const position = positions[i];
 		const isVisible = vector.x !== 0 || vector.y !== 0 || vector.z !== 0;
 
-		_dummy.position.set(position.x, position.y, position.z);
+		setWorldPositionFromSimulation(_dummy.position, position);
 
 		if (!isVisible) {
 			_dummy.scale.set(0, 0, 0);
@@ -493,7 +520,7 @@ function updateGlyphMesh(mesh: THREE.InstancedMesh) {
 		} else {
 			visibleCount += 1;
 			_dummy.scale.set(1, 1, 1);
-			_tempVec.set(vector.x, vector.y, vector.z).normalize();
+			setWorldDirectionFromSimulation(_tempVec, vector).normalize();
 			_dummy.quaternion.setFromUnitVectors(_defaultUp, _tempVec);
 		}
 
@@ -542,23 +569,23 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 				: Math.abs(componentValue(vector, colorMode));
 		const isVisible = isSampledPosition(position) && metric >= threshold;
 
-		let pz = position.z;
-		let voxelDepth = depthScale;
+		let worldY = position.z;
+		let voxelHeight = depthScale;
 		if (topo) {
 			const topoDisplacement = componentValue(vector, topoComp) * topoMul;
 			const topography = resolveVoxelTopography(position.z, depthScale, topoDisplacement);
-			pz = topography.centerZ;
-			voxelDepth = topography.depthScale;
+			worldY = topography.centerZ;
+			voxelHeight = topography.depthScale;
 		}
 
-		_dummy.position.set(position.x, position.y, pz);
+		_dummy.position.set(position.x, worldY, position.y);
 		_dummy.quaternion.identity();
 
 		if (!isVisible) {
 			_dummy.scale.set(0, 0, 0);
 		} else {
 			visibleCount += 1;
-			_dummy.scale.set(baseScale, baseScale, voxelDepth);
+			_dummy.scale.set(baseScale, voxelHeight, baseScale);
 		}
 
 		applyVoxelColor(vector, _color);
@@ -813,20 +840,17 @@ export function setTopoMultiplier(value: number) {
 }
 
 export function resetCamera() {
-	const depthCells = getDepthCells();
-	const xSize = getPreviewWidthCells();
-	const ySize = getPreviewHeightCells();
-	const positionZ = Math.max(xSize, ySize, depthCells) * 1.5;
+	const { centerX, centerY, centerZ, orbitDistance } = getWorldExtents();
 	const display = get(threeDPreview);
 
 	if (!display) {
 		return;
 	}
 
-	display.camera.position.set(xSize / 2, ySize / 2, positionZ);
+	display.camera.position.set(centerX, centerY, centerZ + orbitDistance);
 	display.camera.up.set(0, 1, 0);
-	display.camera.lookAt(xSize / 2, ySize / 2, depthCells / 2);
-	display.controls.target.set(xSize / 2, ySize / 2, depthCells / 2);
+	display.camera.lookAt(centerX, centerY, centerZ);
+	display.controls.target.set(centerX, centerY, centerZ);
 	display.controls.update();
 }
 
@@ -836,32 +860,31 @@ export function setCameraViewDirection(dx: number, dy: number, dz: number) {
 
 	const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
 	if (len === 0) return;
-	dx /= len;
-	dy /= len;
-	dz /= len;
 
-	const depthCells = getDepthCells();
-	const xSize = getPreviewWidthCells();
-	const ySize = getPreviewHeightCells();
-	const dist = Math.max(xSize, ySize, depthCells) * 1.5;
-
-	const cx = xSize / 2,
-		cy = ySize / 2,
-		cz = depthCells / 2;
+	const worldDir = setWorldDirectionFromSimulation(_tempVec, {
+		x: dx / len,
+		y: dy / len,
+		z: dz / len
+	}).normalize();
+	const { centerX, centerY, centerZ, orbitDistance } = getWorldExtents();
 
 	let ux = 0,
 		uy = 1,
 		uz = 0;
-	if (Math.abs(dy) > 0.9) {
+	if (Math.abs(worldDir.y) > 0.9) {
 		ux = 0;
 		uy = 0;
-		uz = dy > 0 ? -1 : 1;
+		uz = worldDir.y > 0 ? -1 : 1;
 	}
 
-	display.camera.position.set(cx + dx * dist, cy + dy * dist, cz + dz * dist);
+	display.camera.position.set(
+		centerX + worldDir.x * orbitDistance,
+		centerY + worldDir.y * orbitDistance,
+		centerZ + worldDir.z * orbitDistance
+	);
 	display.camera.up.set(ux, uy, uz);
-	display.camera.lookAt(cx, cy, cz);
-	display.controls.target.set(cx, cy, cz);
+	display.camera.lookAt(centerX, centerY, centerZ);
+	display.controls.target.set(centerX, centerY, centerZ);
 	display.controls.update();
 }
 
