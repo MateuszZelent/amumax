@@ -254,6 +254,7 @@ func setGeomFaceAxis(dst *data.Slice, negativeComp, positiveComp int) {
 func (g *geom) setGeom(s shape) {
 	setBusy(true)
 	defer setBusy(false)
+	invalidateDemagBoundaryPlan()
 
 	if s.isNil() {
 		// TODO: would be nice not to save volume if entirely filled

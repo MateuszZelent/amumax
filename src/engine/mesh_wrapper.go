@@ -13,6 +13,7 @@ func CreateMesh() {
 	Mesh.Create()
 	NormMag.Alloc()
 	Regions.Alloc()
+	invalidateDemagBoundaryPlan()
 }
 
 func SmoothMesh(smoothx, smoothy, smoothz bool) {
@@ -21,6 +22,7 @@ func SmoothMesh(smoothx, smoothy, smoothz bool) {
 	Mesh.SmoothMesh(smoothx, smoothy, smoothz)
 	NormMag.Alloc()
 	Regions.Alloc()
+	invalidateDemagBoundaryPlan()
 	EngineState.Metadata.AddMesh(&Mesh)
 }
 
@@ -31,6 +33,7 @@ func ReCreateMesh(Nx, Ny, Nz int, dx, dy, dz float64, PBCx, PBCy, PBCz int) {
 	Mesh.ReCreate(Nx, Ny, Nz, dx, dy, dz, PBCx, PBCy, PBCz)
 	NormMag.Alloc()
 	Regions.Alloc()
+	invalidateDemagBoundaryPlan()
 	kernel := mag.DemagKernel(Mesh.Size(), Mesh.PBC(), Mesh.CellSize(), DemagAccuracy, CacheDir, HideProgresBar)
 	conv = cuda.NewDemag(Mesh.Size(), Mesh.PBC(), kernel, SelfTest)
 }
