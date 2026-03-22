@@ -21,10 +21,7 @@
 			return;
 		}
 		await tick();
-		const isNearBottom = codeDiv.scrollTop + codeDiv.clientHeight >= codeDiv.scrollHeight - 96;
-		if (isNearBottom) {
-			codeDiv.scrollTop = codeDiv.scrollHeight;
-		}
+		codeDiv.scrollTop = codeDiv.scrollHeight;
 	}
 
 	function submitCommand() {

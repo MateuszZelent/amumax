@@ -1,6 +1,4 @@
-import { previewState } from '$api/incoming/preview';
 import { post } from '$api/post';
-import { get } from 'svelte/store';
 
 export function postComponent(component: string) {
 	post('preview/component', { component });
@@ -27,4 +25,8 @@ export function postRefresh() {
 
 export function postAllLayers(allLayers: boolean) {
 	post('preview/allLayers', { allLayers });
+}
+
+export function postAutoScaleEnabled(autoScaleEnabled: boolean) {
+	post('preview/autoScaleEnabled', { autoScaleEnabled });
 }

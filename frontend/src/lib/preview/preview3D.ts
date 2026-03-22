@@ -77,6 +77,7 @@ const COMPONENT_POSITIVE = new THREE.Color('#cf6256');
 const _dummy = new THREE.Object3D();
 const _defaultUp = new THREE.Vector3(0, 1, 0);
 const _tempVec = new THREE.Vector3();
+const _camDir = new THREE.Vector3();
 const _color = new THREE.Color();
 
 export const brightness = writable<number>(loadBrightness());
@@ -205,6 +206,16 @@ function getDepthCells() {
 	return get(previewState).allLayers ? Math.max(get(meshState).Nz, 1) : 1;
 }
 
+function getPreviewWidthCells() {
+	const state = get(previewState);
+	return Math.max(state.appliedXChosenSize || state.xChosenSize, 1);
+}
+
+function getPreviewHeightCells() {
+	const state = get(previewState);
+	return Math.max(state.appliedYChosenSize || state.yChosenSize, 1);
+}
+
 function componentValue(
 	vector: { x: number; y: number; z: number },
 	mode: Exclude<VoxelColorMode, 'orientation'>
@@ -225,7 +236,7 @@ function vectorMagnitude(vector: { x: number; y: number; z: number }) {
 
 function magnetizationHSL(vx: number, vy: number, vz: number, color: THREE.Color) {
 	const hue = Math.atan2(vy, vx) / (Math.PI * 2);
-	const saturation = Math.min(1, Math.sqrt(vx * vx + vy * vy + vz * vz));
+	const saturation = Math.min(1, Math.sqrt(vx * vx + vy * vy));
 	const lightness = THREE.MathUtils.clamp((vz + 1) / 2, 0.18, 0.84);
 	color.setHSL((hue + 1) % 1, saturation, lightness);
 }
@@ -327,8 +338,8 @@ function createCamera() {
 	const height = container?.offsetHeight || 1;
 	const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
 	const depthCells = getDepthCells();
-	const xSize = get(previewState).xChosenSize;
-	const ySize = get(previewState).yChosenSize;
+	const xSize = getPreviewWidthCells();
+	const ySize = getPreviewHeightCells();
 	camera.position.set(xSize / 2, ySize / 2, Math.max(xSize, ySize, depthCells) * 1.5);
 	return camera;
 }
@@ -362,11 +373,7 @@ function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 	controls.dynamicDampingFactor = 1;
 	controls.panSpeed = 0.8;
 	controls.rotateSpeed = 1;
-	controls.target.set(
-		get(previewState).xChosenSize / 2,
-		get(previewState).yChosenSize / 2,
-		depthCells / 2
-	);
+	controls.target.set(getPreviewWidthCells() / 2, getPreviewHeightCells() / 2, depthCells / 2);
 	controls.update();
 
 	return controls;
@@ -795,8 +802,8 @@ export function setTopoMultiplier(value: number) {
 
 export function resetCamera() {
 	const depthCells = getDepthCells();
-	const xSize = get(previewState).xChosenSize;
-	const ySize = get(previewState).yChosenSize;
+	const xSize = getPreviewWidthCells();
+	const ySize = getPreviewHeightCells();
 	const positionZ = Math.max(xSize, ySize, depthCells) * 1.5;
 	const display = get(threeDPreview);
 
@@ -810,3 +817,77 @@ export function resetCamera() {
 	display.controls.target.set(xSize / 2, ySize / 2, depthCells / 2);
 	display.controls.update();
 }
+
+export function setCameraViewDirection(dx: number, dy: number, dz: number) {
+	const display = get(threeDPreview);
+	if (!display) return;
+
+	const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+	if (len === 0) return;
+	dx /= len; dy /= len; dz /= len;
+
+	const depthCells = getDepthCells();
+	const xSize = getPreviewWidthCells();
+	const ySize = getPreviewHeightCells();
+	const dist = Math.max(xSize, ySize, depthCells) * 1.5;
+
+	const cx = xSize / 2, cy = ySize / 2, cz = depthCells / 2;
+
+	let ux = 0, uy = 1, uz = 0;
+	if (Math.abs(dy) > 0.9) {
+		ux = 0; uy = 0; uz = dy > 0 ? -1 : 1;
+	}
+
+	display.camera.position.set(cx + dx * dist, cy + dy * dist, cz + dz * dist);
+	display.camera.up.set(ux, uy, uz);
+	display.camera.lookAt(cx, cy, cz);
+	display.controls.target.set(cx, cy, cz);
+	display.controls.update();
+}
+
+export function orbitCamera(deltaX: number, deltaY: number) {
+	const display = get(threeDPreview);
+	if (!display) return;
+
+	const camera = display.camera;
+	const target = display.controls.target;
+	const offset = new THREE.Vector3().subVectors(camera.position, target);
+	const radius = offset.length();
+
+	let theta = Math.atan2(offset.x, offset.z);
+	let phi = Math.asin(THREE.MathUtils.clamp(offset.y / radius, -1, 1));
+
+	theta -= deltaX * 0.01;
+	phi += deltaY * 0.01;
+	phi = THREE.MathUtils.clamp(phi, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+
+	offset.x = radius * Math.cos(phi) * Math.sin(theta);
+	offset.y = radius * Math.sin(phi);
+	offset.z = radius * Math.cos(phi) * Math.cos(theta);
+
+	camera.position.copy(target).add(offset);
+	camera.up.set(0, 1, 0);
+	camera.lookAt(target);
+	display.controls.update();
+}
+
+export function getCameraMatrix(): string {
+	const display = get(threeDPreview);
+	if (!display) return 'none';
+
+	const cam = display.camera;
+	const target = display.controls.target;
+
+	// Direction from target toward camera (NOT camera toward target)
+	const dir = _camDir.subVectors(cam.position, target).normalize();
+
+	// Spherical angles: theta = horizontal (around Y), phi = vertical
+	const theta = Math.atan2(dir.x, dir.z); // 0 when camera at +Z (front)
+	const phi = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1));
+
+	// CSS rotations: rotate the cube so the face the camera sees is toward the viewer
+	// rotateY(-theta): horizontal orbit
+	// rotateX(phi): vertical tilt (positive phi = camera above = tilt cube forward)
+	return `rotateX(${phi}rad) rotateY(${-theta}rad)`;
+}
+

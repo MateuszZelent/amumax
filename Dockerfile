@@ -1,10 +1,10 @@
-# Legacy ubuntu version to be compatible with PCSS
-FROM docker.io/nvidia/cuda:11.0.3-devel-ubuntu16.04
+# CUDA 12.4 for H100 (sm_90) support — cuRAND requires matching architecture kernels
+FROM docker.io/nvidia/cuda:12.4.0-devel-ubuntu22.04
 RUN apt-get update
 RUN apt-get install -y wget git
 
 # Installing go
-ENV GO_VERSION=1.22.5
+ENV GO_VERSION=1.23.6
 RUN wget https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz
 RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go$GO_VERSION.linux-amd64.tar.gz
 RUN rm go$GO_VERSION.linux-amd64.tar.gz

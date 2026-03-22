@@ -5,6 +5,7 @@
 	import {
 		postAllLayers,
 		postComponent,
+		postAutoScaleEnabled,
 		postLayer,
 		postQuantity,
 		postXChosenSize,
@@ -17,6 +18,7 @@
 	import SelectField from '$lib/ui/SelectField.svelte';
 	import SegmentedControl from '$lib/ui/SegmentedControl.svelte';
 	import StatusBadge from '$lib/ui/StatusBadge.svelte';
+	import Toggle from '$lib/ui/Toggle.svelte';
 	import { panelPreferences, setPreferredPreviewMode } from '$lib/ui/preferences';
 	import type { SelectOption } from '$lib/ui/SelectField.svelte';
 	import type { ViewportMode } from '$lib/ui/types';
@@ -35,6 +37,7 @@
 		type QualityLevel
 	} from './preview3D';
 	import Toolbar3D from './inputs/Toolbar3D.svelte';
+	import ViewCube from './ViewCube.svelte';
 	import { quantities } from './inputs/quantities';
 
 	let viewMode = $state<ViewportMode>('inline');
@@ -51,11 +54,14 @@
 
 	const quantityOptions = $derived(
 		Object.entries(quantities).flatMap(([group, items]) =>
-			items.map((item) => ({
-				value: item,
-				label: item,
-				group: group === 'Common' ? undefined : group
-			} satisfies SelectOption))
+			items.map(
+				(item) =>
+					({
+						value: item,
+						label: item,
+						group: group === 'Common' ? undefined : group
+					}) satisfies SelectOption
+			)
 		)
 	);
 
@@ -81,9 +87,12 @@
 	);
 
 	const hasData = $derived(
-		($previewState.scalarField?.length ?? 0) > 0 || ($previewState.vectorFieldPositions?.length ?? 0) > 0
+		($previewState.scalarField?.length ?? 0) > 0 ||
+			($previewState.vectorFieldPositions?.length ?? 0) > 0
 	);
-	const previewTone = $derived(!$connected ? 'warn' : hasData ? 'info' : 'default');
+	const previewTone = $derived(
+		!$connected ? 'warn' : $previewState.autoDownscaled ? 'warn' : hasData ? 'info' : 'default'
+	);
 
 	$effect(() => {
 		viewMode = $panelPreferences.preferredPreviewMode;
@@ -207,7 +216,10 @@
 	tone={previewTone}
 >
 	{#snippet actions()}
-		<StatusBadge label={$previewState.type || 'Awaiting data'} tone={hasData ? 'info' : 'default'} />
+		<StatusBadge
+			label={$previewState.type || 'Awaiting data'}
+			tone={hasData ? 'info' : 'default'}
+		/>
 		<div class="preview-mode-switcher">
 			<Button
 				size="sm"
@@ -266,6 +278,11 @@
 			/>
 		{/if}
 		<div class="preview-toolbar__stack">
+			<Toggle
+				label="Auto-scale preview"
+				checked={$previewState.autoScaleEnabled}
+				onchange={postAutoScaleEnabled}
+			/>
 			{#if $meshState.Nz > 1}
 				<Slider
 					label="Layer"
@@ -310,24 +327,38 @@
 		{/if}
 	</div>
 
+	{#if $previewState.autoDownscaled && $previewState.autoDownscaleMessage}
+		<div class="preview-notice">
+			<StatusBadge label="Auto-scaled" tone="warn" />
+			<p>{$previewState.autoDownscaleMessage}</p>
+		</div>
+	{/if}
+
 	<div
 		class="preview-wrapper"
 		class:preview-wrapper--popout={viewMode === 'popout'}
 		class:preview-wrapper--fullscreen={viewMode === 'fullscreen'}
-		style={viewMode === 'popout' ? `left:${popX}px;top:${popY}px;width:${popW}px;height:${popH}px;` : ''}
+		style={viewMode === 'popout'
+			? `left:${popX}px;top:${popY}px;width:${popW}px;height:${popH}px;`
+			: ''}
 		bind:this={previewWrapper}
 	>
 		{#if viewMode === 'popout'}
 			<div class="preview-wrapper__titlebar" role="presentation" onmousedown={startDrag}>
 				<span>Floating preview</span>
 				<div class="preview-wrapper__title-actions">
-					<Button size="sm" variant="ghost" tone="info" onclick={() => setMode('inline')}>Dock</Button>
-					<Button size="sm" variant="ghost" tone="info" onclick={() => setMode('fullscreen')}>Fullscreen</Button>
+					<Button size="sm" variant="ghost" tone="info" onclick={() => setMode('inline')}
+						>Dock</Button
+					>
+					<Button size="sm" variant="ghost" tone="info" onclick={() => setMode('fullscreen')}
+						>Fullscreen</Button
+					>
 				</div>
 			</div>
 		{/if}
 
 		<Toolbar3D />
+		<ViewCube />
 
 		{#if !$connected || !hasData}
 			<div class="preview-wrapper__empty">
@@ -374,14 +405,28 @@
 		gap: 0.75rem;
 	}
 
+	.preview-notice {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.8rem;
+		padding: 0.8rem 0.95rem;
+		border-radius: var(--radius-md);
+		border: 1px solid rgba(242, 180, 90, 0.28);
+		background: rgba(242, 180, 90, 0.08);
+	}
+
+	.preview-notice p {
+		margin: 0;
+		font-size: 0.88rem;
+		color: var(--text-2);
+	}
+
 	.preview-wrapper {
 		position: relative;
 		min-height: var(--canvas-min-height);
 		border-radius: var(--radius-lg);
 		border: 1px solid var(--border-subtle);
-		background:
-			linear-gradient(180deg, rgba(6, 10, 18, 0.98), rgba(7, 10, 17, 0.98)),
-			#050811;
+		background: linear-gradient(180deg, rgba(6, 10, 18, 0.98), rgba(7, 10, 17, 0.98)), #050811;
 		overflow: hidden;
 	}
 

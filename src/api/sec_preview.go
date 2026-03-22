@@ -35,17 +35,18 @@ type PreviewState struct {
 	Refresh              bool         `msgpack:"refresh"`
 	NComp                int          `msgpack:"nComp"`
 
-	MaxPoints             int    `msgpack:"maxPoints"`
-	DataPointsCount       int    `msgpack:"dataPointsCount"`
-	XPossibleSizes        []int  `msgpack:"xPossibleSizes"`
-	YPossibleSizes        []int  `msgpack:"yPossibleSizes"`
-	XChosenSize           int    `msgpack:"xChosenSize"`
-	YChosenSize           int    `msgpack:"yChosenSize"`
-	AppliedXChosenSize    int    `msgpack:"appliedXChosenSize"`
-	AppliedYChosenSize    int    `msgpack:"appliedYChosenSize"`
-	AppliedLayerStride    int    `msgpack:"appliedLayerStride"`
-	AutoDownscaled        bool   `msgpack:"autoDownscaled"`
-	AutoDownscaleMessage  string `msgpack:"autoDownscaleMessage"`
+	MaxPoints            int    `msgpack:"maxPoints"`
+	DataPointsCount      int    `msgpack:"dataPointsCount"`
+	XPossibleSizes       []int  `msgpack:"xPossibleSizes"`
+	YPossibleSizes       []int  `msgpack:"yPossibleSizes"`
+	XChosenSize          int    `msgpack:"xChosenSize"`
+	YChosenSize          int    `msgpack:"yChosenSize"`
+	AppliedXChosenSize   int    `msgpack:"appliedXChosenSize"`
+	AppliedYChosenSize   int    `msgpack:"appliedYChosenSize"`
+	AppliedLayerStride   int    `msgpack:"appliedLayerStride"`
+	AutoScaleEnabled     bool   `msgpack:"autoScaleEnabled"`
+	AutoDownscaled       bool   `msgpack:"autoDownscaled"`
+	AutoDownscaleMessage string `msgpack:"autoDownscaleMessage"`
 }
 
 type Vector3f struct {
@@ -75,6 +76,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		Max:                  0,
 		Refresh:              true,
 		NComp:                3,
+		AutoScaleEnabled:     true,
 		DataPointsCount:      0,
 		XPossibleSizes:       nil,
 		YPossibleSizes:       nil,
@@ -95,6 +97,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 	e.POST("/api/preview/XChosenSize", previewState.postXChosenSize)
 	e.POST("/api/preview/YChosenSize", previewState.postYChosenSize)
 	e.POST("/api/preview/allLayers", previewState.postAllLayers)
+	e.POST("/api/preview/autoScaleEnabled", previewState.postAutoScaleEnabled)
 
 	return previewState
 }
@@ -116,16 +119,16 @@ func (s *PreviewState) Update() {
 }
 
 type previewSizing struct {
-	RequestedX         int
-	RequestedY         int
-	AppliedX           int
-	AppliedY           int
-	RequestedDepth     int
-	AppliedDepth       int
-	LayerStride        int
-	RequestedPoints    int
-	AppliedPoints      int
-	AutoDownscaled     bool
+	RequestedX      int
+	RequestedY      int
+	AppliedX        int
+	AppliedY        int
+	RequestedDepth  int
+	AppliedDepth    int
+	LayerStride     int
+	RequestedPoints int
+	AppliedPoints   int
+	AutoDownscaled  bool
 }
 
 func (s *PreviewState) UpdateQuantityBuffer() {
@@ -292,7 +295,7 @@ func (s *PreviewState) resolvePreviewSizing(depthLayers int) previewSizing {
 	sizing.RequestedPoints = sizing.RequestedX * sizing.RequestedY * sizing.RequestedDepth
 
 	maxPoints := maxInt(s.MaxPoints, 8)
-	if sizing.RequestedPoints <= maxPoints {
+	if !s.AutoScaleEnabled || sizing.RequestedPoints <= maxPoints {
 		sizing.AppliedPoints = sizing.RequestedPoints
 		return sizing
 	}
@@ -870,6 +873,21 @@ func (s *PreviewState) postAllLayers(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Invalid request payload"})
 	}
 	s.AllLayers = req.AllLayers
+	s.Refresh = true
+	s.ws.broadcastEngineState()
+	return c.JSON(http.StatusOK, nil)
+}
+
+func (s *PreviewState) postAutoScaleEnabled(c echo.Context) error {
+	type Request struct {
+		AutoScaleEnabled bool `msgpack:"autoScaleEnabled"`
+	}
+	req := new(Request)
+	if err := c.Bind(req); err != nil {
+		log.Log.Err("%v", err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Invalid request payload"})
+	}
+	s.AutoScaleEnabled = req.AutoScaleEnabled
 	s.Refresh = true
 	s.ws.broadcastEngineState()
 	return c.JSON(http.StatusOK, nil)

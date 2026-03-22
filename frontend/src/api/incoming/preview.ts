@@ -20,10 +20,16 @@ export interface Preview {
 
 	maxPoints: number;
 	dataPointsCount: number;
-	xPossibleSizes: number[]
-	yPossibleSizes: number[]
-	xChosenSize: number
-	yChosenSize: number
+	xPossibleSizes: number[];
+	yPossibleSizes: number[];
+	xChosenSize: number;
+	yChosenSize: number;
+	appliedXChosenSize: number;
+	appliedYChosenSize: number;
+	appliedLayerStride: number;
+	autoScaleEnabled: boolean;
+	autoDownscaled: boolean;
+	autoDownscaleMessage: string;
 }
 
 export const previewState = writable<Preview>({
@@ -45,5 +51,11 @@ export const previewState = writable<Preview>({
 	xPossibleSizes: [],
 	yPossibleSizes: [],
 	xChosenSize: 0,
-	yChosenSize: 0
+	yChosenSize: 0,
+	appliedXChosenSize: 0,
+	appliedYChosenSize: 0,
+	appliedLayerStride: 1,
+	autoScaleEnabled: true,
+	autoDownscaled: false,
+	autoDownscaleMessage: ''
 });

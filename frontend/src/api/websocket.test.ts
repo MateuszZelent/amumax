@@ -78,7 +78,8 @@ function resetStores() {
 		ymin: 0,
 		ymax: 0,
 		maxPoints: 0,
-		step: 0
+		step: 0,
+		corePos: null
 	});
 	previewState.set({
 		quantity: '',
@@ -99,7 +100,13 @@ function resetStores() {
 		xPossibleSizes: [],
 		yPossibleSizes: [],
 		xChosenSize: 0,
-		yChosenSize: 0
+		yChosenSize: 0,
+		appliedXChosenSize: 0,
+		appliedYChosenSize: 0,
+		appliedLayerStride: 1,
+		autoScaleEnabled: true,
+		autoDownscaled: false,
+		autoDownscaleMessage: ''
 	});
 	metricsState.set({
 		pid: 0,
@@ -127,7 +134,20 @@ describe('websocket parsing', () => {
 			toArrayBuffer({
 				console: { hist: 'Run()\n' },
 				header: { path: '/tmp/job.mx3', status: 'running', version: '1.2.3' },
-				mesh: { dx: 1, dy: 2, dz: 3, Nx: 10, Ny: 11, Nz: 12, Tx: 4, Ty: 5, Tz: 6, PBCx: 0, PBCy: 1, PBCz: 2 },
+				mesh: {
+					dx: 1,
+					dy: 2,
+					dz: 3,
+					Nx: 10,
+					Ny: 11,
+					Nz: 12,
+					Tx: 4,
+					Ty: 5,
+					Tz: 6,
+					PBCx: 0,
+					PBCy: 1,
+					PBCz: 2
+				},
 				parameters: {
 					regions: [0, 1],
 					selectedRegion: 1,
@@ -136,14 +156,58 @@ describe('websocket parsing', () => {
 						{ name: 'Aex', value: '2e-11', description: 'Exchange', changed: false }
 					]
 				},
-				solver: { type: 'rk45', steps: 12, time: 1e-9, dt: 1e-12, errPerStep: 0.1, maxTorque: 0.2, fixdt: 0, mindt: 0, maxdt: 0, maxerr: 1e-5 },
-				tablePlot: { autoSaveInterval: 1, columns: ['t', 'mx'], xColumn: 't', yColumn: 'mx', xColumnUnit: 's', yColumnUnit: '', data: [], xmin: 0, xmax: 1, ymin: -1, ymax: 1, maxPoints: 100, step: 2 },
-				metrics: { pid: 42, error: '', cpuPercent: 20, cpuPercentTotal: 60, ramPercent: 10, ramPercentTotal: 50, gpuName: 'RTX', gpuUtilizationPercent: 70, gpuUUID: 'gpu-1', gpuTemperature: 60, gpuPowerDraw: 80, gpuPowerLimit: 100, gpuVramUsed: 1024, gpuVramTotal: 8192 }
+				solver: {
+					type: 'rk45',
+					steps: 12,
+					time: 1e-9,
+					dt: 1e-12,
+					errPerStep: 0.1,
+					maxTorque: 0.2,
+					fixdt: 0,
+					mindt: 0,
+					maxdt: 0,
+					maxerr: 1e-5
+				},
+				tablePlot: {
+					autoSaveInterval: 1,
+					columns: ['t', 'mx'],
+					xColumn: 't',
+					yColumn: 'mx',
+					xColumnUnit: 's',
+					yColumnUnit: '',
+					data: [],
+					xmin: 0,
+					xmax: 1,
+					ymin: -1,
+					ymax: 1,
+					maxPoints: 100,
+					step: 2
+				},
+				metrics: {
+					pid: 42,
+					error: '',
+					cpuPercent: 20,
+					cpuPercentTotal: 60,
+					ramPercent: 10,
+					ramPercentTotal: 50,
+					gpuName: 'RTX',
+					gpuUtilizationPercent: 70,
+					gpuUUID: 'gpu-1',
+					gpuTemperature: 60,
+					gpuPowerDraw: 80,
+					gpuPowerLimit: 100,
+					gpuVramUsed: 1024,
+					gpuVramTotal: 8192
+				}
 			})
 		);
 
 		expect(get(consoleState).hist).toContain('Run()');
-		expect(get(headerState)).toMatchObject({ path: '/tmp/job.mx3', status: 'running', version: '1.2.3' });
+		expect(get(headerState)).toMatchObject({
+			path: '/tmp/job.mx3',
+			status: 'running',
+			version: '1.2.3'
+		});
 		expect(get(meshState)).toMatchObject({ Nx: 10, Ny: 11, Nz: 12 });
 		expect(get(parametersState).selectedRegion).toBe(1);
 		expect(get(parametersState).fields[0].name).toBe('Aex');
@@ -173,7 +237,13 @@ describe('websocket parsing', () => {
 				xPossibleSizes: [16, 32],
 				yPossibleSizes: [16, 32],
 				xChosenSize: 32,
-				yChosenSize: 32
+				yChosenSize: 32,
+				appliedXChosenSize: 16,
+				appliedYChosenSize: 16,
+				appliedLayerStride: 1,
+				autoScaleEnabled: true,
+				autoDownscaled: true,
+				autoDownscaleMessage: 'Preview auto-scaled from 32x32 to 16x16 to stay within 128 points'
 			})
 		);
 

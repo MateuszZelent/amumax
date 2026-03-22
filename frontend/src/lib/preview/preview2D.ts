@@ -174,8 +174,8 @@ function buildVisualMap(quantity: string, unit: string, min: number, max: number
 function getAxisMetrics(): AxisMetrics {
 	const ps = get(previewState);
 	const mesh = get(meshState);
-	const xChosenSize = Math.max(ps.xChosenSize, 1);
-	const yChosenSize = Math.max(ps.yChosenSize, 1);
+	const xChosenSize = Math.max(ps.appliedXChosenSize || ps.xChosenSize, 1);
+	const yChosenSize = Math.max(ps.appliedYChosenSize || ps.yChosenSize, 1);
 	const xExtentNm = mesh.dx * 1e9 * mesh.Nx;
 	const yExtentNm = mesh.dy * 1e9 * mesh.Ny;
 
@@ -261,7 +261,10 @@ function init() {
 	// Reuse existing instance if possible — avoids canvas teardown/flicker.
 	if (!chartInstance || chartInstance.isDisposed()) {
 		ensureAmumaxEChartsTheme();
-		chartInstance = initECharts(chartDom, ECHARTS_THEME_NAME, { renderer: 'canvas', useDirtyRect: true });
+		chartInstance = initECharts(chartDom, ECHARTS_THEME_NAME, {
+			renderer: 'canvas',
+			useDirtyRect: true
+		});
 	}
 	resizeECharts();
 	setFullOptions();
@@ -401,19 +404,19 @@ function setFullOptions() {
 				}
 			},
 			visualMap: [visualMap],
-				series: [
-					{
-						name: ps.quantity,
-						type: 'heatmap',
-						selectedMode: false,
-						emphasis: { disabled: true },
-						// Disable progressive chunks to avoid visible left-to-right repainting on each refresh.
-						progressive: 0,
-						progressiveThreshold: Number.MAX_SAFE_INTEGER,
-						animation: false,
-						data: ps.scalarField
-					}
-				],
+			series: [
+				{
+					name: ps.quantity,
+					type: 'heatmap',
+					selectedMode: false,
+					emphasis: { disabled: true },
+					// Disable progressive chunks to avoid visible left-to-right repainting on each refresh.
+					progressive: 0,
+					progressiveThreshold: Number.MAX_SAFE_INTEGER,
+					animation: false,
+					data: ps.scalarField
+				}
+			],
 			grid: {
 				containLabel: true,
 				left: 58,
@@ -456,10 +459,10 @@ function setFullOptions() {
 					}
 				}
 			},
-				animation: false,
-				animationDurationUpdate: 0
-			},
-			{ notMerge: true }
+			animation: false,
+			animationDurationUpdate: 0
+		},
+		{ notMerge: true }
 	);
 }
 
