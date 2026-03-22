@@ -89,7 +89,7 @@ var oerstedkernmul3dMap = map[int]string{
 // oerstedkernmul3d PTX code for various compute capabilities.
 const (
 	oerstedkernmul3dPtx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -125,50 +125,50 @@ const (
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %ctaid.x;
 	mov.u32 	%r9, %tid.x;
-	mad.lo.s32 	%r1, %r7, %r8, %r9;
+	mad.lo.s32 	%r1, %r8, %r7, %r9;
 	mov.u32 	%r10, %ntid.y;
 	mov.u32 	%r11, %ctaid.y;
 	mov.u32 	%r12, %tid.y;
-	mad.lo.s32 	%r2, %r10, %r11, %r12;
+	mad.lo.s32 	%r2, %r11, %r10, %r12;
 	mov.u32 	%r13, %ntid.z;
 	mov.u32 	%r14, %ctaid.z;
 	mov.u32 	%r15, %tid.z;
-	mad.lo.s32 	%r3, %r13, %r14, %r15;
-	setp.ge.s32	%p1, %r2, %r5;
-	setp.ge.s32	%p2, %r1, %r4;
+	mad.lo.s32 	%r3, %r14, %r13, %r15;
+	setp.ge.s32 	%p1, %r1, %r4;
+	setp.ge.s32 	%p2, %r2, %r5;
 	or.pred  	%p3, %p1, %p2;
-	setp.ge.s32	%p4, %r3, %r6;
+	setp.ge.s32 	%p4, %r3, %r6;
 	or.pred  	%p5, %p3, %p4;
-	@%p5 bra 	BB0_2;
+	@%p5 bra 	$L__BB0_2;
 
-	cvta.to.global.u64 	%rd7, %rd6;
-	cvta.to.global.u64 	%rd8, %rd5;
 	mad.lo.s32 	%r16, %r3, %r5, %r2;
 	mad.lo.s32 	%r17, %r16, %r4, %r1;
 	shl.b32 	%r18, %r17, 1;
-	cvta.to.global.u64 	%rd9, %rd1;
-	mul.wide.s32 	%rd10, %r18, 4;
-	add.s64 	%rd11, %rd9, %rd10;
-	cvta.to.global.u64 	%rd12, %rd2;
-	add.s64 	%rd13, %rd12, %rd10;
-	cvta.to.global.u64 	%rd14, %rd3;
-	add.s64 	%rd15, %rd14, %rd10;
-	cvta.to.global.u64 	%rd16, %rd4;
-	add.s64 	%rd17, %rd16, %rd10;
-	add.s64 	%rd18, %rd8, %rd10;
-	add.s64 	%rd19, %rd7, %rd10;
+	cvta.to.global.u64 	%rd7, %rd1;
+	mul.wide.s32 	%rd8, %r18, 4;
+	add.s64 	%rd9, %rd7, %rd8;
+	cvta.to.global.u64 	%rd10, %rd2;
+	add.s64 	%rd11, %rd10, %rd8;
+	cvta.to.global.u64 	%rd12, %rd3;
+	add.s64 	%rd13, %rd12, %rd8;
+	cvta.to.global.u64 	%rd14, %rd4;
+	add.s64 	%rd15, %rd14, %rd8;
+	cvta.to.global.u64 	%rd16, %rd5;
+	add.s64 	%rd17, %rd16, %rd8;
+	cvta.to.global.u64 	%rd18, %rd6;
+	add.s64 	%rd19, %rd18, %rd8;
 	ld.global.nc.f32 	%f1, [%rd19];
-	ld.global.f32 	%f2, [%rd13];
+	ld.global.f32 	%f2, [%rd11];
 	mul.f32 	%f3, %f2, %f1;
 	ld.global.nc.f32 	%f4, [%rd19+4];
-	ld.global.f32 	%f5, [%rd13+4];
+	ld.global.f32 	%f5, [%rd11+4];
 	mul.f32 	%f6, %f5, %f4;
 	sub.f32 	%f7, %f3, %f6;
-	ld.global.nc.f32 	%f8, [%rd18];
-	ld.global.f32 	%f9, [%rd15];
+	ld.global.nc.f32 	%f8, [%rd17];
+	ld.global.f32 	%f9, [%rd13];
 	mul.f32 	%f10, %f9, %f8;
-	ld.global.nc.f32 	%f11, [%rd18+4];
-	ld.global.f32 	%f12, [%rd15+4];
+	ld.global.nc.f32 	%f11, [%rd17+4];
+	ld.global.f32 	%f12, [%rd13+4];
 	mul.f32 	%f13, %f12, %f11;
 	sub.f32 	%f14, %f10, %f13;
 	sub.f32 	%f15, %f7, %f14;
@@ -177,14 +177,14 @@ const (
 	mul.f32 	%f18, %f9, %f11;
 	fma.rn.f32 	%f19, %f12, %f8, %f18;
 	sub.f32 	%f20, %f17, %f19;
-	ld.global.nc.f32 	%f21, [%rd17];
+	ld.global.nc.f32 	%f21, [%rd15];
 	mul.f32 	%f22, %f9, %f21;
-	ld.global.nc.f32 	%f23, [%rd17+4];
+	ld.global.nc.f32 	%f23, [%rd15+4];
 	mul.f32 	%f24, %f12, %f23;
 	sub.f32 	%f25, %f22, %f24;
-	ld.global.f32 	%f26, [%rd11];
+	ld.global.f32 	%f26, [%rd9];
 	mul.f32 	%f27, %f26, %f1;
-	ld.global.f32 	%f28, [%rd11+4];
+	ld.global.f32 	%f28, [%rd9+4];
 	mul.f32 	%f29, %f28, %f4;
 	sub.f32 	%f30, %f27, %f29;
 	sub.f32 	%f31, %f25, %f30;
@@ -205,17 +205,17 @@ const (
 	mul.f32 	%f46, %f2, %f23;
 	fma.rn.f32 	%f47, %f5, %f21, %f46;
 	sub.f32 	%f48, %f45, %f47;
-	st.global.f32 	[%rd11], %f15;
-	st.global.f32 	[%rd11+4], %f20;
-	st.global.f32 	[%rd13], %f31;
-	st.global.f32 	[%rd13+4], %f36;
-	st.global.f32 	[%rd15], %f43;
-	st.global.f32 	[%rd15+4], %f48;
+	st.global.f32 	[%rd9], %f15;
+	st.global.f32 	[%rd9+4], %f20;
+	st.global.f32 	[%rd11], %f31;
+	st.global.f32 	[%rd11+4], %f36;
+	st.global.f32 	[%rd13], %f43;
+	st.global.f32 	[%rd13+4], %f48;
 
-BB0_2:
+$L__BB0_2:
 	ret;
-}
 
+}
 
 `
 	)

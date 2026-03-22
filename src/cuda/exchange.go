@@ -15,7 +15,7 @@ import (
 //
 // see exchange.cu
 
-func AddExchange(B, m *data.Slice, AexRed SymmLUT, Msat MSlice, regions *Bytes, mesh mesh.MeshLike) {
+func AddExchange(B, m *data.Slice, AexRed SymmLUT, Msat MSlice, geom, faces *data.Slice, regions *Bytes, mesh mesh.MeshLike) {
 	c := mesh.CellSize()
 	wx := float32(2 / (c[X] * c[X]))
 	wy := float32(2 / (c[Y] * c[Y]))
@@ -25,7 +25,8 @@ func AddExchange(B, m *data.Slice, AexRed SymmLUT, Msat MSlice, regions *Bytes, 
 	cfg := make3DConf(N)
 	kAddexchangeAsync(B.DevPtr(X), B.DevPtr(Y), B.DevPtr(Z),
 		m.DevPtr(X), m.DevPtr(Y), m.DevPtr(Z),
-		Msat.DevPtr(0), Msat.Mul(0),
+		Msat.DevPtr(0), Msat.Mul(0), geom.DevPtr(0),
+		faces.DevPtr(0), faces.DevPtr(1), faces.DevPtr(2), faces.DevPtr(3), faces.DevPtr(4), faces.DevPtr(5),
 		unsafe.Pointer(AexRed), regions.Ptr,
 		wx, wy, wz, N[X], N[Y], N[Z], pbc, cfg)
 }

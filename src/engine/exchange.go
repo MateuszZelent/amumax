@@ -47,13 +47,22 @@ func addExchangeField(dst *data.Slice) {
 	bulk := !Dbulk.isZero()
 	ms := Msat.MSlice()
 	defer ms.Recycle()
+	geom, recycleGeom := Geometry.Slice()
+	if recycleGeom {
+		defer cuda.Recycle(geom)
+	}
+	faces, recycleFaces := Geometry.FaceSlice()
+	if recycleFaces {
+		defer cuda.Recycle(faces)
+	}
+
 	switch {
 	case !inter && !bulk:
-		cuda.AddExchange(dst, NormMag.Buffer(), lex2.Gpu(), ms, Regions.Gpu(), NormMag.Mesh())
+		cuda.AddExchange(dst, NormMag.Buffer(), lex2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh())
 	case inter && !bulk:
-		cuda.AddDMI(dst, NormMag.Buffer(), lex2.Gpu(), din2.Gpu(), ms, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
+		cuda.AddDMI(dst, NormMag.Buffer(), lex2.Gpu(), din2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
 	case bulk && !inter:
-		cuda.AddDMIBulk(dst, NormMag.Buffer(), lex2.Gpu(), dbulk2.Gpu(), ms, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
+		cuda.AddDMIBulk(dst, NormMag.Buffer(), lex2.Gpu(), dbulk2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
 		// TODO: add ScaleInterDbulk and InterDbulk
 	case inter && bulk:
 		log.Log.ErrAndExit("Cannot have interfacial-induced DMI and bulk DMI at the same time")

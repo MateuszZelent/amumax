@@ -92,7 +92,7 @@ var madd4Map = map[int]string{
 // madd4 PTX code for various compute capabilities.
 const (
 	madd4Ptx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -130,12 +130,12 @@ const (
 	mov.u32 	%r3, %ctaid.y;
 	mov.u32 	%r4, %nctaid.x;
 	mov.u32 	%r5, %ctaid.x;
-	mad.lo.s32 	%r6, %r4, %r3, %r5;
+	mad.lo.s32 	%r6, %r3, %r4, %r5;
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r1, %r6, %r7, %r8;
-	setp.ge.s32	%p1, %r1, %r2;
-	@%p1 bra 	BB0_2;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_2;
 
 	cvta.to.global.u64 	%rd6, %rd2;
 	mul.wide.s32 	%rd7, %r1, 4;
@@ -158,10 +158,10 @@ const (
 	add.s64 	%rd16, %rd15, %rd7;
 	st.global.f32 	[%rd16], %f12;
 
-BB0_2:
+$L__BB0_2:
 	ret;
-}
 
+}
 
 `
 	)

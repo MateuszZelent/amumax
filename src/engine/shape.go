@@ -63,7 +63,9 @@ func sinWaveguide(length, width, height, period, sinAmp float64) shape {
 // height:    thickness in z (measured vertically, not normal to curve)
 // period:    spatial period of the sine along x
 // centerAmp: amplitude of the CENTERLINE oscillation in z
-//            (visible outer envelope = centerAmp + height/2)
+//
+//	(visible outer envelope = centerAmp + height/2)
+//
 // phase:     initial phase of the sine (radians); 0 = zero-crossing at x=0
 // z0:        vertical offset of the centerline
 func sinWaveguide2(length, width, height, period, centerAmp, phase, z0 float64) shape {
@@ -125,6 +127,112 @@ func archWaveguide(length, width, height, archHeight, z0 float64) shape {
 		zCenter := z0 + archHeight*math.Sin(math.Pi*t)
 		return z >= zCenter-halfH && z < zCenter+halfH
 	}
+}
+
+func clampFloat64(v, min, max float64) float64 {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+// normalThicknessWaveguide creates a finite waveguide with thickness measured orthogonally
+// to the x-z centerline instead of vertically along z.
+func normalThicknessWaveguide(length, width, height float64, centerZ, dCenterZ, ddCenterZ func(float64) float64) shape {
+	halfL := length / 2
+	halfW := width / 2
+	halfH := height / 2
+	projectionTol := math.Max(length, height) * 1e-12
+	if projectionTol == 0 {
+		projectionTol = 1e-12
+	}
+
+	return func(x, y, z float64) bool {
+		if x < -halfL || x > halfL || y < -halfW || y > halfW {
+			return false
+		}
+
+		u := clampFloat64(x, -halfL, halfL)
+		for iter := 0; iter < 8; iter++ {
+			zu := centerZ(u)
+			slope := dCenterZ(u)
+			f := (u - x) + (zu-z)*slope
+			df := 1 + slope*slope + (zu-z)*ddCenterZ(u)
+			if math.Abs(df) < 1e-18 {
+				break
+			}
+			next := clampFloat64(u-f/df, -halfL, halfL)
+			if math.Abs(next-u) <= projectionTol {
+				u = next
+				break
+			}
+			u = next
+		}
+
+		dx := x - u
+		dz := z - centerZ(u)
+		return dx*dx+dz*dz <= halfH*halfH
+	}
+}
+
+// sinWaveguideNormal creates a sinusoidal waveguide with thickness measured orthogonally
+// to the centerline in the x-z plane.
+func sinWaveguideNormal(length, width, height, period, centerAmp, phase, z0 float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("SinWaveguideNormal: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("SinWaveguideNormal: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("SinWaveguideNormal: height must be > 0, got %g", height)
+	case period <= 0:
+		log.Log.ErrAndExit("SinWaveguideNormal: period must be > 0, got %g", period)
+	}
+
+	k := 2 * math.Pi / period
+	centerZFn := func(x float64) float64 {
+		return z0 + centerAmp*math.Sin(k*x+phase)
+	}
+	dCenterZFn := func(x float64) float64 {
+		return centerAmp * k * math.Cos(k*x+phase)
+	}
+	ddCenterZFn := func(x float64) float64 {
+		return -centerAmp * k * k * math.Sin(k*x+phase)
+	}
+
+	return normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
+}
+
+// archWaveguideNormal creates a half-sine arch waveguide with thickness measured orthogonally
+// to the centerline in the x-z plane.
+func archWaveguideNormal(length, width, height, archHeight, z0 float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("ArchWaveguideNormal: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("ArchWaveguideNormal: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("ArchWaveguideNormal: height must be > 0, got %g", height)
+	}
+
+	halfL := length / 2
+	centerZFn := func(x float64) float64 {
+		t := (x + halfL) / length
+		return z0 + archHeight*math.Sin(math.Pi*t)
+	}
+	dCenterZFn := func(x float64) float64 {
+		t := (x + halfL) / length
+		return archHeight * (math.Pi / length) * math.Cos(math.Pi*t)
+	}
+	ddCenterZFn := func(x float64) float64 {
+		t := (x + halfL) / length
+		return -archHeight * (math.Pi / length) * (math.Pi / length) * math.Sin(math.Pi*t)
+	}
+
+	return normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
 }
 
 // ellipsoid with given diameters

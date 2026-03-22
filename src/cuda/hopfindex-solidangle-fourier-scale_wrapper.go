@@ -98,7 +98,7 @@ var scaleemergentfieldMap = map[int]string{
 // scaleemergentfield PTX code for various compute capabilities.
 const (
 	scaleemergentfieldPtx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -140,21 +140,21 @@ const (
 	mov.u32 	%r7, %ctaid.x;
 	mov.u32 	%r8, %ntid.x;
 	mov.u32 	%r9, %tid.x;
-	mad.lo.s32 	%r1, %r8, %r7, %r9;
+	mad.lo.s32 	%r1, %r7, %r8, %r9;
 	mov.u32 	%r10, %ntid.y;
 	mov.u32 	%r11, %ctaid.y;
 	mov.u32 	%r12, %tid.y;
-	mad.lo.s32 	%r2, %r10, %r11, %r12;
+	mad.lo.s32 	%r2, %r11, %r10, %r12;
 	mov.u32 	%r13, %ntid.z;
 	mov.u32 	%r14, %ctaid.z;
 	mov.u32 	%r15, %tid.z;
-	mad.lo.s32 	%r3, %r13, %r14, %r15;
-	setp.ge.s32	%p1, %r2, %r5;
-	setp.ge.s32	%p2, %r1, %r4;
+	mad.lo.s32 	%r3, %r14, %r13, %r15;
+	setp.ge.s32 	%p1, %r1, %r4;
+	setp.ge.s32 	%p2, %r2, %r5;
 	or.pred  	%p3, %p1, %p2;
-	setp.ge.s32	%p4, %r3, %r6;
+	setp.ge.s32 	%p4, %r3, %r6;
 	or.pred  	%p5, %p3, %p4;
-	@%p5 bra 	BB0_2;
+	@%p5 bra 	$L__BB0_2;
 
 	cvta.to.global.u64 	%rd7, %rd4;
 	mad.lo.s32 	%r16, %r3, %r5, %r2;
@@ -184,10 +184,10 @@ const (
 	add.s64 	%rd19, %rd18, %rd8;
 	st.global.f32 	[%rd19], %f12;
 
-BB0_2:
+$L__BB0_2:
 	ret;
-}
 
+}
 
 `
 	)

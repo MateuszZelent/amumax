@@ -86,7 +86,7 @@ var regionaddvMap = map[int]string{
 // regionaddv PTX code for various compute capabilities.
 const (
 	regionaddvPtx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -121,19 +121,19 @@ const (
 	mov.u32 	%r3, %ctaid.y;
 	mov.u32 	%r4, %nctaid.x;
 	mov.u32 	%r5, %ctaid.x;
-	mad.lo.s32 	%r6, %r4, %r3, %r5;
+	mad.lo.s32 	%r6, %r3, %r4, %r5;
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r1, %r6, %r7, %r8;
-	setp.ge.s32	%p1, %r1, %r2;
-	@%p1 bra 	BB0_2;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_2;
 
 	cvta.to.global.u64 	%rd8, %rd7;
-	cvt.s64.s32	%rd9, %r1;
+	cvt.s64.s32 	%rd9, %r1;
 	add.s64 	%rd10, %rd8, %rd9;
 	ld.global.nc.u8 	%rs1, [%rd10];
 	cvta.to.global.u64 	%rd11, %rd4;
-	cvt.u32.u16	%r9, %rs1;
+	cvt.u32.u16 	%r9, %rs1;
 	and.b32  	%r10, %r9, 255;
 	mul.wide.u32 	%rd12, %r10, 4;
 	add.s64 	%rd13, %rd11, %rd12;
@@ -161,10 +161,10 @@ const (
 	add.f32 	%f9, %f8, %f7;
 	st.global.f32 	[%rd24], %f9;
 
-BB0_2:
+$L__BB0_2:
 	ret;
-}
 
+}
 
 `
 	)

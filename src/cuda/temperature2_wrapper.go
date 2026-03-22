@@ -95,7 +95,7 @@ var settemperature2Map = map[int]string{
 // settemperature2 PTX code for various compute capabilities.
 const (
 	settemperature2Ptx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -135,15 +135,15 @@ const (
 	mov.u32 	%r3, %nctaid.x;
 	mov.u32 	%r4, %ctaid.y;
 	mov.u32 	%r5, %ctaid.x;
-	mad.lo.s32 	%r6, %r3, %r4, %r5;
+	mad.lo.s32 	%r6, %r4, %r3, %r5;
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r1, %r6, %r7, %r8;
-	setp.ge.s32	%p1, %r1, %r2;
-	@%p1 bra 	BB0_12;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_12;
 
-	setp.eq.s64	%p2, %rd3, 0;
-	@%p2 bra 	BB0_3;
+	setp.eq.s64 	%p2, %rd3, 0;
+	@%p2 bra 	$L__BB0_3;
 
 	cvta.to.global.u64 	%rd7, %rd3;
 	mul.wide.s32 	%rd8, %r1, 4;
@@ -151,16 +151,16 @@ const (
 	ld.global.nc.f32 	%f15, [%rd9];
 	mul.f32 	%f27, %f15, %f27;
 
-BB0_3:
-	setp.eq.f32	%p3, %f27, 0f00000000;
+$L__BB0_3:
+	setp.eq.f32 	%p3, %f27, 0f00000000;
 	mov.f32 	%f28, 0f00000000;
-	@%p3 bra 	BB0_5;
+	@%p3 bra 	$L__BB0_5;
 
 	rcp.rn.f32 	%f28, %f27;
 
-BB0_5:
-	setp.eq.s64	%p4, %rd4, 0;
-	@%p4 bra 	BB0_7;
+$L__BB0_5:
+	setp.eq.s64 	%p4, %rd4, 0;
+	@%p4 bra 	$L__BB0_7;
 
 	cvta.to.global.u64 	%rd10, %rd4;
 	mul.wide.s32 	%rd11, %r1, 4;
@@ -168,19 +168,19 @@ BB0_5:
 	ld.global.nc.f32 	%f17, [%rd12];
 	mul.f32 	%f29, %f17, %f29;
 
-BB0_7:
-	setp.eq.s64	%p5, %rd6, 0;
+$L__BB0_7:
+	setp.eq.s64 	%p5, %rd6, 0;
 	mov.f32 	%f30, 0f00000000;
-	@%p5 bra 	BB0_9;
+	@%p5 bra 	$L__BB0_9;
 
 	cvta.to.global.u64 	%rd13, %rd6;
 	mul.wide.s32 	%rd14, %r1, 4;
 	add.s64 	%rd15, %rd13, %rd14;
 	ld.global.nc.f32 	%f30, [%rd15];
 
-BB0_9:
-	setp.eq.s64	%p6, %rd5, 0;
-	@%p6 bra 	BB0_11;
+$L__BB0_9:
+	setp.eq.s64 	%p6, %rd5, 0;
+	@%p6 bra 	$L__BB0_11;
 
 	cvta.to.global.u64 	%rd16, %rd5;
 	mul.wide.s32 	%rd17, %r1, 4;
@@ -188,25 +188,25 @@ BB0_9:
 	ld.global.nc.f32 	%f19, [%rd18];
 	mul.f32 	%f31, %f19, %f31;
 
-BB0_11:
-	cvta.to.global.u64 	%rd19, %rd1;
-	cvta.to.global.u64 	%rd20, %rd2;
-	mul.wide.s32 	%rd21, %r1, 4;
-	add.s64 	%rd22, %rd20, %rd21;
+$L__BB0_11:
+	cvta.to.global.u64 	%rd19, %rd2;
+	mul.wide.s32 	%rd20, %r1, 4;
+	add.s64 	%rd21, %rd19, %rd20;
 	add.f32 	%f20, %f30, %f31;
 	mul.f32 	%f21, %f20, %f11;
 	mul.f32 	%f22, %f29, %f21;
 	mul.f32 	%f23, %f28, %f22;
 	sqrt.rn.f32 	%f24, %f23;
-	ld.global.nc.f32 	%f25, [%rd22];
+	ld.global.nc.f32 	%f25, [%rd21];
 	mul.f32 	%f26, %f25, %f24;
-	add.s64 	%rd23, %rd19, %rd21;
+	cvta.to.global.u64 	%rd22, %rd1;
+	add.s64 	%rd23, %rd22, %rd20;
 	st.global.f32 	[%rd23], %f26;
 
-BB0_12:
+$L__BB0_12:
 	ret;
-}
 
+}
 
 `
 	)

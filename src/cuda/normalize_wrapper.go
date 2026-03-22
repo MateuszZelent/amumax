@@ -77,7 +77,7 @@ var normalizeMap = map[int]string{
 // normalize PTX code for various compute capabilities.
 const (
 	normalizePtx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -105,47 +105,50 @@ const (
 	mov.u32 	%r3, %nctaid.x;
 	mov.u32 	%r4, %ctaid.y;
 	mov.u32 	%r5, %ctaid.x;
-	mad.lo.s32 	%r6, %r3, %r4, %r5;
+	mad.lo.s32 	%r6, %r4, %r3, %r5;
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r1, %r6, %r7, %r8;
-	setp.ge.s32	%p1, %r1, %r2;
-	@%p1 bra 	BB0_6;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_7;
 
-	setp.eq.s64	%p2, %rd7, 0;
-	mov.f32 	%f20, 0f3F800000;
-	@%p2 bra 	BB0_3;
+	setp.eq.s64 	%p2, %rd7, 0;
+	@%p2 bra 	$L__BB0_3;
 
 	cvta.to.global.u64 	%rd8, %rd7;
 	mul.wide.s32 	%rd9, %r1, 4;
 	add.s64 	%rd10, %rd8, %rd9;
 	ld.global.nc.f32 	%f20, [%rd10];
+	bra.uni 	$L__BB0_4;
 
-BB0_3:
-	cvta.to.global.u64 	%rd11, %rd6;
-	cvta.to.global.u64 	%rd12, %rd5;
-	cvta.to.global.u64 	%rd13, %rd4;
-	mul.wide.s32 	%rd14, %r1, 4;
-	add.s64 	%rd1, %rd13, %rd14;
+$L__BB0_3:
+	mov.f32 	%f20, 0f3F800000;
+
+$L__BB0_4:
+	cvta.to.global.u64 	%rd11, %rd4;
+	mul.wide.s32 	%rd12, %r1, 4;
+	add.s64 	%rd1, %rd11, %rd12;
 	ld.global.f32 	%f11, [%rd1];
 	mul.f32 	%f3, %f20, %f11;
-	add.s64 	%rd2, %rd12, %rd14;
+	cvta.to.global.u64 	%rd13, %rd5;
+	add.s64 	%rd2, %rd13, %rd12;
 	ld.global.f32 	%f12, [%rd2];
 	mul.f32 	%f4, %f20, %f12;
-	add.s64 	%rd3, %rd11, %rd14;
+	cvta.to.global.u64 	%rd14, %rd6;
+	add.s64 	%rd3, %rd14, %rd12;
 	ld.global.f32 	%f13, [%rd3];
 	mul.f32 	%f5, %f20, %f13;
 	mul.f32 	%f14, %f4, %f4;
 	fma.rn.f32 	%f15, %f3, %f3, %f14;
 	fma.rn.f32 	%f16, %f5, %f5, %f15;
 	sqrt.rn.f32 	%f6, %f16;
+	setp.eq.f32 	%p3, %f6, 0f00000000;
 	mov.f32 	%f21, 0f00000000;
-	setp.eq.f32	%p3, %f6, 0f00000000;
-	@%p3 bra 	BB0_5;
+	@%p3 bra 	$L__BB0_6;
 
 	rcp.rn.f32 	%f21, %f6;
 
-BB0_5:
+$L__BB0_6:
 	mul.f32 	%f17, %f3, %f21;
 	st.global.f32 	[%rd1], %f17;
 	mul.f32 	%f18, %f4, %f21;
@@ -153,10 +156,10 @@ BB0_5:
 	mul.f32 	%f19, %f5, %f21;
 	st.global.f32 	[%rd3], %f19;
 
-BB0_6:
+$L__BB0_7:
 	ret;
-}
 
+}
 
 `
 	)

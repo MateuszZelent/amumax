@@ -11,7 +11,7 @@ import (
 // AddDMIBulk Add effective field due to bulk Dzyaloshinskii-Moriya interaction to Beff.
 // See dmibulk.cu
 
-func AddDMIBulk(Beff *data.Slice, m *data.Slice, AexRed, DRed SymmLUT, Msat MSlice, regions *Bytes, mesh mesh.MeshLike, OpenBC bool) {
+func AddDMIBulk(Beff *data.Slice, m *data.Slice, AexRed, DRed SymmLUT, Msat MSlice, geom, faces *data.Slice, regions *Bytes, mesh mesh.MeshLike, OpenBC bool) {
 	cellsize := mesh.CellSize()
 	N := Beff.Size()
 	log.AssertMsg(m.Size() == N, "Size mismatch: m and Beff must have the same dimensions in AddDMIBulk")
@@ -24,7 +24,8 @@ func AddDMIBulk(Beff *data.Slice, m *data.Slice, AexRed, DRed SymmLUT, Msat MSli
 
 	kAdddmibulkAsync(Beff.DevPtr(X), Beff.DevPtr(Y), Beff.DevPtr(Z),
 		m.DevPtr(X), m.DevPtr(Y), m.DevPtr(Z),
-		Msat.DevPtr(0), Msat.Mul(0),
+		Msat.DevPtr(0), Msat.Mul(0), geom.DevPtr(0),
+		faces.DevPtr(0), faces.DevPtr(1), faces.DevPtr(2), faces.DevPtr(3), faces.DevPtr(4), faces.DevPtr(5),
 		unsafe.Pointer(AexRed), unsafe.Pointer(DRed), regions.Ptr,
 		float32(cellsize[X]), float32(cellsize[Y]), float32(cellsize[Z]), N[X], N[Y], N[Z], mesh.PBCCode(), openBC, cfg)
 }

@@ -74,7 +74,7 @@ var pointwiseDivMap = map[int]string{
 // pointwise_div PTX code for various compute capabilities.
 const (
 	pointwiseDivPtx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -90,49 +90,51 @@ const (
 	.reg .pred 	%p<3>;
 	.reg .f32 	%f<4>;
 	.reg .b32 	%r<10>;
-	.reg .b64 	%rd<12>;
+	.reg .b64 	%rd<13>;
 
 
-	ld.param.u64 	%rd2, [pointwise_div_param_0];
-	ld.param.u64 	%rd3, [pointwise_div_param_1];
-	ld.param.u64 	%rd4, [pointwise_div_param_2];
+	ld.param.u64 	%rd3, [pointwise_div_param_0];
+	ld.param.u64 	%rd4, [pointwise_div_param_1];
+	ld.param.u64 	%rd5, [pointwise_div_param_2];
 	ld.param.u32 	%r2, [pointwise_div_param_3];
 	mov.u32 	%r3, %nctaid.x;
 	mov.u32 	%r4, %ctaid.y;
 	mov.u32 	%r5, %ctaid.x;
-	mad.lo.s32 	%r6, %r3, %r4, %r5;
+	mad.lo.s32 	%r6, %r4, %r3, %r5;
 	mov.u32 	%r7, %ntid.x;
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r1, %r6, %r7, %r8;
-	setp.ge.s32	%p1, %r1, %r2;
-	@%p1 bra 	BB0_4;
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_4;
 
-	cvta.to.global.u64 	%rd5, %rd4;
-	mul.wide.s32 	%rd6, %r1, 4;
-	add.s64 	%rd7, %rd5, %rd6;
-	ld.global.nc.f32 	%f1, [%rd7];
-	setp.neu.f32	%p2, %f1, 0f00000000;
-	cvta.to.global.u64 	%rd8, %rd2;
-	add.s64 	%rd1, %rd8, %rd6;
-	@%p2 bra 	BB0_3;
-	bra.uni 	BB0_2;
-
-BB0_3:
+	cvta.to.global.u64 	%rd6, %rd5;
+	cvt.s64.s32 	%rd1, %r1;
+	mul.wide.s32 	%rd7, %r1, 4;
+	add.s64 	%rd8, %rd6, %rd7;
+	ld.global.nc.f32 	%f1, [%rd8];
+	setp.neu.f32 	%p2, %f1, 0f00000000;
 	cvta.to.global.u64 	%rd9, %rd3;
-	add.s64 	%rd11, %rd9, %rd6;
-	ld.global.nc.f32 	%f2, [%rd11];
+	add.s64 	%rd2, %rd9, %rd7;
+	@%p2 bra 	$L__BB0_3;
+	bra.uni 	$L__BB0_2;
+
+$L__BB0_3:
+	cvta.to.global.u64 	%rd10, %rd4;
+	shl.b64 	%rd11, %rd1, 2;
+	add.s64 	%rd12, %rd10, %rd11;
+	ld.global.nc.f32 	%f2, [%rd12];
 	div.rn.f32 	%f3, %f2, %f1;
-	st.global.f32 	[%rd1], %f3;
-	bra.uni 	BB0_4;
+	st.global.f32 	[%rd2], %f3;
+	bra.uni 	$L__BB0_4;
 
-BB0_2:
+$L__BB0_2:
 	mov.u32 	%r9, 0;
-	st.global.u32 	[%rd1], %r9;
+	st.global.u32 	[%rd2], %r9;
 
-BB0_4:
+$L__BB0_4:
 	ret;
-}
 
+}
 
 `
 	)

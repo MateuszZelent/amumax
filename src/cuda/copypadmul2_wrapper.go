@@ -95,7 +95,7 @@ var copypadmul2Map = map[int]string{
 // copypadmul2 PTX code for various compute capabilities.
 const (
 	copypadmul2Ptx52 = `
-.version 7.0
+.version 8.4
 .target sm_52
 .address_size 64
 
@@ -135,28 +135,26 @@ const (
 	mov.u32 	%r10, %ntid.x;
 	mov.u32 	%r11, %ctaid.x;
 	mov.u32 	%r12, %tid.x;
-	mad.lo.s32 	%r1, %r10, %r11, %r12;
+	mad.lo.s32 	%r1, %r11, %r10, %r12;
 	mov.u32 	%r13, %ntid.y;
 	mov.u32 	%r14, %ctaid.y;
 	mov.u32 	%r15, %tid.y;
-	mad.lo.s32 	%r2, %r13, %r14, %r15;
+	mad.lo.s32 	%r2, %r14, %r13, %r15;
 	mov.u32 	%r16, %ntid.z;
 	mov.u32 	%r17, %ctaid.z;
 	mov.u32 	%r18, %tid.z;
-	mad.lo.s32 	%r3, %r16, %r17, %r18;
-	setp.lt.s32	%p1, %r1, %r7;
-	setp.lt.s32	%p2, %r2, %r8;
-	and.pred  	%p3, %p1, %p2;
-	setp.lt.s32	%p4, %r3, %r9;
-	and.pred  	%p5, %p3, %p4;
-	@!%p5 bra 	BB0_6;
-	bra.uni 	BB0_1;
+	mad.lo.s32 	%r3, %r17, %r16, %r18;
+	setp.ge.s32 	%p1, %r1, %r7;
+	setp.ge.s32 	%p2, %r2, %r8;
+	or.pred  	%p3, %p1, %p2;
+	setp.ge.s32 	%p4, %r3, %r9;
+	or.pred  	%p5, %p3, %p4;
+	@%p5 bra 	$L__BB0_7;
 
-BB0_1:
 	mad.lo.s32 	%r19, %r3, %r8, %r2;
 	mad.lo.s32 	%r4, %r19, %r7, %r1;
-	setp.eq.s64	%p6, %rd3, 0;
-	@%p6 bra 	BB0_3;
+	setp.eq.s64 	%p6, %rd3, 0;
+	@%p6 bra 	$L__BB0_3;
 
 	cvta.to.global.u64 	%rd5, %rd3;
 	mul.wide.s32 	%rd6, %r4, 4;
@@ -164,37 +162,40 @@ BB0_1:
 	ld.global.nc.f32 	%f6, [%rd7];
 	mul.f32 	%f12, %f6, %f12;
 
-BB0_3:
-	setp.eq.s64	%p7, %rd4, 0;
-	mov.f32 	%f13, 0f3F800000;
-	@%p7 bra 	BB0_5;
+$L__BB0_3:
+	setp.eq.s64 	%p7, %rd4, 0;
+	@%p7 bra 	$L__BB0_5;
 
 	cvta.to.global.u64 	%rd8, %rd4;
 	mul.wide.s32 	%rd9, %r4, 4;
 	add.s64 	%rd10, %rd8, %rd9;
 	ld.global.nc.f32 	%f13, [%rd10];
+	bra.uni 	$L__BB0_6;
 
-BB0_5:
-	cvta.to.global.u64 	%rd11, %rd1;
-	cvta.to.global.u64 	%rd12, %rd2;
-	mul.wide.s32 	%rd13, %r4, 4;
-	add.s64 	%rd14, %rd12, %rd13;
-	ld.global.nc.f32 	%f8, [%rd14];
-	cvt.f64.f32	%fd1, %f12;
+$L__BB0_5:
+	mov.f32 	%f13, 0f3F800000;
+
+$L__BB0_6:
+	cvta.to.global.u64 	%rd11, %rd2;
+	mul.wide.s32 	%rd12, %r4, 4;
+	add.s64 	%rd13, %rd11, %rd12;
+	ld.global.nc.f32 	%f8, [%rd13];
+	cvt.f64.f32 	%fd1, %f12;
 	mul.f64 	%fd2, %fd1, 0d3EB515370F99F6CB;
-	cvt.rn.f32.f64	%f9, %fd2;
-	mul.f32 	%f10, %f9, %f13;
+	cvt.rn.f32.f64 	%f9, %fd2;
+	mul.f32 	%f10, %f13, %f9;
 	mul.f32 	%f11, %f10, %f8;
 	mad.lo.s32 	%r20, %r3, %r6, %r2;
 	mad.lo.s32 	%r21, %r20, %r5, %r1;
+	cvta.to.global.u64 	%rd14, %rd1;
 	mul.wide.s32 	%rd15, %r21, 4;
-	add.s64 	%rd16, %rd11, %rd15;
+	add.s64 	%rd16, %rd14, %rd15;
 	st.global.f32 	[%rd16], %f11;
 
-BB0_6:
+$L__BB0_7:
 	ret;
-}
 
+}
 
 `
 	)

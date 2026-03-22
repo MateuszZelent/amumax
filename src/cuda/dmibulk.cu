@@ -33,6 +33,10 @@ extern "C" __global__ void
 adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
            float* __restrict__ mx, float* __restrict__ my, float* __restrict__ mz,
            float* __restrict__ Ms_, float Ms_mul,
+           float* __restrict__ vol,
+           float* __restrict__ fxm, float* __restrict__ fxp,
+           float* __restrict__ fym, float* __restrict__ fyp,
+           float* __restrict__ fzm, float* __restrict__ fzp,
            float* __restrict__ aLUT2d, float* __restrict__ DLUT2d,
            uint8_t* __restrict__ regions,
            float cx, float cy, float cz, int Nx, int Ny, int Nz, uint8_t PBC, uint8_t OpenBC) {
@@ -45,161 +49,208 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
         return;
     }
 
-    int I = idx(ix, iy, iz);                      // central cell index
-    float3 h = make_float3(0.0,0.0,0.0);          // add to H
-    float3 m0 = make_float3(mx[I], my[I], mz[I]); // central m
+    int I = idx(ix, iy, iz);
+    float3 h = make_float3(0.0f, 0.0f, 0.0f);
+    float3 m0 = make_float3(mx[I], my[I], mz[I]);
     uint8_t r0 = regions[I];
-    int i_;                                       // neighbor index
+    int i_;
 
-    if(is0(m0)) {
+    if (is0(m0)) {
         return;
     }
 
-    // x derivatives (along length)
+    float v0 = vol[I];
+    if (v0 <= 0.0f) {
+        return;
+    }
+    float invVol = 1.0f / fmaxf(v0, 1e-6f);
+
     {
-        float3 m1 = make_float3(0.0f, 0.0f, 0.0f);     // left neighbor
-        i_ = idx(lclampx(ix-1), iy, iz);               // load neighbor m if inside grid, keep 0 otherwise
-        if (ix-1 >= 0 || PBCx) {
-            m1 = make_float3(mx[i_], my[i_], mz[i_]);
-        }
-        int r1 = is0(m1)? r0 : regions[i_];
-        float A = aLUT2d[symidx(r0, r1)];
-        float D = DLUT2d[symidx(r0, r1)];
-        float D_2A = D/(2.0f*A);
-        if (!is0(m1) || !OpenBC){                      // do nothing at an open boundary
-            if (is0(m1)) {                             // neighbor missing
+        float faceWeight = fxm[I] * invVol;
+        if (faceWeight > 0.0f) {
+            float3 m1 = make_float3(0.0f, 0.0f, 0.0f);
+            int r1 = r0;
+            if (ix-1 >= 0 || PBCx) {
+                i_ = idx(lclampx(ix-1), iy, iz);
+                m1 = make_float3(mx[i_], my[i_], mz[i_]);
+                if (!is0(m1)) {
+                    r1 = regions[i_];
+                }
+            }
+            float A = aLUT2d[symidx(r0, r1)];
+            float D = DLUT2d[symidx(r0, r1)];
+            float D_2A = D / (2.0f*A);
+            if (!is0(m1)) {
+                h   += faceWeight * ((2.0f*A/(cx*cx)) * (m1 - m0));
+                h.y += faceWeight * (D/cx) * (-m1.z);
+                h.z -= faceWeight * (D/cx) * (-m1.y);
+            } else if (!OpenBC) {
                 m1.x = m0.x;
                 m1.y = m0.y - (-cx * D_2A * m0.z);
                 m1.z = m0.z + (-cx * D_2A * m0.y);
+                h   += faceWeight * ((2.0f*A/(cx*cx)) * (m1 - m0));
+                h.y += faceWeight * (D/cx) * (-m1.z);
+                h.z -= faceWeight * (D/cx) * (-m1.y);
             }
-            h   += (2.0f*A/(cx*cx)) * (m1 - m0);       // exchange
-            h.y += (D/cx)*(-m1.z);
-            h.z -= (D/cx)*(-m1.y);
         }
     }
 
-
     {
-        float3 m2 = make_float3(0.0f, 0.0f, 0.0f);     // right neighbor
-        i_ = idx(hclampx(ix+1), iy, iz);
-        if (ix+1 < Nx || PBCx) {
-            m2 = make_float3(mx[i_], my[i_], mz[i_]);
-        }
-        int r1 = is0(m2)? r0 : regions[i_];
-        float A = aLUT2d[symidx(r0, r1)];
-        float D = DLUT2d[symidx(r0, r1)];
-        float D_2A = D/(2.0f*A);
-        if (!is0(m2) || !OpenBC){
-            if (is0(m2)) {
+        float faceWeight = fxp[I] * invVol;
+        if (faceWeight > 0.0f) {
+            float3 m2 = make_float3(0.0f, 0.0f, 0.0f);
+            int r1 = r0;
+            if (ix+1 < Nx || PBCx) {
+                i_ = idx(hclampx(ix+1), iy, iz);
+                m2 = make_float3(mx[i_], my[i_], mz[i_]);
+                if (!is0(m2)) {
+                    r1 = regions[i_];
+                }
+            }
+            float A = aLUT2d[symidx(r0, r1)];
+            float D = DLUT2d[symidx(r0, r1)];
+            float D_2A = D / (2.0f*A);
+            if (!is0(m2)) {
+                h   += faceWeight * ((2.0f*A/(cx*cx)) * (m2 - m0));
+                h.y += faceWeight * (D/cx) * (m2.z);
+                h.z -= faceWeight * (D/cx) * (m2.y);
+            } else if (!OpenBC) {
                 m2.x = m0.x;
                 m2.y = m0.y - (+cx * D_2A * m0.z);
                 m2.z = m0.z + (+cx * D_2A * m0.y);
+                h   += faceWeight * ((2.0f*A/(cx*cx)) * (m2 - m0));
+                h.y += faceWeight * (D/cx) * (m2.z);
+                h.z -= faceWeight * (D/cx) * (m2.y);
             }
-            h   += (2.0f*A/(cx*cx)) * (m2 - m0);
-            h.y += (D/cx)*(m2.z);
-            h.z -= (D/cx)*(m2.y);
         }
     }
 
-    // y derivatives (along height)
     {
-        float3 m1 = make_float3(0.0f, 0.0f, 0.0f);
-        i_ = idx(ix, lclampy(iy-1), iz);
-        if (iy-1 >= 0 || PBCy) {
-            m1 = make_float3(mx[i_], my[i_], mz[i_]);
-        }
-        int r1 = is0(m1)? r0 : regions[i_];
-        float A = aLUT2d[symidx(r0, r1)];
-        float D = DLUT2d[symidx(r0, r1)];
-        float D_2A = D/(2.0f*A);
-        if (!is0(m1) || !OpenBC){
-            if (is0(m1)) {
+        float faceWeight = fym[I] * invVol;
+        if (faceWeight > 0.0f) {
+            float3 m1 = make_float3(0.0f, 0.0f, 0.0f);
+            int r1 = r0;
+            if (iy-1 >= 0 || PBCy) {
+                i_ = idx(ix, lclampy(iy-1), iz);
+                m1 = make_float3(mx[i_], my[i_], mz[i_]);
+                if (!is0(m1)) {
+                    r1 = regions[i_];
+                }
+            }
+            float A = aLUT2d[symidx(r0, r1)];
+            float D = DLUT2d[symidx(r0, r1)];
+            float D_2A = D / (2.0f*A);
+            if (!is0(m1)) {
+                h   += faceWeight * ((2.0f*A/(cy*cy)) * (m1 - m0));
+                h.x -= faceWeight * (D/cy) * (-m1.z);
+                h.z += faceWeight * (D/cy) * (-m1.x);
+            } else if (!OpenBC) {
                 m1.x = m0.x + (-cy * D_2A * m0.z);
                 m1.y = m0.y;
                 m1.z = m0.z - (-cy * D_2A * m0.x);
+                h   += faceWeight * ((2.0f*A/(cy*cy)) * (m1 - m0));
+                h.x -= faceWeight * (D/cy) * (-m1.z);
+                h.z += faceWeight * (D/cy) * (-m1.x);
             }
-            h   += (2.0f*A/(cy*cy)) * (m1 - m0);
-            h.x -= (D/cy)*(-m1.z);
-            h.z += (D/cy)*(-m1.x);
         }
     }
 
     {
-        float3 m2 = make_float3(0.0f, 0.0f, 0.0f);
-        i_ = idx(ix, hclampy(iy+1), iz);
-        if  (iy+1 < Ny || PBCy) {
-            m2 = make_float3(mx[i_], my[i_], mz[i_]);
-        }
-        int r1 = is0(m2)? r0 : regions[i_];
-        float A = aLUT2d[symidx(r0, r1)];
-        float D = DLUT2d[symidx(r0, r1)];
-        float D_2A = D/(2.0f*A);
-        if (!is0(m2) || !OpenBC){
-            if (is0(m2)) {
+        float faceWeight = fyp[I] * invVol;
+        if (faceWeight > 0.0f) {
+            float3 m2 = make_float3(0.0f, 0.0f, 0.0f);
+            int r1 = r0;
+            if (iy+1 < Ny || PBCy) {
+                i_ = idx(ix, hclampy(iy+1), iz);
+                m2 = make_float3(mx[i_], my[i_], mz[i_]);
+                if (!is0(m2)) {
+                    r1 = regions[i_];
+                }
+            }
+            float A = aLUT2d[symidx(r0, r1)];
+            float D = DLUT2d[symidx(r0, r1)];
+            float D_2A = D / (2.0f*A);
+            if (!is0(m2)) {
+                h   += faceWeight * ((2.0f*A/(cy*cy)) * (m2 - m0));
+                h.x -= faceWeight * (D/cy) * (m2.z);
+                h.z += faceWeight * (D/cy) * (m2.x);
+            } else if (!OpenBC) {
                 m2.x = m0.x + (+cy * D_2A * m0.z);
                 m2.y = m0.y;
                 m2.z = m0.z - (+cy * D_2A * m0.x);
+                h   += faceWeight * ((2.0f*A/(cy*cy)) * (m2 - m0));
+                h.x -= faceWeight * (D/cy) * (m2.z);
+                h.z += faceWeight * (D/cy) * (m2.x);
             }
-            h   += (2.0f*A/(cy*cy)) * (m2 - m0);
-            h.x -= (D/cy)*(m2.z);
-            h.z += (D/cy)*(m2.x);
         }
     }
 
-    // only take vertical derivative for 3D sim or for Neumann BC
     if ((Nz != 1) || (!OpenBC)) {
-        // bottom neighbor
         {
-            float3 m1 = make_float3(0.0f, 0.0f, 0.0f);
-            i_ = idx(ix, iy, lclampz(iz-1));
-            if (iz-1 >= 0 || PBCz) {
-                m1 = make_float3(mx[i_], my[i_], mz[i_]);
-            }
-            int r1 = is0(m1)? r0 : regions[i_];
-            float A = aLUT2d[symidx(r0, r1)];
-            float D = DLUT2d[symidx(r0, r1)];
-            float D_2A = D/(2.0f*A);
-            if (!is0(m1) || !OpenBC){
-                if (is0(m1)) {
+            float faceWeight = fzm[I] * invVol;
+            if (faceWeight > 0.0f) {
+                float3 m1 = make_float3(0.0f, 0.0f, 0.0f);
+                int r1 = r0;
+                if (iz-1 >= 0 || PBCz) {
+                    i_ = idx(ix, iy, lclampz(iz-1));
+                    m1 = make_float3(mx[i_], my[i_], mz[i_]);
+                    if (!is0(m1)) {
+                        r1 = regions[i_];
+                    }
+                }
+                float A = aLUT2d[symidx(r0, r1)];
+                float D = DLUT2d[symidx(r0, r1)];
+                float D_2A = D / (2.0f*A);
+                if (!is0(m1)) {
+                    h   += faceWeight * ((2.0f*A/(cz*cz)) * (m1 - m0));
+                    h.x += faceWeight * (D/cz) * (-m1.y);
+                    h.y -= faceWeight * (D/cz) * (-m1.x);
+                } else if (!OpenBC) {
                     m1.x = m0.x - (-cz * D_2A * m0.y);
                     m1.y = m0.y + (-cz * D_2A * m0.x);
                     m1.z = m0.z;
+                    h   += faceWeight * ((2.0f*A/(cz*cz)) * (m1 - m0));
+                    h.x += faceWeight * (D/cz) * (-m1.y);
+                    h.y -= faceWeight * (D/cz) * (-m1.x);
                 }
-                h   += (2.0f*A/(cz*cz)) * (m1 - m0);
-                h.x += (D/cz)*(- m1.y);
-                h.y -= (D/cz)*(- m1.x);
             }
         }
 
-        // top neighbor
         {
-            float3 m2 = make_float3(0.0f, 0.0f, 0.0f);
-            i_ = idx(ix, iy, hclampz(iz+1));
-            if (iz+1 < Nz || PBCz) {
-                m2 = make_float3(mx[i_], my[i_], mz[i_]);
-            }
-            int r1 = is0(m2)? r0 : regions[i_];
-            float A = aLUT2d[symidx(r0, r1)];
-            float D = DLUT2d[symidx(r0, r1)];
-            float D_2A = D/(2.0f*A);
-            if (!is0(m2) || !OpenBC){
-                if (is0(m2)) {
+            float faceWeight = fzp[I] * invVol;
+            if (faceWeight > 0.0f) {
+                float3 m2 = make_float3(0.0f, 0.0f, 0.0f);
+                int r1 = r0;
+                if (iz+1 < Nz || PBCz) {
+                    i_ = idx(ix, iy, hclampz(iz+1));
+                    m2 = make_float3(mx[i_], my[i_], mz[i_]);
+                    if (!is0(m2)) {
+                        r1 = regions[i_];
+                    }
+                }
+                float A = aLUT2d[symidx(r0, r1)];
+                float D = DLUT2d[symidx(r0, r1)];
+                float D_2A = D / (2.0f*A);
+                if (!is0(m2)) {
+                    h   += faceWeight * ((2.0f*A/(cz*cz)) * (m2 - m0));
+                    h.x += faceWeight * (D/cz) * (m2.y);
+                    h.y -= faceWeight * (D/cz) * (m2.x);
+                } else if (!OpenBC) {
                     m2.x = m0.x - (+cz * D_2A * m0.y);
                     m2.y = m0.y + (+cz * D_2A * m0.x);
                     m2.z = m0.z;
+                    h   += faceWeight * ((2.0f*A/(cz*cz)) * (m2 - m0));
+                    h.x += faceWeight * (D/cz) * (m2.y);
+                    h.y -= faceWeight * (D/cz) * (m2.x);
                 }
-                h   += (2.0f*A/(cz*cz)) * (m2 - m0);
-                h.x += (D/cz)*(m2.y );
-                h.y -= (D/cz)*(m2.x );
             }
         }
     }
 
-    // write back, result is H + Hdmi + Hex
     float invMs = inv_Msat(Ms_, Ms_mul, I);
-    Hx[I] += h.x*invMs;
-    Hy[I] += h.y*invMs;
-    Hz[I] += h.z*invMs;
+    Hx[I] += h.x * invMs;
+    Hy[I] += h.y * invMs;
+    Hz[I] += h.z * invMs;
 }
 
 // Note on boundary conditions.
