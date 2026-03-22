@@ -95,6 +95,7 @@ export const voxelThreshold = writable<number>(
 export const voxelColorMode = writable<VoxelColorMode>(loadVoxelColorMode());
 export const voxelSampling = writable<VoxelSampling>(loadVoxelSampling());
 export const threeDPreview = writable<ThreeDPreview | null>(null);
+export const visibleRenderCount = writable<number>(0);
 export const topoEnabled = writable<boolean>(loadTopoEnabled());
 export const topoComponent = writable<TopoComponent>(loadTopoComponent());
 export const topoMultiplier = writable<number>(
@@ -472,21 +473,25 @@ function updateGlyphMesh(mesh: THREE.InstancedMesh) {
 	const instanceColor = mesh.instanceColor;
 
 	if (!instanceColor) {
+		visibleRenderCount.set(0);
 		return;
 	}
 
 	const colors = instanceColor.array as Float32Array;
+	let visibleCount = 0;
 
 	for (let i = 0; i < count; i++) {
 		const vector = values[i];
 		const position = positions[i];
+		const isVisible = vector.x !== 0 || vector.y !== 0 || vector.z !== 0;
 
 		_dummy.position.set(position.x, position.y, position.z);
 
-		if (vector.x === 0 && vector.y === 0 && vector.z === 0) {
+		if (!isVisible) {
 			_dummy.scale.set(0, 0, 0);
 			_dummy.quaternion.identity();
 		} else {
+			visibleCount += 1;
 			_dummy.scale.set(1, 1, 1);
 			_tempVec.set(vector.x, vector.y, vector.z).normalize();
 			_dummy.quaternion.setFromUnitVectors(_defaultUp, _tempVec);
@@ -501,6 +506,7 @@ function updateGlyphMesh(mesh: THREE.InstancedMesh) {
 		mesh.setMatrixAt(i, _dummy.matrix);
 	}
 
+	visibleRenderCount.set(visibleCount);
 	mesh.instanceMatrix.needsUpdate = true;
 	instanceColor.needsUpdate = true;
 }
@@ -512,6 +518,7 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 	const instanceColor = mesh.instanceColor;
 
 	if (!instanceColor) {
+		visibleRenderCount.set(0);
 		return;
 	}
 
@@ -524,6 +531,7 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 	const topo = get(topoEnabled);
 	const topoComp = get(topoComponent);
 	const topoMul = get(topoMultiplier);
+	let visibleCount = 0;
 
 	for (let i = 0; i < count; i++) {
 		const vector = values[i];
@@ -532,6 +540,7 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 			colorMode === 'orientation'
 				? vectorMagnitude(vector)
 				: Math.abs(componentValue(vector, colorMode));
+		const isVisible = isSampledPosition(position) && metric >= threshold;
 
 		let pz = position.z;
 		let voxelDepth = depthScale;
@@ -545,9 +554,10 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 		_dummy.position.set(position.x, position.y, pz);
 		_dummy.quaternion.identity();
 
-		if (!isSampledPosition(position) || metric < threshold) {
+		if (!isVisible) {
 			_dummy.scale.set(0, 0, 0);
 		} else {
+			visibleCount += 1;
 			_dummy.scale.set(baseScale, baseScale, voxelDepth);
 		}
 
@@ -560,6 +570,7 @@ function updateVoxelMesh(mesh: THREE.InstancedMesh) {
 		mesh.setMatrixAt(i, _dummy.matrix);
 	}
 
+	visibleRenderCount.set(visibleCount);
 	mesh.instanceMatrix.needsUpdate = true;
 	instanceColor.needsUpdate = true;
 	updateMaterialAppearance();
@@ -653,6 +664,7 @@ export function preview3D() {
 export function disposePreview3D() {
 	const container = document.getElementById('container');
 	const display = get(threeDPreview);
+	visibleRenderCount.set(0);
 
 	if (animationFrameId !== null) {
 		cancelAnimationFrame(animationFrameId);
@@ -824,18 +836,26 @@ export function setCameraViewDirection(dx: number, dy: number, dz: number) {
 
 	const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
 	if (len === 0) return;
-	dx /= len; dy /= len; dz /= len;
+	dx /= len;
+	dy /= len;
+	dz /= len;
 
 	const depthCells = getDepthCells();
 	const xSize = getPreviewWidthCells();
 	const ySize = getPreviewHeightCells();
 	const dist = Math.max(xSize, ySize, depthCells) * 1.5;
 
-	const cx = xSize / 2, cy = ySize / 2, cz = depthCells / 2;
+	const cx = xSize / 2,
+		cy = ySize / 2,
+		cz = depthCells / 2;
 
-	let ux = 0, uy = 1, uz = 0;
+	let ux = 0,
+		uy = 1,
+		uz = 0;
 	if (Math.abs(dy) > 0.9) {
-		ux = 0; uy = 0; uz = dy > 0 ? -1 : 1;
+		ux = 0;
+		uy = 0;
+		uz = dy > 0 ? -1 : 1;
 	}
 
 	display.camera.position.set(cx + dx * dist, cy + dy * dist, cz + dz * dist);
@@ -890,4 +910,3 @@ export function getCameraMatrix(): string {
 	// rotateX(phi): vertical tilt (positive phi = camera above = tilt cube forward)
 	return `rotateX(${phi}rad) rotateY(${-theta}rad)`;
 }
-

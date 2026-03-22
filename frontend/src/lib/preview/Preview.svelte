@@ -33,6 +33,7 @@
 		setQuality,
 		setRenderMode,
 		threeDPreview,
+		visibleRenderCount,
 		type Preview3DRenderMode,
 		type QualityLevel
 	} from './preview3D';
@@ -374,6 +375,12 @@
 
 		<div id="container" class="preview-wrapper__canvas"></div>
 
+		{#if $previewState.type === '3D' && $previewState.nComp === 3 && hasData}
+			<div class="preview-wrapper__stats">
+				{$renderMode === 'voxel' ? 'Voxels' : 'Arrows'}: {$visibleRenderCount.toLocaleString()}
+			</div>
+		{/if}
+
 		{#if viewMode === 'popout'}
 			<div class="preview-wrapper__resize" role="presentation" onmousedown={startResize}></div>
 		{/if}
@@ -490,6 +497,22 @@
 		pointer-events: auto;
 		width: min(28rem, 100%);
 		backdrop-filter: blur(12px);
+	}
+
+	.preview-wrapper__stats {
+		position: absolute;
+		left: 0.9rem;
+		bottom: 0.9rem;
+		z-index: 2;
+		padding: 0.35rem 0.6rem;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: rgba(9, 14, 25, 0.84);
+		backdrop-filter: blur(10px);
+		color: var(--text-2);
+		font-size: 0.78rem;
+		font-family: 'IBM Plex Mono', monospace;
+		pointer-events: none;
 	}
 
 	.preview-wrapper__resize {
