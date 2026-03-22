@@ -55,6 +55,18 @@ func normalizedGeomMode() string {
 	return mode
 }
 
+func geomCutCellEnabled(s shape) bool {
+	switch normalizedGeomMode() {
+	case "cutcell":
+		return s.voxelizer != nil
+	case "legacy":
+		return false
+	default:
+		log.Log.ErrAndExit(`GeomMode: unsupported mode %q (expected "legacy" or "cutcell")`, GeomMode)
+		return false
+	}
+}
+
 func geomUsesCutCell(s shape) bool {
 	switch normalizedGeomMode() {
 	case "cutcell":
@@ -72,7 +84,7 @@ func geomUsesCutCell(s shape) bool {
 }
 
 func (g *geom) usesCutCell() bool {
-	return geomUsesCutCell(g.shape)
+	return geomCutCellEnabled(g.shape)
 }
 
 type geom struct {
@@ -255,35 +267,122 @@ func (g *geom) setGeom(s shape) {
 	if g.FaceBuffer == nil || g.FaceBuffer.IsNil() || g.FaceBuffer.Size() != g.Mesh().Size() {
 		g.FaceBuffer = cuda.NewSlice(6, g.Mesh().Size())
 	}
-	if !geomUsesCutCell(s) {
+	useCutCell := geomUsesCutCell(s)
+	if !useCutCell {
 		g.ClearLinks()
 	}
 
-	host := data.NewSlice(1, g.Gpu().Size())
-	array := host.Scalars()
-	V := host
-	v := array
+	var host *data.Slice
+	empty := true
+
+	if useCutCell {
+		var hostFaces *data.Slice
+		var cutCells int
+		var minPositive float32
+		var belowFloor int
+		host, hostFaces, empty, cutCells, minPositive, belowFloor = g.setGeomCutCellHost(s)
+		data.Copy(g.Buffer, host)
+		data.Copy(g.FaceBuffer, hostFaces)
+		g.rebuildLinks(hostFaces)
+		if cutCells > 0 {
+			log.Log.Info("Cut-cell geometry: %d partial cells, minimum positive phi=%g", cutCells, minPositive)
+		}
+		if belowFloor > 0 {
+			log.Log.Warn("Cut-cell geometry: %d cells have phi < GeomPhiFloor=%g; exchange and DMI normalization will be clamped for stability", belowFloor, GeomPhiFloor)
+		}
+	} else {
+		host, empty = g.setGeomLegacyHost(s)
+		data.Copy(g.Buffer, host)
+		g.rebuildFaceBuffer()
+	}
+
+	if empty {
+		log.Log.ErrAndExit("SetGeom: geometry completely empty")
+	}
+
+	// M inside geom but previously outside needs to be re-inited
+	needupload := false
+	geomlist := host.Host()[0]
+	mhost := NormMag.Buffer().HostCopy()
+	m := mhost.Host()
+	rng := rand.New(rand.NewSource(0))
+	for i := range m[0] {
+		if geomlist[i] != 0 {
+			mx, my, mz := m[X][i], m[Y][i], m[Z][i]
+			if mx == 0 && my == 0 && mz == 0 {
+				needupload = true
+				rnd := randomDir(rng)
+				m[X][i], m[Y][i], m[Z][i] = float32(rnd[X]), float32(rnd[Y]), float32(rnd[Z])
+			}
+		}
+	}
+	if needupload {
+		data.Copy(NormMag.Buffer(), mhost)
+	}
+
+	NormMag.normalize() // removes m outside vol
+}
+
+func (g *geom) setGeomCutCellHost(s shape) (*data.Slice, *data.Slice, bool, int, float32, int) {
+	hostGeom := data.NewSlice(1, g.Gpu().Size())
+	hostFaces := data.NewSlice(6, g.Mesh().Size())
+	geomValues := hostGeom.Host()[0]
+	faceValues := hostFaces.Host()
 	n := g.Mesh().Size()
-	c := g.Mesh().CellSize()
-	cx, cy, cz := c[X], c[Y], c[Z]
+	empty := true
+	minPositive := float32(1)
+	cutCells := 0
+	belowFloor := 0
 
 	log.Log.Info("Initializing geometry")
-	empty := true
 	for iz := 0; iz < n[Z]; iz++ {
 		pct := 100 * (iz + 1) / n[Z]
 		fmt.Fprintf(os.Stderr, "\rInitializing geometry: %3d%%", pct)
-
 		for iy := 0; iy < n[Y]; iy++ {
 			for ix := 0; ix < n[X]; ix++ {
+				idx := data.Index(n, ix, iy, iz)
+				metrics := s.voxelizer.cellMetrics(boundsFromIndex(ix, iy, iz))
+				phi := metrics.VolumeFraction
+				geomValues[idx] = phi
+				for comp, value := range metrics.FaceFraction {
+					faceValues[comp][idx] = value
+				}
+				if phi > 0 {
+					empty = false
+					if phi < minPositive {
+						minPositive = phi
+					}
+					if phi < float32(GeomPhiFloor) {
+						belowFloor++
+					}
+				}
+				if phi > 0 && phi < 1 {
+					cutCells++
+				}
+			}
+		}
+	}
+	fmt.Fprintf(os.Stderr, "\n")
 
+	return hostGeom, hostFaces, empty, cutCells, minPositive, belowFloor
+}
+
+func (g *geom) setGeomLegacyHost(s shape) (*data.Slice, bool) {
+	host := data.NewSlice(1, g.Gpu().Size())
+	v := host.Scalars()
+	n := g.Mesh().Size()
+	c := g.Mesh().CellSize()
+	cx, cy, cz := c[X], c[Y], c[Z]
+	empty := true
+
+	log.Log.Info("Initializing geometry")
+	for iz := 0; iz < n[Z]; iz++ {
+		pct := 100 * (iz + 1) / n[Z]
+		fmt.Fprintf(os.Stderr, "\rInitializing geometry: %3d%%", pct)
+		for iy := 0; iy < n[Y]; iy++ {
+			for ix := 0; ix < n[X]; ix++ {
 				r := index2Coord(ix, iy, iz)
 				x0, y0, z0 := r[X], r[Y], r[Z]
-
-				if geomUsesCutCell(s) {
-					v[iz][iy][ix] = g.cellVolume(ix, iy, iz)
-					empty = empty && (v[iz][iy][ix] == 0)
-					continue
-				}
 
 				// check if center and all vertices lie inside or all outside
 				allIn, allOut := true, true
@@ -322,58 +421,7 @@ func (g *geom) setGeom(s shape) {
 	}
 	fmt.Fprintf(os.Stderr, "\n")
 
-	if geomUsesCutCell(s) {
-		geomlist := host.Host()[0]
-		minPositive := float32(1)
-		cutCells := 0
-		belowFloor := 0
-		for _, phi := range geomlist {
-			if phi > 0 && phi < 1 {
-				cutCells++
-			}
-			if phi > 0 && phi < minPositive {
-				minPositive = phi
-			}
-			if phi > 0 && phi < float32(GeomPhiFloor) {
-				belowFloor++
-			}
-		}
-		if cutCells > 0 {
-			log.Log.Info("Cut-cell geometry: %d partial cells, minimum positive phi=%g", cutCells, minPositive)
-		}
-		if belowFloor > 0 {
-			log.Log.Warn("Cut-cell geometry: %d cells have phi < GeomPhiFloor=%g; exchange and DMI normalization will be clamped for stability", belowFloor, GeomPhiFloor)
-		}
-	}
-
-	if empty {
-		log.Log.ErrAndExit("SetGeom: geometry completely empty")
-	}
-
-	data.Copy(g.Buffer, V)
-	g.rebuildFaceBuffer()
-
-	// M inside geom but previously outside needs to be re-inited
-	needupload := false
-	geomlist := host.Host()[0]
-	mhost := NormMag.Buffer().HostCopy()
-	m := mhost.Host()
-	rng := rand.New(rand.NewSource(0))
-	for i := range m[0] {
-		if geomlist[i] != 0 {
-			mx, my, mz := m[X][i], m[Y][i], m[Z][i]
-			if mx == 0 && my == 0 && mz == 0 {
-				needupload = true
-				rnd := randomDir(rng)
-				m[X][i], m[Y][i], m[Z][i] = float32(rnd[X]), float32(rnd[Y]), float32(rnd[Z])
-			}
-		}
-	}
-	if needupload {
-		data.Copy(NormMag.Buffer(), mhost)
-	}
-
-	NormMag.normalize() // removes m outside vol
+	return host, empty
 }
 
 func edgeSmoothSamples() int {

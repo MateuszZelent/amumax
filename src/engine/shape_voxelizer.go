@@ -154,7 +154,11 @@ func faceEpsilon(span float64) float64 {
 }
 
 func sampledLeafSamples() int {
-	return 2
+	n := edgeSmoothSamples()
+	if n < 4 {
+		return 4
+	}
+	return n
 }
 
 func sampledSnapUnit(v float64) float64 {
