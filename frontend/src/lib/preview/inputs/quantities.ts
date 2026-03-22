@@ -53,7 +53,7 @@ export const quantities: { [category: string]: string[] } = {
 
 	'Magneto-elastic': ['B1', 'B2', 'F_mel', 'B_mel'],
 
-	Geometry: ['geom', 'geom_thickness_z', 'geom_face_x', 'geom_face_y', 'geom_face_z'],
+	Geometry: ['geom', 'geom_phi', 'geom_fx', 'geom_fy', 'geom_fz', 'geom_thickness_z', 'geom_face_x', 'geom_face_y', 'geom_face_z'],
 
 	Miscellaneous: ['frozenspins', 'NoDemagSpins', 'MFM', 'spinAngle', 'LLtorque', 'm_full', 'Temp']
 };

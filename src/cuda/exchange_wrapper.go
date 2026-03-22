@@ -38,11 +38,12 @@ type addexchangeArgsT struct {
 	argWx float32
 	argWy float32
 	argWz float32
+	argPhiFloor float32
 	argNx int
 	argNy int
 	argNz int
 	argPBC byte
-	argptr [24]unsafe.Pointer
+	argptr [25]unsafe.Pointer
 	sync.Mutex
 }
 
@@ -71,14 +72,15 @@ func init() {
 	addexchangeArgs.argptr[17] = unsafe.Pointer(&addexchangeArgs.argWx)
 	addexchangeArgs.argptr[18] = unsafe.Pointer(&addexchangeArgs.argWy)
 	addexchangeArgs.argptr[19] = unsafe.Pointer(&addexchangeArgs.argWz)
-	addexchangeArgs.argptr[20] = unsafe.Pointer(&addexchangeArgs.argNx)
-	addexchangeArgs.argptr[21] = unsafe.Pointer(&addexchangeArgs.argNy)
-	addexchangeArgs.argptr[22] = unsafe.Pointer(&addexchangeArgs.argNz)
-	addexchangeArgs.argptr[23] = unsafe.Pointer(&addexchangeArgs.argPBC)
+	addexchangeArgs.argptr[20] = unsafe.Pointer(&addexchangeArgs.argPhiFloor)
+	addexchangeArgs.argptr[21] = unsafe.Pointer(&addexchangeArgs.argNx)
+	addexchangeArgs.argptr[22] = unsafe.Pointer(&addexchangeArgs.argNy)
+	addexchangeArgs.argptr[23] = unsafe.Pointer(&addexchangeArgs.argNz)
+	addexchangeArgs.argptr[24] = unsafe.Pointer(&addexchangeArgs.argPBC)
 	}
 
 // Wrapper for addexchange CUDA kernel, asynchronous.
-func kAddexchangeAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, vol unsafe.Pointer, fxm unsafe.Pointer, fxp unsafe.Pointer, fym unsafe.Pointer, fyp unsafe.Pointer, fzm unsafe.Pointer, fzp unsafe.Pointer, aLUT2d unsafe.Pointer, regions unsafe.Pointer, wx float32, wy float32, wz float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
+func kAddexchangeAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, mx unsafe.Pointer, my unsafe.Pointer, mz unsafe.Pointer, Ms_ unsafe.Pointer, Ms_mul float32, vol unsafe.Pointer, fxm unsafe.Pointer, fxp unsafe.Pointer, fym unsafe.Pointer, fyp unsafe.Pointer, fzm unsafe.Pointer, fzp unsafe.Pointer, aLUT2d unsafe.Pointer, regions unsafe.Pointer, wx float32, wy float32, wz float32, phiFloor float32, Nx int, Ny int, Nz int, PBC byte, cfg *config) {
 	if Synchronous { // debug
 		Sync()
 		timer.Start("addexchange")
@@ -111,6 +113,7 @@ func kAddexchangeAsync(Bx unsafe.Pointer, By unsafe.Pointer, Bz unsafe.Pointer, 
 	addexchangeArgs.argWx = wx
 	addexchangeArgs.argWy = wy
 	addexchangeArgs.argWz = wz
+	addexchangeArgs.argPhiFloor = phiFloor
 	addexchangeArgs.argNx = Nx
 	addexchangeArgs.argNy = Ny
 	addexchangeArgs.argNz = Nz
@@ -161,20 +164,21 @@ const (
 	.param .f32 addexchange_param_17,
 	.param .f32 addexchange_param_18,
 	.param .f32 addexchange_param_19,
-	.param .u32 addexchange_param_20,
+	.param .f32 addexchange_param_20,
 	.param .u32 addexchange_param_21,
 	.param .u32 addexchange_param_22,
-	.param .u8 addexchange_param_23
+	.param .u32 addexchange_param_23,
+	.param .u8 addexchange_param_24
 )
 {
 	.reg .pred 	%p<47>;
 	.reg .b16 	%rs<38>;
-	.reg .f32 	%f<187>;
+	.reg .f32 	%f<190>;
 	.reg .b32 	%r<111>;
 	.reg .b64 	%rd<114>;
 
 
-	ld.param.u8 	%rs5, [addexchange_param_23];
+	ld.param.u8 	%rs5, [addexchange_param_24];
 	ld.param.u64 	%rd13, [addexchange_param_0];
 	ld.param.u64 	%rd14, [addexchange_param_1];
 	ld.param.u64 	%rd15, [addexchange_param_2];
@@ -184,9 +188,9 @@ const (
 	ld.param.u64 	%rd16, [addexchange_param_6];
 	ld.param.u64 	%rd27, [addexchange_param_15];
 	ld.param.u64 	%rd28, [addexchange_param_16];
-	ld.param.u32 	%r30, [addexchange_param_20];
-	ld.param.u32 	%r31, [addexchange_param_21];
-	ld.param.u32 	%r32, [addexchange_param_22];
+	ld.param.u32 	%r30, [addexchange_param_21];
+	ld.param.u32 	%r31, [addexchange_param_22];
+	ld.param.u32 	%r32, [addexchange_param_23];
 	cvta.to.global.u64 	%rd1, %rd27;
 	cvta.to.global.u64 	%rd2, %rd28;
 	cvta.to.global.u64 	%rd3, %rd26;
@@ -222,11 +226,11 @@ const (
 	add.s64 	%rd32, %rd3, %rd29;
 	ld.global.nc.f32 	%f1, [%rd30];
 	ld.global.nc.f32 	%f2, [%rd31];
-	mul.f32 	%f74, %f2, %f2;
-	fma.rn.f32 	%f75, %f1, %f1, %f74;
+	mul.f32 	%f75, %f2, %f2;
+	fma.rn.f32 	%f76, %f1, %f1, %f75;
 	ld.global.nc.f32 	%f3, [%rd32];
-	fma.rn.f32 	%f76, %f3, %f3, %f75;
-	setp.eq.f32 	%p6, %f76, 0f00000000;
+	fma.rn.f32 	%f77, %f3, %f3, %f76;
+	setp.eq.f32 	%p6, %f77, 0f00000000;
 	@%p6 bra 	$L__BB0_51;
 
 	ld.param.u64 	%rd107, [addexchange_param_8];
@@ -235,14 +239,16 @@ const (
 	add.s64 	%rd35, %rd33, %rd34;
 	ld.global.nc.f32 	%f4, [%rd35];
 	setp.le.f32 	%p7, %f4, 0f00000000;
-	mov.f32 	%f170, 0f00000000;
-	mov.f32 	%f171, 0f00000000;
-	mov.f32 	%f172, 0f00000000;
+	mov.f32 	%f173, 0f00000000;
+	mov.f32 	%f174, 0f00000000;
+	mov.f32 	%f175, 0f00000000;
 	@%p7 bra 	$L__BB0_51;
 
-	mov.f32 	%f80, 0f358637BD;
-	max.f32 	%f81, %f4, %f80;
-	rcp.rn.f32 	%f5, %f81;
+	ld.param.f32 	%f161, [addexchange_param_20];
+	mov.f32 	%f81, 0f358637BD;
+	max.f32 	%f82, %f161, %f81;
+	max.f32 	%f83, %f4, %f82;
+	rcp.rn.f32 	%f5, %f83;
 	add.s64 	%rd36, %rd2, %rd6;
 	ld.global.nc.u8 	%rs1, [%rd36];
 	and.b16  	%rs2, %rs5, 1;
@@ -254,8 +260,8 @@ const (
 	ld.param.u64 	%rd111, [addexchange_param_9];
 	cvta.to.global.u64 	%rd37, %rd111;
 	add.s64 	%rd39, %rd37, %rd34;
-	ld.global.nc.f32 	%f85, [%rd39];
-	mul.f32 	%f6, %f5, %f85;
+	ld.global.nc.f32 	%f87, [%rd39];
+	mul.f32 	%f6, %f5, %f87;
 	setp.leu.f32 	%p11, %f6, 0f00000000;
 	@%p11 bra 	$L__BB0_10;
 
@@ -281,14 +287,14 @@ $L__BB0_8:
 	add.s64 	%rd43, %rd3, %rd40;
 	ld.global.nc.f32 	%f7, [%rd41];
 	ld.global.nc.f32 	%f8, [%rd42];
-	mul.f32 	%f89, %f8, %f8;
-	fma.rn.f32 	%f90, %f7, %f7, %f89;
+	mul.f32 	%f91, %f8, %f8;
+	fma.rn.f32 	%f92, %f7, %f7, %f91;
 	ld.global.nc.f32 	%f9, [%rd43];
-	fma.rn.f32 	%f91, %f9, %f9, %f90;
-	setp.eq.f32 	%p13, %f91, 0f00000000;
+	fma.rn.f32 	%f93, %f9, %f9, %f92;
+	setp.eq.f32 	%p13, %f93, 0f00000000;
 	@%p13 bra 	$L__BB0_10;
 
-	ld.param.f32 	%f162, [addexchange_param_17];
+	ld.param.f32 	%f165, [addexchange_param_17];
 	add.s64 	%rd44, %rd2, %rd7;
 	ld.global.nc.u8 	%rs6, [%rd44];
 	min.u16 	%rs9, %rs6, %rs1;
@@ -301,15 +307,15 @@ $L__BB0_8:
 	add.s32 	%r52, %r50, %r51;
 	mul.wide.s32 	%rd45, %r52, 4;
 	add.s64 	%rd46, %rd1, %rd45;
-	mul.f32 	%f92, %f6, %f162;
-	ld.global.nc.f32 	%f93, [%rd46];
-	mul.f32 	%f94, %f92, %f93;
-	sub.f32 	%f95, %f7, %f1;
-	sub.f32 	%f96, %f8, %f2;
-	sub.f32 	%f97, %f9, %f3;
-	fma.rn.f32 	%f172, %f95, %f94, 0f00000000;
-	fma.rn.f32 	%f171, %f96, %f94, 0f00000000;
-	fma.rn.f32 	%f170, %f97, %f94, 0f00000000;
+	mul.f32 	%f94, %f6, %f165;
+	ld.global.nc.f32 	%f95, [%rd46];
+	mul.f32 	%f96, %f94, %f95;
+	sub.f32 	%f97, %f7, %f1;
+	sub.f32 	%f98, %f8, %f2;
+	sub.f32 	%f99, %f9, %f3;
+	fma.rn.f32 	%f175, %f97, %f96, 0f00000000;
+	fma.rn.f32 	%f174, %f98, %f96, 0f00000000;
+	fma.rn.f32 	%f173, %f99, %f96, 0f00000000;
 
 $L__BB0_10:
 	add.s32 	%r10, %r1, 1;
@@ -320,8 +326,8 @@ $L__BB0_10:
 	ld.param.u64 	%rd110, [addexchange_param_10];
 	cvta.to.global.u64 	%rd47, %rd110;
 	add.s64 	%rd49, %rd47, %rd34;
-	ld.global.nc.f32 	%f98, [%rd49];
-	mul.f32 	%f16, %f5, %f98;
+	ld.global.nc.f32 	%f100, [%rd49];
+	mul.f32 	%f16, %f5, %f100;
 	setp.leu.f32 	%p17, %f16, 0f00000000;
 	@%p17 bra 	$L__BB0_17;
 
@@ -347,14 +353,14 @@ $L__BB0_15:
 	add.s64 	%rd53, %rd3, %rd50;
 	ld.global.nc.f32 	%f17, [%rd51];
 	ld.global.nc.f32 	%f18, [%rd52];
-	mul.f32 	%f99, %f18, %f18;
-	fma.rn.f32 	%f100, %f17, %f17, %f99;
+	mul.f32 	%f101, %f18, %f18;
+	fma.rn.f32 	%f102, %f17, %f17, %f101;
 	ld.global.nc.f32 	%f19, [%rd53];
-	fma.rn.f32 	%f101, %f19, %f19, %f100;
-	setp.eq.f32 	%p19, %f101, 0f00000000;
+	fma.rn.f32 	%f103, %f19, %f19, %f102;
+	setp.eq.f32 	%p19, %f103, 0f00000000;
 	@%p19 bra 	$L__BB0_17;
 
-	ld.param.f32 	%f161, [addexchange_param_17];
+	ld.param.f32 	%f164, [addexchange_param_17];
 	add.s64 	%rd54, %rd2, %rd8;
 	ld.global.nc.u8 	%rs11, [%rd54];
 	min.u16 	%rs14, %rs11, %rs1;
@@ -367,18 +373,18 @@ $L__BB0_15:
 	add.s32 	%r62, %r60, %r61;
 	mul.wide.s32 	%rd55, %r62, 4;
 	add.s64 	%rd56, %rd1, %rd55;
-	mul.f32 	%f102, %f16, %f161;
-	ld.global.nc.f32 	%f103, [%rd56];
-	mul.f32 	%f104, %f102, %f103;
-	sub.f32 	%f105, %f17, %f1;
-	sub.f32 	%f106, %f18, %f2;
-	sub.f32 	%f107, %f19, %f3;
-	fma.rn.f32 	%f172, %f105, %f104, %f172;
-	fma.rn.f32 	%f171, %f106, %f104, %f171;
-	fma.rn.f32 	%f170, %f107, %f104, %f170;
+	mul.f32 	%f104, %f16, %f164;
+	ld.global.nc.f32 	%f105, [%rd56];
+	mul.f32 	%f106, %f104, %f105;
+	sub.f32 	%f107, %f17, %f1;
+	sub.f32 	%f108, %f18, %f2;
+	sub.f32 	%f109, %f19, %f3;
+	fma.rn.f32 	%f175, %f107, %f106, %f175;
+	fma.rn.f32 	%f174, %f108, %f106, %f174;
+	fma.rn.f32 	%f173, %f109, %f106, %f173;
 
 $L__BB0_17:
-	ld.param.u8 	%rs36, [addexchange_param_23];
+	ld.param.u8 	%rs36, [addexchange_param_24];
 	and.b16  	%rs3, %rs36, 2;
 	setp.eq.s16 	%p20, %rs3, 0;
 	setp.lt.s32 	%p21, %r2, 1;
@@ -388,8 +394,8 @@ $L__BB0_17:
 	ld.param.u64 	%rd109, [addexchange_param_11];
 	cvta.to.global.u64 	%rd57, %rd109;
 	add.s64 	%rd59, %rd57, %rd34;
-	ld.global.nc.f32 	%f108, [%rd59];
-	mul.f32 	%f26, %f5, %f108;
+	ld.global.nc.f32 	%f110, [%rd59];
+	mul.f32 	%f26, %f5, %f110;
 	setp.leu.f32 	%p23, %f26, 0f00000000;
 	@%p23 bra 	$L__BB0_24;
 
@@ -416,14 +422,14 @@ $L__BB0_22:
 	add.s64 	%rd63, %rd3, %rd60;
 	ld.global.nc.f32 	%f27, [%rd61];
 	ld.global.nc.f32 	%f28, [%rd62];
-	mul.f32 	%f109, %f28, %f28;
-	fma.rn.f32 	%f110, %f27, %f27, %f109;
+	mul.f32 	%f111, %f28, %f28;
+	fma.rn.f32 	%f112, %f27, %f27, %f111;
 	ld.global.nc.f32 	%f29, [%rd63];
-	fma.rn.f32 	%f111, %f29, %f29, %f110;
-	setp.eq.f32 	%p25, %f111, 0f00000000;
+	fma.rn.f32 	%f113, %f29, %f29, %f112;
+	setp.eq.f32 	%p25, %f113, 0f00000000;
 	@%p25 bra 	$L__BB0_24;
 
-	ld.param.f32 	%f160, [addexchange_param_18];
+	ld.param.f32 	%f163, [addexchange_param_18];
 	add.s64 	%rd64, %rd2, %rd9;
 	ld.global.nc.u8 	%rs16, [%rd64];
 	min.u16 	%rs19, %rs16, %rs1;
@@ -436,15 +442,15 @@ $L__BB0_22:
 	add.s32 	%r72, %r70, %r71;
 	mul.wide.s32 	%rd65, %r72, 4;
 	add.s64 	%rd66, %rd1, %rd65;
-	mul.f32 	%f112, %f26, %f160;
-	ld.global.nc.f32 	%f113, [%rd66];
-	mul.f32 	%f114, %f112, %f113;
-	sub.f32 	%f115, %f27, %f1;
-	sub.f32 	%f116, %f28, %f2;
-	sub.f32 	%f117, %f29, %f3;
-	fma.rn.f32 	%f172, %f115, %f114, %f172;
-	fma.rn.f32 	%f171, %f116, %f114, %f171;
-	fma.rn.f32 	%f170, %f117, %f114, %f170;
+	mul.f32 	%f114, %f26, %f163;
+	ld.global.nc.f32 	%f115, [%rd66];
+	mul.f32 	%f116, %f114, %f115;
+	sub.f32 	%f117, %f27, %f1;
+	sub.f32 	%f118, %f28, %f2;
+	sub.f32 	%f119, %f29, %f3;
+	fma.rn.f32 	%f175, %f117, %f116, %f175;
+	fma.rn.f32 	%f174, %f118, %f116, %f174;
+	fma.rn.f32 	%f173, %f119, %f116, %f173;
 
 $L__BB0_24:
 	add.s32 	%r18, %r2, 1;
@@ -455,8 +461,8 @@ $L__BB0_24:
 	ld.param.u64 	%rd108, [addexchange_param_12];
 	cvta.to.global.u64 	%rd67, %rd108;
 	add.s64 	%rd69, %rd67, %rd34;
-	ld.global.nc.f32 	%f118, [%rd69];
-	mul.f32 	%f36, %f5, %f118;
+	ld.global.nc.f32 	%f120, [%rd69];
+	mul.f32 	%f36, %f5, %f120;
 	setp.leu.f32 	%p29, %f36, 0f00000000;
 	@%p29 bra 	$L__BB0_31;
 
@@ -483,14 +489,14 @@ $L__BB0_29:
 	add.s64 	%rd73, %rd3, %rd70;
 	ld.global.nc.f32 	%f37, [%rd71];
 	ld.global.nc.f32 	%f38, [%rd72];
-	mul.f32 	%f119, %f38, %f38;
-	fma.rn.f32 	%f120, %f37, %f37, %f119;
+	mul.f32 	%f121, %f38, %f38;
+	fma.rn.f32 	%f122, %f37, %f37, %f121;
 	ld.global.nc.f32 	%f39, [%rd73];
-	fma.rn.f32 	%f121, %f39, %f39, %f120;
-	setp.eq.f32 	%p31, %f121, 0f00000000;
+	fma.rn.f32 	%f123, %f39, %f39, %f122;
+	setp.eq.f32 	%p31, %f123, 0f00000000;
 	@%p31 bra 	$L__BB0_31;
 
-	ld.param.f32 	%f159, [addexchange_param_18];
+	ld.param.f32 	%f162, [addexchange_param_18];
 	add.s64 	%rd74, %rd2, %rd10;
 	ld.global.nc.u8 	%rs21, [%rd74];
 	min.u16 	%rs24, %rs21, %rs1;
@@ -503,21 +509,21 @@ $L__BB0_29:
 	add.s32 	%r83, %r81, %r82;
 	mul.wide.s32 	%rd75, %r83, 4;
 	add.s64 	%rd76, %rd1, %rd75;
-	mul.f32 	%f122, %f36, %f159;
-	ld.global.nc.f32 	%f123, [%rd76];
-	mul.f32 	%f124, %f122, %f123;
-	sub.f32 	%f125, %f37, %f1;
-	sub.f32 	%f126, %f38, %f2;
-	sub.f32 	%f127, %f39, %f3;
-	fma.rn.f32 	%f172, %f125, %f124, %f172;
-	fma.rn.f32 	%f171, %f126, %f124, %f171;
-	fma.rn.f32 	%f170, %f127, %f124, %f170;
+	mul.f32 	%f124, %f36, %f162;
+	ld.global.nc.f32 	%f125, [%rd76];
+	mul.f32 	%f126, %f124, %f125;
+	sub.f32 	%f127, %f37, %f1;
+	sub.f32 	%f128, %f38, %f2;
+	sub.f32 	%f129, %f39, %f3;
+	fma.rn.f32 	%f175, %f127, %f126, %f175;
+	fma.rn.f32 	%f174, %f128, %f126, %f174;
+	fma.rn.f32 	%f173, %f129, %f126, %f173;
 
 $L__BB0_31:
 	setp.eq.s32 	%p32, %r32, 1;
 	@%p32 bra 	$L__BB0_46;
 
-	ld.param.u8 	%rs37, [addexchange_param_23];
+	ld.param.u8 	%rs37, [addexchange_param_24];
 	setp.lt.s32 	%p33, %r3, 1;
 	and.b16  	%rs4, %rs37, 4;
 	setp.eq.s16 	%p34, %rs4, 0;
@@ -527,8 +533,8 @@ $L__BB0_31:
 	ld.param.u64 	%rd112, [addexchange_param_13];
 	cvta.to.global.u64 	%rd77, %rd112;
 	add.s64 	%rd79, %rd77, %rd34;
-	ld.global.nc.f32 	%f128, [%rd79];
-	mul.f32 	%f46, %f5, %f128;
+	ld.global.nc.f32 	%f130, [%rd79];
+	mul.f32 	%f46, %f5, %f130;
 	setp.leu.f32 	%p36, %f46, 0f00000000;
 	@%p36 bra 	$L__BB0_39;
 
@@ -555,14 +561,14 @@ $L__BB0_37:
 	add.s64 	%rd83, %rd3, %rd80;
 	ld.global.nc.f32 	%f47, [%rd81];
 	ld.global.nc.f32 	%f48, [%rd82];
-	mul.f32 	%f129, %f48, %f48;
-	fma.rn.f32 	%f130, %f47, %f47, %f129;
+	mul.f32 	%f131, %f48, %f48;
+	fma.rn.f32 	%f132, %f47, %f47, %f131;
 	ld.global.nc.f32 	%f49, [%rd83];
-	fma.rn.f32 	%f131, %f49, %f49, %f130;
-	setp.eq.f32 	%p38, %f131, 0f00000000;
+	fma.rn.f32 	%f133, %f49, %f49, %f132;
+	setp.eq.f32 	%p38, %f133, 0f00000000;
 	@%p38 bra 	$L__BB0_39;
 
-	ld.param.f32 	%f164, [addexchange_param_19];
+	ld.param.f32 	%f167, [addexchange_param_19];
 	add.s64 	%rd84, %rd2, %rd11;
 	ld.global.nc.u8 	%rs26, [%rd84];
 	min.u16 	%rs29, %rs26, %rs1;
@@ -575,15 +581,15 @@ $L__BB0_37:
 	add.s32 	%r93, %r91, %r92;
 	mul.wide.s32 	%rd85, %r93, 4;
 	add.s64 	%rd86, %rd1, %rd85;
-	mul.f32 	%f132, %f46, %f164;
-	ld.global.nc.f32 	%f133, [%rd86];
-	mul.f32 	%f134, %f132, %f133;
-	sub.f32 	%f135, %f47, %f1;
-	sub.f32 	%f136, %f48, %f2;
-	sub.f32 	%f137, %f49, %f3;
-	fma.rn.f32 	%f172, %f135, %f134, %f172;
-	fma.rn.f32 	%f171, %f136, %f134, %f171;
-	fma.rn.f32 	%f170, %f137, %f134, %f170;
+	mul.f32 	%f134, %f46, %f167;
+	ld.global.nc.f32 	%f135, [%rd86];
+	mul.f32 	%f136, %f134, %f135;
+	sub.f32 	%f137, %f47, %f1;
+	sub.f32 	%f138, %f48, %f2;
+	sub.f32 	%f139, %f49, %f3;
+	fma.rn.f32 	%f175, %f137, %f136, %f175;
+	fma.rn.f32 	%f174, %f138, %f136, %f174;
+	fma.rn.f32 	%f173, %f139, %f136, %f173;
 
 $L__BB0_39:
 	add.s32 	%r26, %r3, 1;
@@ -594,8 +600,8 @@ $L__BB0_39:
 	ld.param.u64 	%rd113, [addexchange_param_14];
 	cvta.to.global.u64 	%rd87, %rd113;
 	add.s64 	%rd89, %rd87, %rd34;
-	ld.global.nc.f32 	%f138, [%rd89];
-	mul.f32 	%f56, %f5, %f138;
+	ld.global.nc.f32 	%f140, [%rd89];
+	mul.f32 	%f56, %f5, %f140;
 	setp.leu.f32 	%p42, %f56, 0f00000000;
 	@%p42 bra 	$L__BB0_46;
 
@@ -622,14 +628,14 @@ $L__BB0_44:
 	add.s64 	%rd93, %rd3, %rd90;
 	ld.global.nc.f32 	%f57, [%rd91];
 	ld.global.nc.f32 	%f58, [%rd92];
-	mul.f32 	%f139, %f58, %f58;
-	fma.rn.f32 	%f140, %f57, %f57, %f139;
+	mul.f32 	%f141, %f58, %f58;
+	fma.rn.f32 	%f142, %f57, %f57, %f141;
 	ld.global.nc.f32 	%f59, [%rd93];
-	fma.rn.f32 	%f141, %f59, %f59, %f140;
-	setp.eq.f32 	%p44, %f141, 0f00000000;
+	fma.rn.f32 	%f143, %f59, %f59, %f142;
+	setp.eq.f32 	%p44, %f143, 0f00000000;
 	@%p44 bra 	$L__BB0_46;
 
-	ld.param.f32 	%f163, [addexchange_param_19];
+	ld.param.f32 	%f166, [addexchange_param_19];
 	add.s64 	%rd94, %rd2, %rd12;
 	ld.global.nc.u8 	%rs31, [%rd94];
 	min.u16 	%rs34, %rs31, %rs1;
@@ -642,50 +648,50 @@ $L__BB0_44:
 	add.s32 	%r104, %r102, %r103;
 	mul.wide.s32 	%rd95, %r104, 4;
 	add.s64 	%rd96, %rd1, %rd95;
-	mul.f32 	%f142, %f56, %f163;
-	ld.global.nc.f32 	%f143, [%rd96];
-	mul.f32 	%f144, %f142, %f143;
-	sub.f32 	%f145, %f57, %f1;
-	sub.f32 	%f146, %f58, %f2;
-	sub.f32 	%f147, %f59, %f3;
-	fma.rn.f32 	%f172, %f145, %f144, %f172;
-	fma.rn.f32 	%f171, %f146, %f144, %f171;
-	fma.rn.f32 	%f170, %f147, %f144, %f170;
+	mul.f32 	%f144, %f56, %f166;
+	ld.global.nc.f32 	%f145, [%rd96];
+	mul.f32 	%f146, %f144, %f145;
+	sub.f32 	%f147, %f57, %f1;
+	sub.f32 	%f148, %f58, %f2;
+	sub.f32 	%f149, %f59, %f3;
+	fma.rn.f32 	%f175, %f147, %f146, %f175;
+	fma.rn.f32 	%f174, %f148, %f146, %f174;
+	fma.rn.f32 	%f173, %f149, %f146, %f173;
 
 $L__BB0_46:
-	ld.param.f32 	%f185, [addexchange_param_7];
+	ld.param.f32 	%f188, [addexchange_param_7];
 	setp.eq.s64 	%p45, %rd16, 0;
 	@%p45 bra 	$L__BB0_48;
 
-	ld.param.f32 	%f166, [addexchange_param_7];
+	ld.param.f32 	%f169, [addexchange_param_7];
 	cvta.to.global.u64 	%rd97, %rd16;
 	add.s64 	%rd99, %rd97, %rd34;
-	ld.global.nc.f32 	%f148, [%rd99];
-	mul.f32 	%f185, %f148, %f166;
+	ld.global.nc.f32 	%f150, [%rd99];
+	mul.f32 	%f188, %f150, %f169;
 
 $L__BB0_48:
-	setp.eq.f32 	%p46, %f185, 0f00000000;
-	mov.f32 	%f186, 0f00000000;
+	setp.eq.f32 	%p46, %f188, 0f00000000;
+	mov.f32 	%f189, 0f00000000;
 	@%p46 bra 	$L__BB0_50;
 
-	rcp.rn.f32 	%f186, %f185;
+	rcp.rn.f32 	%f189, %f188;
 
 $L__BB0_50:
 	cvta.to.global.u64 	%rd100, %rd13;
 	add.s64 	%rd102, %rd100, %rd34;
-	ld.global.f32 	%f150, [%rd102];
-	fma.rn.f32 	%f151, %f172, %f186, %f150;
-	st.global.f32 	[%rd102], %f151;
+	ld.global.f32 	%f152, [%rd102];
+	fma.rn.f32 	%f153, %f175, %f189, %f152;
+	st.global.f32 	[%rd102], %f153;
 	cvta.to.global.u64 	%rd103, %rd14;
 	add.s64 	%rd104, %rd103, %rd34;
-	ld.global.f32 	%f152, [%rd104];
-	fma.rn.f32 	%f153, %f171, %f186, %f152;
-	st.global.f32 	[%rd104], %f153;
+	ld.global.f32 	%f154, [%rd104];
+	fma.rn.f32 	%f155, %f174, %f189, %f154;
+	st.global.f32 	[%rd104], %f155;
 	cvta.to.global.u64 	%rd105, %rd15;
 	add.s64 	%rd106, %rd105, %rd34;
-	ld.global.f32 	%f154, [%rd106];
-	fma.rn.f32 	%f155, %f170, %f186, %f154;
-	st.global.f32 	[%rd106], %f155;
+	ld.global.f32 	%f156, [%rd106];
+	fma.rn.f32 	%f157, %f173, %f189, %f156;
+	st.global.f32 	[%rd106], %f157;
 
 $L__BB0_51:
 	ret;

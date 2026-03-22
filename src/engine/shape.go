@@ -11,122 +11,89 @@ import (
 )
 
 // geometrical shape for setting sample geometry
-type shape func(x, y, z float64) bool
+type shape struct {
+	insideFn  func(x, y, z float64) bool
+	voxelizer shapeVoxelizer
+}
+
+func newShape(inside func(x, y, z float64) bool) shape {
+	return shape{insideFn: inside}
+}
+
+func newVoxelizedShape(inside func(x, y, z float64) bool, voxelizer shapeVoxelizer) shape {
+	return shape{insideFn: inside, voxelizer: voxelizer}
+}
+
+func (s shape) isNil() bool { return s.insideFn == nil }
+
+func (s shape) contains(x, y, z float64) bool {
+	return s.insideFn != nil && s.insideFn(x, y, z)
+}
 
 // wave with given diameters
 func wave(period, amin, amax float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		wavex := (math.Cos(x/period*2*math.Pi)/2 - 0.5) * (amax - amin) / 2
 		return y > wavex-amin/2 && y < -wavex+amin/2
-	}
+	})
 }
 
-// sinWaveguide creates a finite waveguide whose centerline follows a sinusoidal path.
-// The waveguide propagates along x. In the XZ plane you see a sine wave.
-// length: total waveguide length along x
-// width:  waveguide width in y
-// height: waveguide thickness in z
-// period: spatial period of the sine oscillation along x
-// sinAmp: amplitude of the sinusoidal oscillation in z
+// sinWaveguide creates a finite sinusoidal waveguide with vertically measured thickness.
+// It is a legacy convenience wrapper for SinWaveguideVertical with phase=0 and z0=0.
 func sinWaveguide(length, width, height, period, sinAmp float64) shape {
-	switch {
-	case length <= 0:
-		log.Log.ErrAndExit("SinWaveguide: length must be > 0, got %g", length)
-	case width <= 0:
-		log.Log.ErrAndExit("SinWaveguide: width must be > 0, got %g", width)
-	case height <= 0:
-		log.Log.ErrAndExit("SinWaveguide: height must be > 0, got %g", height)
-	case period <= 0:
-		log.Log.ErrAndExit("SinWaveguide: period must be > 0, got %g", period)
-	}
-
-	halfLength := length / 2
-	halfWidth := width / 2
-	halfHeight := height / 2
-	k := 2 * math.Pi / period
-
-	return func(x, y, z float64) bool {
-		if math.Abs(x) > halfLength || math.Abs(y) > halfWidth {
-			return false
-		}
-		zCenter := sinAmp * math.Sin(k*x)
-		return z >= zCenter-halfHeight && z < zCenter+halfHeight
-	}
+	return sinWaveguideVertical(length, width, height, period, sinAmp, 0, 0)
 }
 
-// sinWaveguide2 creates a finite waveguide whose centerline follows a sinusoidal path.
-// Propagates along x; in the XZ plane you see a sinusoidal strip of thickness height.
-// Centered at the origin; use .Transl() to reposition, .RotZ(Pi/2) for propagation along y.
-//
-// length:    total extent along x
-// width:     extent in y
-// height:    thickness in z (measured vertically, not normal to curve)
-// period:    spatial period of the sine along x
-// centerAmp: amplitude of the CENTERLINE oscillation in z
-//
-//	(visible outer envelope = centerAmp + height/2)
-//
-// phase:     initial phase of the sine (radians); 0 = zero-crossing at x=0
-// z0:        vertical offset of the centerline
+// sinWaveguideVertical creates a finite waveguide whose centerline follows a sinusoidal path,
+// with thickness measured vertically along z.
+func sinWaveguideVertical(length, width, height, period, centerAmp, phase, z0 float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("SinWaveguideVertical: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("SinWaveguideVertical: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("SinWaveguideVertical: height must be > 0, got %g", height)
+	case period <= 0:
+		log.Log.ErrAndExit("SinWaveguideVertical: period must be > 0, got %g", period)
+	}
+
+	k := 2 * math.Pi / period
+	centerZ := func(x float64) float64 {
+		return z0 + centerAmp*math.Sin(k*x+phase)
+	}
+	return newVerticalWaveguideShape(length, width, height, centerZ)
+}
+
+// sinWaveguide2 is a backwards-compatible alias for sinWaveguideVertical.
 func sinWaveguide2(length, width, height, period, centerAmp, phase, z0 float64) shape {
-	switch {
-	case length <= 0:
-		log.Log.ErrAndExit("SinWaveguide2: length must be > 0, got %g", length)
-	case width <= 0:
-		log.Log.ErrAndExit("SinWaveguide2: width must be > 0, got %g", width)
-	case height <= 0:
-		log.Log.ErrAndExit("SinWaveguide2: height must be > 0, got %g", height)
-	case period <= 0:
-		log.Log.ErrAndExit("SinWaveguide2: period must be > 0, got %g", period)
-	}
-
-	halfL := length / 2
-	halfW := width / 2
-	halfH := height / 2
-	k := 2 * math.Pi / period
-
-	return func(x, y, z float64) bool {
-		if x < -halfL || x > halfL || y < -halfW || y > halfW {
-			return false
-		}
-		zCenter := z0 + centerAmp*math.Sin(k*x+phase)
-		return z >= zCenter-halfH && z < zCenter+halfH
-	}
+	return sinWaveguideVertical(length, width, height, period, centerAmp, phase, z0)
 }
 
-// archWaveguide creates a waveguide whose centerline follows a half-sine arch.
-// The waveguide propagates along x from -length/2 to +length/2.
-// The centerline rises as z(x) = z0 + archHeight * sin(π * (x + length/2) / length),
-// creating a single smooth arch: z0 at both ends, z0+archHeight at the center.
-//
-//	length:     total waveguide extent along x
-//	width:      extent in y
-//	height:     thickness of the strip in z (measured vertically)
-//	archHeight: peak rise of the arch centerline above z0
-//	z0:         vertical offset of the arch endpoints
+// archWaveguide creates a half-sine arch waveguide with vertically measured thickness.
+// It is a legacy convenience wrapper for ArchWaveguideVertical.
 func archWaveguide(length, width, height, archHeight, z0 float64) shape {
+	return archWaveguideVertical(length, width, height, archHeight, z0)
+}
+
+// archWaveguideVertical creates a waveguide whose centerline follows a half-sine arch,
+// with thickness measured vertically along z.
+func archWaveguideVertical(length, width, height, archHeight, z0 float64) shape {
 	switch {
 	case length <= 0:
-		log.Log.ErrAndExit("ArchWaveguide: length must be > 0, got %g", length)
+		log.Log.ErrAndExit("ArchWaveguideVertical: length must be > 0, got %g", length)
 	case width <= 0:
-		log.Log.ErrAndExit("ArchWaveguide: width must be > 0, got %g", width)
+		log.Log.ErrAndExit("ArchWaveguideVertical: width must be > 0, got %g", width)
 	case height <= 0:
-		log.Log.ErrAndExit("ArchWaveguide: height must be > 0, got %g", height)
+		log.Log.ErrAndExit("ArchWaveguideVertical: height must be > 0, got %g", height)
 	}
 
 	halfL := length / 2
-	halfW := width / 2
-	halfH := height / 2
-
-	return func(x, y, z float64) bool {
-		if x < -halfL || x > halfL || y < -halfW || y > halfW {
-			return false
-		}
-		// half-sine: 0 at x=-halfL, peaks at x=0, back to 0 at x=+halfL
-		t := (x + halfL) / length // t ∈ [0,1]
-		zCenter := z0 + archHeight*math.Sin(math.Pi*t)
-		return z >= zCenter-halfH && z < zCenter+halfH
+	centerZ := func(x float64) float64 {
+		t := (x + halfL) / length
+		return z0 + archHeight*math.Sin(math.Pi*t)
 	}
+	return newVerticalWaveguideShape(length, width, height, centerZ)
 }
 
 func clampFloat64(v, min, max float64) float64 {
@@ -142,40 +109,7 @@ func clampFloat64(v, min, max float64) float64 {
 // normalThicknessWaveguide creates a finite waveguide with thickness measured orthogonally
 // to the x-z centerline instead of vertically along z.
 func normalThicknessWaveguide(length, width, height float64, centerZ, dCenterZ, ddCenterZ func(float64) float64) shape {
-	halfL := length / 2
-	halfW := width / 2
-	halfH := height / 2
-	projectionTol := math.Max(length, height) * 1e-12
-	if projectionTol == 0 {
-		projectionTol = 1e-12
-	}
-
-	return func(x, y, z float64) bool {
-		if x < -halfL || x > halfL || y < -halfW || y > halfW {
-			return false
-		}
-
-		u := clampFloat64(x, -halfL, halfL)
-		for iter := 0; iter < 8; iter++ {
-			zu := centerZ(u)
-			slope := dCenterZ(u)
-			f := (u - x) + (zu-z)*slope
-			df := 1 + slope*slope + (zu-z)*ddCenterZ(u)
-			if math.Abs(df) < 1e-18 {
-				break
-			}
-			next := clampFloat64(u-f/df, -halfL, halfL)
-			if math.Abs(next-u) <= projectionTol {
-				u = next
-				break
-			}
-			u = next
-		}
-
-		dx := x - u
-		dz := z - centerZ(u)
-		return dx*dx+dz*dz <= halfH*halfH
-	}
+	return newNormalWaveguideShape(length, width, height, centerZ, dCenterZ, ddCenterZ)
 }
 
 // sinWaveguideNormal creates a sinusoidal waveguide with thickness measured orthogonally
@@ -237,9 +171,9 @@ func archWaveguideNormal(length, width, height, archHeight, z0 float64) shape {
 
 // ellipsoid with given diameters
 func ellipsoid(diamx, diamy, diamz float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return sqr64(x/diamx)+sqr64(y/diamy)+sqr64(z/diamz) <= 0.25
-	}
+	})
 }
 
 // superball with given diameter and shape parameter p
@@ -256,14 +190,14 @@ func ellipsoid(diamx, diamy, diamz float64) shape {
 // for consistency with other shapes, diameter (2r) is used as parameter instead of radius
 func superball(diameter, p float64) shape {
 	if p <= 0 { // Yields empty shape
-		return func(x, y, z float64) bool { return false }
+		return newShape(func(x, y, z float64) bool { return false })
 	}
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		norm := math.Pow(math.Abs(2*x/diameter), 2*p) +
 			math.Pow(math.Abs(2*y/diameter), 2*p) +
 			math.Pow(math.Abs(2*z/diameter), 2*p)
 		return norm <= 1
-	}
+	})
 }
 
 func ellipse(diamx, diamy float64) shape {
@@ -272,9 +206,9 @@ func ellipse(diamx, diamy float64) shape {
 
 // 3D cone with base at z=0 and vertex at z=height.
 func cone(diam, height float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return (height-z)*z >= 0 && sqr64(x/diam)+sqr64(y/diam) <= 0.25*sqr64(1-z/height)
-	}
+	})
 }
 
 func circle(diam float64) shape {
@@ -283,33 +217,33 @@ func circle(diam float64) shape {
 
 // cylinder along z.
 func cylinder(diam, height float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return z <= height/2 && z >= -height/2 &&
 			sqr64(x/diam)+sqr64(y/diam) <= 0.25
-	}
+	})
 }
 
 // 3D Rectangular slab with given sides.
 func cuboid(sidex, sidey, sidez float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		rx, ry, rz := sidex/2, sidey/2, sidez/2
 		return x < rx && x > -rx && y < ry && y > -ry && z < rz && z > -rz
-	}
+	})
 }
 
 // 2D Rectangle with given sides.
 func rect(sidex, sidey float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		rx, ry := sidex/2, sidey/2
 		return x < rx && x > -rx && y < ry && y > -ry
-	}
+	})
 }
 
 // 2D triangle with given vertices using barycentric coordinates.
 func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
 	denom := x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1) // 2 * area
 	if denom == 0 {
-		return func(x, y, z float64) bool { return false }
+		return newShape(func(x, y, z float64) bool { return false })
 	}
 	A2m1 := 1 / denom
 
@@ -321,50 +255,50 @@ func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
 	Tx := A2m1 * (y0 - y1)
 	Ty := A2m1 * (x1 - x0)
 
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		// barycentric coordinates
 		s := Sc + Sx*x + Sy*y
 		t := Tc + Tx*x + Ty*y
 		return ((0 <= s) && (0 <= t) && (s+t <= 1))
-	}
+	})
 }
 
 // eqTriangle creates an equilateral triangle with given side length, centered at origin.
 func eqTriangle(side float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		c := math.Sqrt(3)
 		return y > -side/(2*c) && y < x*c+side/c && y < -x*c+side/c
-	}
+	})
 }
 
 // Rounded Equilateral triangle with given sides.
 func rTriangle(side, diam float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		c := math.Sqrt(3)
 		return y > -side/(2*c) && y < x*c+side/c && y < -x*c+side/c && math.Sqrt(sqr64(x)+sqr64(y)) < diam/2
-	}
+	})
 }
 
 // hexagon with given sides.
 func hexagon(side float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		a, b := math.Sqrt(3), math.Sqrt(3)*side
 		return y < b/2 && y < -a*x+b && y > a*x-b && y > -b/2 && y > -a*x-b && y < a*x+b
-	}
+	})
 }
 
 // diamond with given sides.
 func diamond(sidex, sidey float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		a, b := sidey/sidex, sidey/2
 		return y < a*x+b && y < -a*x+b && y > a*x-b && y > -a*x-b
-	}
+	})
 }
 
 // squircle creates a 3D rounded rectangle (a generalized squircle) with specified side lengths and thickness.
 func squircle(sidex, sidey, sidez, a float64) shape {
 	// r := math.Min(sidex, sidey) / 2
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		normX := x / (sidex / 2)
 		normY := y / (sidey / 2)
 
@@ -377,7 +311,7 @@ func squircle(sidex, sidey, sidez, a float64) shape {
 		rz := sidez / 2
 		inThickness := z >= -rz && z <= rz
 		return inSquircleXY && inThickness
-	}
+	})
 }
 
 // 2D square with given side.
@@ -387,23 +321,23 @@ func square(side float64) shape {
 
 // All cells with x-coordinate between a and b
 func xRange(a, b float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return x >= a && x < b
-	}
+	})
 }
 
 // All cells with y-coordinate between a and b
 func yRange(a, b float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return y >= a && y < b
-	}
+	})
 }
 
 // All cells with z-coordinate between a and b
 func zRange(a, b float64) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return z >= a && z < b
-	}
+	})
 }
 
 // Cell layers #a (inclusive) up to #b (exclusive).
@@ -432,21 +366,20 @@ func cell(ix, iy, iz int) shape {
 	x2 := pos[X] + c[X]/2
 	y2 := pos[Y] + c[Y]/2
 	z2 := pos[Z] + c[Z]/2
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return x > x1 && x < x2 &&
 			y > y1 && y < y2 &&
 			z > z1 && z < z2
-	}
+	})
 }
 
 func universe() shape {
 	return universeInner
 }
 
-// The entire space.
-func universeInner(x, y, z float64) bool {
+var universeInner = newShape(func(x, y, z float64) bool {
 	return true
-}
+})
 
 func imageShape(fname string) shape {
 	r, err1 := fsutil.Open(fname)
@@ -482,19 +415,19 @@ func imageShape(fname string) shape {
 	N := GetMesh().Size()
 	nx, ny := float64(N[X]), float64(N[Y])
 	w, h := float64(width), float64(height)
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		ix := int((w/nx)*(x/cx) + 0.5*w)
 		iy := int((h/ny)*(y/cy) + 0.5*h)
 		if ix < 0 || ix >= width || iy < 0 || iy >= height {
 			return false
 		}
 		return inside[iy][ix]
-	}
+	})
 }
 
 func grainRoughness(grainsize, zmin, zmax float64, seed int) shape {
 	t := newTesselation(grainsize, 0, 256, int64(seed))
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		if z <= zmin {
 			return true
 		}
@@ -503,23 +436,27 @@ func grainRoughness(grainsize, zmin, zmax float64, seed int) shape {
 		}
 		r := t.RegionOf(x, y, z)
 		return (z-zmin)/(zmax-zmin) < (float64(r) / 256)
-	}
+	})
 }
 
 // Transl returns a translated copy of the shape.
 func (s shape) Transl(dx, dy, dz float64) shape {
-	return func(x, y, z float64) bool {
-		return s(x-dx, y-dy, z-dz)
+	voxelizer := s.voxelizer
+	if voxelizer != nil {
+		voxelizer = translatedShapeVoxelizer{base: voxelizer, dx: dx, dy: dy, dz: dz}
 	}
+	return newDerivedShape(func(x, y, z float64) bool {
+		return s.contains(x-dx, y-dy, z-dz)
+	}, voxelizer)
 }
 
 // Repeat Infinitely repeats the shape with given period in x, y, z.
 // A period of 0 or infinity means no repetition.
 
 func (s shape) Repeat(periodX, periodY, periodZ float64) shape {
-	return func(x, y, z float64) bool {
-		return s(fmod(x, periodX), fmod(y, periodY), fmod(z, periodZ))
-	}
+	return newShape(func(x, y, z float64) bool {
+		return s.contains(fmod(x, periodX), fmod(y, periodY), fmod(z, periodZ))
+	})
 }
 
 func fmod(a, b float64) float64 {
@@ -534,78 +471,82 @@ func fmod(a, b float64) float64 {
 
 // Scale returns a scaled copy of the shape.
 func (s shape) Scale(sx, sy, sz float64) shape {
-	return func(x, y, z float64) bool {
-		return s(x/sx, y/sy, z/sz)
+	voxelizer := s.voxelizer
+	if voxelizer != nil {
+		voxelizer = scaledShapeVoxelizer{base: voxelizer, sx: sx, sy: sy, sz: sz}
 	}
+	return newDerivedShape(func(x, y, z float64) bool {
+		return s.contains(x/sx, y/sy, z/sz)
+	}, voxelizer)
 }
 
 // RotZ Rotates the shape around the Z-axis, over θ radians.
 func (s shape) RotZ(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		xOut := x*cos + y*sin
 		yOut := -x*sin + y*cos
-		return s(xOut, yOut, z)
-	}
+		return s.contains(xOut, yOut, z)
+	})
 }
 
 // RotY Rotates the shape around the Y-axis, over θ radians.
 func (s shape) RotY(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		xOut := x*cos - z*sin
 		zOut := x*sin + z*cos
-		return s(xOut, y, zOut)
-	}
+		return s.contains(xOut, y, zOut)
+	})
 }
 
 // RotX Rotates the shape around the X-axis, over θ radians.
 func (s shape) RotX(θ float64) shape {
 	cos := math.Cos(θ)
 	sin := math.Sin(θ)
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		yOut := y*cos + z*sin
 		zOut := -y*sin + z*cos
-		return s(x, yOut, zOut)
-	}
+		return s.contains(x, yOut, zOut)
+	})
 }
 
 // Add Union of shapes a and b (logical OR).
 func (s shape) Add(b shape) shape {
-	return func(x, y, z float64) bool {
-		return s(x, y, z) || b(x, y, z)
-	}
+	return newShape(func(x, y, z float64) bool {
+		return s.contains(x, y, z) || b.contains(x, y, z)
+	})
 }
 
 // Intersect Intersection of shapes a and b (logical AND).
 func (s shape) Intersect(b shape) shape {
-	return func(x, y, z float64) bool {
-		return s(x, y, z) && b(x, y, z)
-	}
+	return newShape(func(x, y, z float64) bool {
+		return s.contains(x, y, z) && b.contains(x, y, z)
+	})
 }
 
 // Inverse (outside) of shape (logical NOT).
 func (s shape) Inverse() shape {
-	return func(x, y, z float64) bool {
-		return !s(x, y, z)
-	}
+	return newShape(func(x, y, z float64) bool {
+		return !s.contains(x, y, z)
+	})
 }
 
 // Sub Removes b from a (logical a AND NOT b)
 func (s shape) Sub(b shape) shape {
-	return func(x, y, z float64) bool {
-		return s(x, y, z) && !b(x, y, z)
-	}
+	return newShape(func(x, y, z float64) bool {
+		return s.contains(x, y, z) && !b.contains(x, y, z)
+	})
 }
 
 // Xor Logical XOR of shapes a and b
 func (s shape) Xor(b shape) shape {
-	return func(x, y, z float64) bool {
-		A, B := s(x, y, z), b(x, y, z)
+	return newShape(func(x, y, z float64) bool {
+		A, B := s.contains(x, y, z), b.contains(x, y, z)
 		return (A || B) && (!A || !B)
-	}
+	})
 }
 
 func sqr64(x float64) float64 { return x * x }

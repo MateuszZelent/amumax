@@ -53,9 +53,9 @@ func (rs *RegionsState) redefine(startID, endID int) {
 }
 
 func ShapeFromRegion(id int) shape {
-	return func(x, y, z float64) bool {
+	return newShape(func(x, y, z float64) bool {
 		return Regions.get(data.Vector{x, y, z}) == id
-	}
+	})
 }
 
 func (rs *RegionsState) Alloc() {
@@ -67,7 +67,7 @@ func (rs *RegionsState) Alloc() {
 func DefRegion(id int, s shape) {
 	defRegionID(id)
 	f := func(x, y, z float64) int {
-		if s(x, y, z) {
+		if s.contains(x, y, z) {
 			return id
 		}
 		return -1

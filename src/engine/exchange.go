@@ -58,11 +58,11 @@ func addExchangeField(dst *data.Slice) {
 
 	switch {
 	case !inter && !bulk:
-		cuda.AddExchange(dst, NormMag.Buffer(), lex2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh())
+		cuda.AddExchange(dst, NormMag.Buffer(), lex2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), float32(GeomPhiFloor))
 	case inter && !bulk:
-		cuda.AddDMI(dst, NormMag.Buffer(), lex2.Gpu(), din2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
+		cuda.AddDMI(dst, NormMag.Buffer(), lex2.Gpu(), din2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC, float32(GeomPhiFloor)) // dmi+exchange
 	case bulk && !inter:
-		cuda.AddDMIBulk(dst, NormMag.Buffer(), lex2.Gpu(), dbulk2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC) // dmi+exchange
+		cuda.AddDMIBulk(dst, NormMag.Buffer(), lex2.Gpu(), dbulk2.Gpu(), ms, geom, faces, Regions.Gpu(), NormMag.Mesh(), OpenBC, float32(GeomPhiFloor)) // dmi+exchange
 		// TODO: add ScaleInterDbulk and InterDbulk
 	case inter && bulk:
 		log.Log.ErrAndExit("Cannot have interfacial-induced DMI and bulk DMI at the same time")

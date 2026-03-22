@@ -29,7 +29,7 @@ func (m *magnetization) Unit() string        { return "" }
 func (m *magnetization) Buffer() *data.Slice { return m.buffer } // todo: rename Gpu()?
 
 func (m *magnetization) Comp(c int) ScalarField  { return comp(m, c) }
-func (m *magnetization) SetValue(v any)          { m.SetInShape(nil, v.(config)) }
+func (m *magnetization) SetValue(v any)          { m.SetInShape(shape{}, v.(config)) }
 func (m *magnetization) InputType() reflect.Type { return reflect.TypeOf(config(nil)) }
 func (m *magnetization) Type() reflect.Type      { return reflect.TypeOf(new(magnetization)) }
 func (m *magnetization) Eval() any               { return m }
@@ -52,7 +52,7 @@ func (m *magnetization) SetArray(src *data.Slice) {
 }
 
 func (m *magnetization) Set(c config) {
-	m.SetInShape(nil, c)
+	m.SetInShape(shape{}, c)
 }
 
 func (m *magnetization) LoadFile(fname string) {
@@ -76,7 +76,7 @@ func (m *magnetization) Region(r int) *vOneReg { return vOneRegion(m, r) }
 // SetCell Set the value of one cell.
 func (m *magnetization) SetCell(ix, iy, iz int, v data.Vector) {
 	r := index2Coord(ix, iy, iz)
-	if Geometry.shape != nil && !Geometry.shape(r[X], r[Y], r[Z]) {
+	if !Geometry.shape.isNil() && !Geometry.shape.contains(r[X], r[Y], r[Z]) {
 		return
 	}
 	vNorm := v.Len()
@@ -97,7 +97,7 @@ func (m *magnetization) Quantity() []float64 { return slice(m.Average()) }
 
 // SetInShape Sets the magnetization inside the shape
 func (m *magnetization) SetInShape(region shape, conf config) {
-	if region == nil {
+	if region.isNil() {
 		region = universeInner
 	}
 	host := m.Buffer().HostCopy()
@@ -109,7 +109,7 @@ func (m *magnetization) SetInShape(region shape, conf config) {
 			for ix := 0; ix < n[X]; ix++ {
 				r := index2Coord(ix, iy, iz)
 				x, y, z := r[X], r[Y], r[Z]
-				if region(x, y, z) { // inside
+				if region.contains(x, y, z) { // inside
 					m := conf(x, y, z)
 					h[X][iz][iy][ix] = float32(m[X])
 					h[Y][iz][iy][ix] = float32(m[Y])

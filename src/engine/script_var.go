@@ -41,6 +41,10 @@ func init() {
 	declVar("ext_enableCenterBubbleY", &enableCenterBubbleY, "Enables centering along the Y-axis during ext_centerBubble (default=true)")
 	declVar("ext_grainCutShape", &grainCutShape, "Whether to add the complete (3D) voronoi grain, only if its centre lies within the shape (default=false)")
 	declVar("EdgeSmooth", &edgeSmooth, "Geometry edge smoothing with edgeSmooth^3 samples per cell, 0=staircase, ~8=very smooth")
+	declVar("GeomMode", &GeomMode, `Geometry metrics mode: "cutcell" uses voxelizer-derived Phi/Fx/Fy/Fz when available, "legacy" falls back to EdgeSmooth/inside-outside sampling`)
+	declVar("GeomTol", &GeomTol, "Adaptive quadrature tolerance for cut-cell waveguide voxelizers")
+	declVar("GeomMaxDepth", &GeomMaxDepth, "Maximum adaptive subdivision depth for cut-cell waveguide voxelizers")
+	declVar("GeomPhiFloor", &GeomPhiFloor, "Minimum effective cut-cell volume fraction used when normalizing exchange and DMI. Increase this if cut-cell geometries make the solver unstable.")
 
 	declVar("Tx", &Mesh.Tx, "")
 	declVar("Ty", &Mesh.Ty, "")

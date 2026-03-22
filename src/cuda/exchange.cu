@@ -14,7 +14,7 @@ addexchange(float* __restrict__ Bx, float* __restrict__ By, float* __restrict__ 
             float* __restrict__ fym, float* __restrict__ fyp,
             float* __restrict__ fzm, float* __restrict__ fzp,
             float* __restrict__ aLUT2d, uint8_t* __restrict__ regions,
-            float wx, float wy, float wz, int Nx, int Ny, int Nz, uint8_t PBC) {
+            float wx, float wy, float wz, float phiFloor, int Nx, int Ny, int Nz, uint8_t PBC) {
 
     int ix = blockIdx.x * blockDim.x + threadIdx.x;
     int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -34,7 +34,7 @@ addexchange(float* __restrict__ Bx, float* __restrict__ By, float* __restrict__ 
     if (v0 <= 0.0f) {
         return;
     }
-    float invVol = 1.0f / fmaxf(v0, 1e-6f);
+    float invVol = 1.0f / fmaxf(v0, fmaxf(phiFloor, 1e-6f));
 
     uint8_t r0 = regions[I];
     float3 B = make_float3(0.0f, 0.0f, 0.0f);

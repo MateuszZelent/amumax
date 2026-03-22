@@ -409,7 +409,7 @@ func (q *masked) createMask() {
 		for iy := 0; iy < size[Y]; iy++ {
 			for ix := 0; ix < size[X]; ix++ {
 				r := index2Coord(ix, iy, iz)
-				if q.shape(r[X], r[Y], r[Z]) {
+				if q.shape.contains(r[X], r[Y], r[Z]) {
 					maskScalars[iz][iy][ix] = 1
 				}
 			}

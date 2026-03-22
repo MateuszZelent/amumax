@@ -105,7 +105,7 @@ func (t *tesselation3d) tabulateCells() []cellLocs {
 				y := cell.Y()
 				z := cell.Z()
 
-				if t.shape(x, y, z) {
+				if t.shape.contains(x, y, z) {
 					cells = append(cells, cellLocs{x, y, z})
 				}
 			}
@@ -124,7 +124,7 @@ var grainCutShape = false
 // assigned a region.
 
 func (t *tesselation3d) RegionOf(x, y, z float64) int {
-	if !(t.shape(x, y, z) || grainCutShape) {
+	if !(t.shape.contains(x, y, z) || grainCutShape) {
 		return -1 // Regions < 0 won't be rastered
 	}
 
@@ -140,7 +140,7 @@ func (t *tesselation3d) RegionOf(x, y, z float64) int {
 	}
 
 	// Check if the nearest point's region should be returned
-	if (t.shape(x, y, z) && !grainCutShape) || (t.shape(nearest.x, nearest.y, nearest.z) && grainCutShape) {
+	if (t.shape.contains(x, y, z) && !grainCutShape) || (t.shape.contains(nearest.x, nearest.y, nearest.z) && grainCutShape) {
 		return int(nearest.region)
 	}
 

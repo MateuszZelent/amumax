@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
@@ -13,7 +14,11 @@ import (
 
 func init() {
 	Geometry.init()
+	GeomPhi = newScalarField("geom_phi", "", "Cell fill fraction (0..1); explicit alias of geom for cut-cell diagnostics", setGeomPhi)
 	GeomThicknessZ = newScalarField("geom_thickness_z", "m", "Numerical material thickness obtained by summing cell fill fractions along z", setGeomThicknessZ)
+	GeomFx = newScalarField("geom_fx", "", "Positive x-face fill fraction between a cell and its +x neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 1) })
+	GeomFy = newScalarField("geom_fy", "", "Positive y-face fill fraction between a cell and its +y neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 3) })
+	GeomFz = newScalarField("geom_fz", "", "Positive z-face fill fraction between a cell and its +z neighbor (0..1)", func(dst *data.Slice) { setGeomPositiveFace(dst, 5) })
 	GeomFaceX = newScalarField("geom_face_x", "", "Average x-face fill fraction (0..1)", setGeomFaceX)
 	GeomFaceY = newScalarField("geom_face_y", "", "Average y-face fill fraction (0..1)", setGeomFaceY)
 	GeomFaceZ = newScalarField("geom_face_z", "", "Average z-face fill fraction (0..1)", setGeomFaceZ)
@@ -22,11 +27,43 @@ func init() {
 var (
 	Geometry       geom
 	edgeSmooth     int = 0 // disabled by default
+	GeomMode           = "cutcell"
+	GeomTol            = 1e-3
+	GeomMaxDepth       = 4
+	GeomPhiFloor       = 0.05
+	GeomPhi        ScalarField
 	GeomThicknessZ ScalarField
+	GeomFx         ScalarField
+	GeomFy         ScalarField
+	GeomFz         ScalarField
 	GeomFaceX      ScalarField
 	GeomFaceY      ScalarField
 	GeomFaceZ      ScalarField
 )
+
+func normalizedGeomMode() string {
+	mode := strings.ToLower(strings.TrimSpace(GeomMode))
+	if mode == "" {
+		return "cutcell"
+	}
+	return mode
+}
+
+func geomUsesCutCell(s shape) bool {
+	switch normalizedGeomMode() {
+	case "cutcell":
+		return s.voxelizer != nil
+	case "legacy":
+		return false
+	default:
+		log.Log.ErrAndExit(`GeomMode: unsupported mode %q (expected "legacy" or "cutcell")`, GeomMode)
+		return false
+	}
+}
+
+func (g *geom) usesCutCell() bool {
+	return geomUsesCutCell(g.shape)
+}
 
 type geom struct {
 	info
@@ -81,6 +118,23 @@ func (g *geom) average() []float64 {
 }
 
 func (g *geom) Average() float64 { return g.average()[0] }
+
+func setGeomPhi(dst *data.Slice) {
+	Geometry.EvalTo(dst)
+}
+
+func setGeomPositiveFace(dst *data.Slice, comp int) {
+	faces, recycle := Geometry.FaceSlice()
+	if recycle {
+		defer cuda.Recycle(faces)
+	}
+
+	hostFaces := faces.HostCopy()
+	faceValues := hostFaces.Host()[comp]
+	hostDst := data.NewSlice(1, dst.Size())
+	copy(hostDst.Host()[0], faceValues)
+	data.Copy(dst, hostDst)
+}
 
 func setGeomThicknessZ(dst *data.Slice) {
 	geom, recycle := Geometry.Slice()
@@ -138,7 +192,7 @@ func (g *geom) setGeom(s shape) {
 	setBusy(true)
 	defer setBusy(false)
 
-	if s == nil {
+	if s.isNil() {
 		// TODO: would be nice not to save volume if entirely filled
 		s = universeInner
 	}
@@ -171,9 +225,15 @@ func (g *geom) setGeom(s shape) {
 				r := index2Coord(ix, iy, iz)
 				x0, y0, z0 := r[X], r[Y], r[Z]
 
+				if geomUsesCutCell(s) {
+					v[iz][iy][ix] = g.cellVolume(ix, iy, iz)
+					empty = empty && (v[iz][iy][ix] == 0)
+					continue
+				}
+
 				// check if center and all vertices lie inside or all outside
 				allIn, allOut := true, true
-				if s(x0, y0, z0) {
+				if s.contains(x0, y0, z0) {
 					allOut = false
 				} else {
 					allIn = false
@@ -183,7 +243,7 @@ func (g *geom) setGeom(s shape) {
 					for _, Δx := range []float64{-cx / 2, cx / 2} {
 						for _, Δy := range []float64{-cy / 2, cy / 2} {
 							for _, Δz := range []float64{-cz / 2, cz / 2} {
-								if s(x0+Δx, y0+Δy, z0+Δz) { // inside
+								if s.contains(x0+Δx, y0+Δy, z0+Δz) { // inside
 									allOut = false
 								} else {
 									allIn = false
@@ -207,6 +267,30 @@ func (g *geom) setGeom(s shape) {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "\n")
+
+	if geomUsesCutCell(s) {
+		geomlist := host.Host()[0]
+		minPositive := float32(1)
+		cutCells := 0
+		belowFloor := 0
+		for _, phi := range geomlist {
+			if phi > 0 && phi < 1 {
+				cutCells++
+			}
+			if phi > 0 && phi < minPositive {
+				minPositive = phi
+			}
+			if phi > 0 && phi < float32(GeomPhiFloor) {
+				belowFloor++
+			}
+		}
+		if cutCells > 0 {
+			log.Log.Info("Cut-cell geometry: %d partial cells, minimum positive phi=%g", cutCells, minPositive)
+		}
+		if belowFloor > 0 {
+			log.Log.Warn("Cut-cell geometry: %d cells have phi < GeomPhiFloor=%g; exchange and DMI normalization will be clamped for stability", belowFloor, GeomPhiFloor)
+		}
+	}
 
 	if empty {
 		log.Log.ErrAndExit("SetGeom: geometry completely empty")
@@ -247,6 +331,10 @@ func edgeSmoothSamples() int {
 
 // Sample edgeSmooth^3 points inside the cell to estimate its volume.
 func (g *geom) cellVolume(ix, iy, iz int) float32 {
+	if g.usesCutCell() {
+		return g.shape.voxelizer.cellMetrics(boundsFromIndex(ix, iy, iz)).VolumeFraction
+	}
+
 	r := index2Coord(ix, iy, iz)
 	x0, y0, z0 := r[X], r[Y], r[Z]
 
@@ -265,7 +353,7 @@ func (g *geom) cellVolume(ix, iy, iz int) float32 {
 			for dz := 0; dz < N; dz++ {
 				Δz := -cz/2 + (cz / (2 * S)) + (cz/S)*float64(dz)
 
-				if s(x0+Δx, y0+Δy, z0+Δz) { // inside
+				if s.contains(x0+Δx, y0+Δy, z0+Δz) { // inside
 					vol++
 				}
 			}
@@ -275,6 +363,10 @@ func (g *geom) cellVolume(ix, iy, iz int) float32 {
 }
 
 func samplePositiveFaceFill(axis, ix, iy, iz int) float32 {
+	if Geometry.usesCutCell() {
+		return Geometry.shape.voxelizer.cellMetrics(boundsFromIndex(ix, iy, iz)).Face(axis, true)
+	}
+
 	r := index2Coord(ix, iy, iz)
 	x0, y0, z0 := r[X], r[Y], r[Z]
 
@@ -296,7 +388,7 @@ func samplePositiveFaceFill(axis, ix, iy, iz int) float32 {
 			y := y0 - cy/2 + (cy / (2 * S)) + (cy/S)*float64(dy)
 			for dz := 0; dz < N; dz++ {
 				z := z0 - cz/2 + (cz / (2 * S)) + (cz/S)*float64(dz)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -307,7 +399,7 @@ func samplePositiveFaceFill(axis, ix, iy, iz int) float32 {
 			x := x0 - cx/2 + (cx / (2 * S)) + (cx/S)*float64(dx)
 			for dz := 0; dz < N; dz++ {
 				z := z0 - cz/2 + (cz / (2 * S)) + (cz/S)*float64(dz)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -318,7 +410,7 @@ func samplePositiveFaceFill(axis, ix, iy, iz int) float32 {
 			x := x0 - cx/2 + (cx / (2 * S)) + (cx/S)*float64(dx)
 			for dy := 0; dy < N; dy++ {
 				y := y0 - cy/2 + (cy / (2 * S)) + (cy/S)*float64(dy)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -331,6 +423,10 @@ func samplePositiveFaceFill(axis, ix, iy, iz int) float32 {
 }
 
 func sampleNegativeBoundaryFaceFill(axis, ix, iy, iz int) float32 {
+	if Geometry.usesCutCell() {
+		return Geometry.shape.voxelizer.cellMetrics(boundsFromIndex(ix, iy, iz)).Face(axis, false)
+	}
+
 	r := index2Coord(ix, iy, iz)
 	x0, y0, z0 := r[X], r[Y], r[Z]
 
@@ -352,7 +448,7 @@ func sampleNegativeBoundaryFaceFill(axis, ix, iy, iz int) float32 {
 			y := y0 - cy/2 + (cy / (2 * S)) + (cy/S)*float64(dy)
 			for dz := 0; dz < N; dz++ {
 				z := z0 - cz/2 + (cz / (2 * S)) + (cz/S)*float64(dz)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -363,7 +459,7 @@ func sampleNegativeBoundaryFaceFill(axis, ix, iy, iz int) float32 {
 			x := x0 - cx/2 + (cx / (2 * S)) + (cx/S)*float64(dx)
 			for dz := 0; dz < N; dz++ {
 				z := z0 - cz/2 + (cz / (2 * S)) + (cz/S)*float64(dz)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -374,7 +470,7 @@ func sampleNegativeBoundaryFaceFill(axis, ix, iy, iz int) float32 {
 			x := x0 - cx/2 + (cx / (2 * S)) + (cx/S)*float64(dx)
 			for dy := 0; dy < N; dy++ {
 				y := y0 - cy/2 + (cy / (2 * S)) + (cy/S)*float64(dy)
-				if s(x, y, z) {
+				if s.contains(x, y, z) {
 					fill++
 				}
 			}
@@ -395,6 +491,22 @@ func (g *geom) rebuildFaceBuffer() {
 	face := host.Host()
 	n := g.Mesh().Size()
 	pbc := g.Mesh().PBC()
+
+	if g.usesCutCell() {
+		for iz := 0; iz < n[Z]; iz++ {
+			for iy := 0; iy < n[Y]; iy++ {
+				for ix := 0; ix < n[X]; ix++ {
+					idx := data.Index(n, ix, iy, iz)
+					metrics := g.shape.voxelizer.cellMetrics(boundsFromIndex(ix, iy, iz))
+					for comp, value := range metrics.FaceFraction {
+						face[comp][idx] = value
+					}
+				}
+			}
+		}
+		data.Copy(g.FaceBuffer, host)
+		return
+	}
 
 	for iz := 0; iz < n[Z]; iz++ {
 		for iy := 0; iy < n[Y]; iy++ {
@@ -473,14 +585,14 @@ func (g *geom) shift(dx int) {
 		for iy := 0; iy < n[Y]; iy++ {
 			for ix := x1; ix < x2; ix++ {
 				r := index2Coord(ix, iy, iz) // includes shift
-				if !g.shape(r[X], r[Y], r[Z]) {
+				if !g.shape.contains(r[X], r[Y], r[Z]) {
 					cuda.SetCell(g.Buffer, 0, ix, iy, iz, 0) // a bit slowish, but hardly reached
 				}
 			}
 		}
 	}
 
-	if g.shape != nil && g.FaceBuffer != nil && !g.FaceBuffer.IsNil() {
+	if !g.shape.isNil() && g.FaceBuffer != nil && !g.FaceBuffer.IsNil() {
 		g.rebuildFaceBuffer()
 	}
 }
@@ -506,14 +618,14 @@ func (g *geom) shiftY(dy int) {
 		for ix := 0; ix < n[X]; ix++ {
 			for iy := y1; iy < y2; iy++ {
 				r := index2Coord(ix, iy, iz) // includes shift
-				if !g.shape(r[X], r[Y], r[Z]) {
+				if !g.shape.contains(r[X], r[Y], r[Z]) {
 					cuda.SetCell(g.Buffer, 0, ix, iy, iz, 0) // a bit slowish, but hardly reached
 				}
 			}
 		}
 	}
 
-	if g.shape != nil && g.FaceBuffer != nil && !g.FaceBuffer.IsNil() {
+	if !g.shape.isNil() && g.FaceBuffer != nil && !g.FaceBuffer.IsNil() {
 		g.rebuildFaceBuffer()
 	}
 }

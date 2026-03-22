@@ -39,7 +39,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
            float* __restrict__ fzm, float* __restrict__ fzp,
            float* __restrict__ aLUT2d, float* __restrict__ DLUT2d,
            uint8_t* __restrict__ regions,
-           float cx, float cy, float cz, int Nx, int Ny, int Nz, uint8_t PBC, uint8_t OpenBC) {
+           float cx, float cy, float cz, float phiFloor, int Nx, int Ny, int Nz, uint8_t PBC, uint8_t OpenBC) {
 
     int ix = blockIdx.x * blockDim.x + threadIdx.x;
     int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -63,7 +63,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
     if (v0 <= 0.0f) {
         return;
     }
-    float invVol = 1.0f / fmaxf(v0, 1e-6f);
+    float invVol = 1.0f / fmaxf(v0, fmaxf(phiFloor, 1e-6f));
 
     {
         float faceWeight = fxm[I] * invVol;
@@ -84,7 +84,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                 h   += faceWeight * ((2.0f*A/(cx*cx)) * (m1 - m0));
                 h.y += faceWeight * (D/cx) * (-m1.z);
                 h.z -= faceWeight * (D/cx) * (-m1.y);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fxm[I] > 0.999f) {
                 m1.x = m0.x;
                 m1.y = m0.y - (-cx * D_2A * m0.z);
                 m1.z = m0.z + (-cx * D_2A * m0.y);
@@ -114,7 +114,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                 h   += faceWeight * ((2.0f*A/(cx*cx)) * (m2 - m0));
                 h.y += faceWeight * (D/cx) * (m2.z);
                 h.z -= faceWeight * (D/cx) * (m2.y);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fxp[I] > 0.999f) {
                 m2.x = m0.x;
                 m2.y = m0.y - (+cx * D_2A * m0.z);
                 m2.z = m0.z + (+cx * D_2A * m0.y);
@@ -144,7 +144,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                 h   += faceWeight * ((2.0f*A/(cy*cy)) * (m1 - m0));
                 h.x -= faceWeight * (D/cy) * (-m1.z);
                 h.z += faceWeight * (D/cy) * (-m1.x);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fym[I] > 0.999f) {
                 m1.x = m0.x + (-cy * D_2A * m0.z);
                 m1.y = m0.y;
                 m1.z = m0.z - (-cy * D_2A * m0.x);
@@ -174,7 +174,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                 h   += faceWeight * ((2.0f*A/(cy*cy)) * (m2 - m0));
                 h.x -= faceWeight * (D/cy) * (m2.z);
                 h.z += faceWeight * (D/cy) * (m2.x);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fyp[I] > 0.999f) {
                 m2.x = m0.x + (+cy * D_2A * m0.z);
                 m2.y = m0.y;
                 m2.z = m0.z - (+cy * D_2A * m0.x);
@@ -205,7 +205,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                     h   += faceWeight * ((2.0f*A/(cz*cz)) * (m1 - m0));
                     h.x += faceWeight * (D/cz) * (-m1.y);
                     h.y -= faceWeight * (D/cz) * (-m1.x);
-                } else if (!OpenBC) {
+                } else if (!OpenBC && fzm[I] > 0.999f) {
                     m1.x = m0.x - (-cz * D_2A * m0.y);
                     m1.y = m0.y + (-cz * D_2A * m0.x);
                     m1.z = m0.z;
@@ -235,7 +235,7 @@ adddmibulk(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ H
                     h   += faceWeight * ((2.0f*A/(cz*cz)) * (m2 - m0));
                     h.x += faceWeight * (D/cz) * (m2.y);
                     h.y -= faceWeight * (D/cz) * (m2.x);
-                } else if (!OpenBC) {
+                } else if (!OpenBC && fzp[I] > 0.999f) {
                     m2.x = m0.x - (+cz * D_2A * m0.y);
                     m2.y = m0.y + (+cz * D_2A * m0.x);
                     m2.z = m0.z;

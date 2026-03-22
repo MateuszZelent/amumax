@@ -20,7 +20,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
        float* __restrict__ fym, float* __restrict__ fyp,
        float* __restrict__ fzm, float* __restrict__ fzp,
        float* __restrict__ aLUT2d, float* __restrict__ dLUT2d, uint8_t* __restrict__ regions,
-       float cx, float cy, float cz, int Nx, int Ny, int Nz, uint8_t PBC, uint8_t OpenBC) {
+       float cx, float cy, float cz, float phiFloor, int Nx, int Ny, int Nz, uint8_t PBC, uint8_t OpenBC) {
 
     int ix = blockIdx.x * blockDim.x + threadIdx.x;
     int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -44,7 +44,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
     if (v0 <= 0.0f) {
         return;
     }
-    float invVol = 1.0f / fmaxf(v0, 1e-6f);
+    float invVol = 1.0f / fmaxf(v0, fmaxf(phiFloor, 1e-6f));
 
     {
         float faceWeight = fxm[I] * invVol;
@@ -64,7 +64,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
                 h   += faceWeight * ((2.0f*A1/(cx*cx)) * (m1 - m0));
                 h.x += faceWeight * (D1/cx) * (-m1.z);
                 h.z -= faceWeight * (D1/cx) * (-m1.x);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fxm[I] > 0.999f) {
                 m1.x = m0.x - (-cx * (0.5f*D1/A1) * m0.z);
                 m1.y = m0.y;
                 m1.z = m0.z + (-cx * (0.5f*D1/A1) * m0.x);
@@ -93,7 +93,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
                 h   += faceWeight * ((2.0f*A2/(cx*cx)) * (m2 - m0));
                 h.x += faceWeight * (D2/cx) * (m2.z);
                 h.z -= faceWeight * (D2/cx) * (m2.x);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fxp[I] > 0.999f) {
                 m2.x = m0.x - (cx * (0.5f*D2/A2) * m0.z);
                 m2.y = m0.y;
                 m2.z = m0.z + (cx * (0.5f*D2/A2) * m0.x);
@@ -122,7 +122,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
                 h   += faceWeight * ((2.0f*A1/(cy*cy)) * (m1 - m0));
                 h.y += faceWeight * (D1/cy) * (-m1.z);
                 h.z -= faceWeight * (D1/cy) * (-m1.y);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fym[I] > 0.999f) {
                 m1.x = m0.x;
                 m1.y = m0.y - (-cy * (0.5f*D1/A1) * m0.z);
                 m1.z = m0.z + (-cy * (0.5f*D1/A1) * m0.y);
@@ -151,7 +151,7 @@ adddmi(float* __restrict__ Hx, float* __restrict__ Hy, float* __restrict__ Hz,
                 h   += faceWeight * ((2.0f*A2/(cy*cy)) * (m2 - m0));
                 h.y += faceWeight * (D2/cy) * (m2.z);
                 h.z -= faceWeight * (D2/cy) * (m2.y);
-            } else if (!OpenBC) {
+            } else if (!OpenBC && fyp[I] > 0.999f) {
                 m2.x = m0.x;
                 m2.y = m0.y - (cy * (0.5f*D2/A2) * m0.z);
                 m2.z = m0.z + (cy * (0.5f*D2/A2) * m0.y);
