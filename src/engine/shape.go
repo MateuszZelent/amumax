@@ -20,6 +20,10 @@ func newShape(inside func(x, y, z float64) bool) shape {
 	return shape{insideFn: inside}
 }
 
+func newSampledShape(inside func(x, y, z float64) bool) shape {
+	return newDerivedShape(inside, nil)
+}
+
 func newVoxelizedShape(inside func(x, y, z float64) bool, voxelizer shapeVoxelizer) shape {
 	return shape{insideFn: inside, voxelizer: voxelizer}
 }
@@ -32,7 +36,7 @@ func (s shape) contains(x, y, z float64) bool {
 
 // wave with given diameters
 func wave(period, amin, amax float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		wavex := (math.Cos(x/period*2*math.Pi)/2 - 0.5) * (amax - amin) / 2
 		return y > wavex-amin/2 && y < -wavex+amin/2
 	})
@@ -171,7 +175,7 @@ func archWaveguideNormal(length, width, height, archHeight, z0 float64) shape {
 
 // ellipsoid with given diameters
 func ellipsoid(diamx, diamy, diamz float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return sqr64(x/diamx)+sqr64(y/diamy)+sqr64(z/diamz) <= 0.25
 	})
 }
@@ -190,9 +194,9 @@ func ellipsoid(diamx, diamy, diamz float64) shape {
 // for consistency with other shapes, diameter (2r) is used as parameter instead of radius
 func superball(diameter, p float64) shape {
 	if p <= 0 { // Yields empty shape
-		return newShape(func(x, y, z float64) bool { return false })
+		return newSampledShape(func(x, y, z float64) bool { return false })
 	}
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		norm := math.Pow(math.Abs(2*x/diameter), 2*p) +
 			math.Pow(math.Abs(2*y/diameter), 2*p) +
 			math.Pow(math.Abs(2*z/diameter), 2*p)
@@ -206,7 +210,7 @@ func ellipse(diamx, diamy float64) shape {
 
 // 3D cone with base at z=0 and vertex at z=height.
 func cone(diam, height float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return (height-z)*z >= 0 && sqr64(x/diam)+sqr64(y/diam) <= 0.25*sqr64(1-z/height)
 	})
 }
@@ -217,7 +221,7 @@ func circle(diam float64) shape {
 
 // cylinder along z.
 func cylinder(diam, height float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return z <= height/2 && z >= -height/2 &&
 			sqr64(x/diam)+sqr64(y/diam) <= 0.25
 	})
@@ -225,7 +229,7 @@ func cylinder(diam, height float64) shape {
 
 // 3D Rectangular slab with given sides.
 func cuboid(sidex, sidey, sidez float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		rx, ry, rz := sidex/2, sidey/2, sidez/2
 		return x < rx && x > -rx && y < ry && y > -ry && z < rz && z > -rz
 	})
@@ -233,7 +237,7 @@ func cuboid(sidex, sidey, sidez float64) shape {
 
 // 2D Rectangle with given sides.
 func rect(sidex, sidey float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		rx, ry := sidex/2, sidey/2
 		return x < rx && x > -rx && y < ry && y > -ry
 	})
@@ -243,7 +247,7 @@ func rect(sidex, sidey float64) shape {
 func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
 	denom := x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1) // 2 * area
 	if denom == 0 {
-		return newShape(func(x, y, z float64) bool { return false })
+		return newSampledShape(func(x, y, z float64) bool { return false })
 	}
 	A2m1 := 1 / denom
 
@@ -255,7 +259,7 @@ func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
 	Tx := A2m1 * (y0 - y1)
 	Ty := A2m1 * (x1 - x0)
 
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		// barycentric coordinates
 		s := Sc + Sx*x + Sy*y
 		t := Tc + Tx*x + Ty*y
@@ -265,7 +269,7 @@ func triangle(x0, y0, x1, y1, x2, y2 float64) shape {
 
 // eqTriangle creates an equilateral triangle with given side length, centered at origin.
 func eqTriangle(side float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		c := math.Sqrt(3)
 		return y > -side/(2*c) && y < x*c+side/c && y < -x*c+side/c
 	})
@@ -273,7 +277,7 @@ func eqTriangle(side float64) shape {
 
 // Rounded Equilateral triangle with given sides.
 func rTriangle(side, diam float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		c := math.Sqrt(3)
 		return y > -side/(2*c) && y < x*c+side/c && y < -x*c+side/c && math.Sqrt(sqr64(x)+sqr64(y)) < diam/2
 	})
@@ -281,7 +285,7 @@ func rTriangle(side, diam float64) shape {
 
 // hexagon with given sides.
 func hexagon(side float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		a, b := math.Sqrt(3), math.Sqrt(3)*side
 		return y < b/2 && y < -a*x+b && y > a*x-b && y > -b/2 && y > -a*x-b && y < a*x+b
 	})
@@ -289,7 +293,7 @@ func hexagon(side float64) shape {
 
 // diamond with given sides.
 func diamond(sidex, sidey float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		a, b := sidey/sidex, sidey/2
 		return y < a*x+b && y < -a*x+b && y > a*x-b && y > -a*x-b
 	})
@@ -298,7 +302,7 @@ func diamond(sidex, sidey float64) shape {
 // squircle creates a 3D rounded rectangle (a generalized squircle) with specified side lengths and thickness.
 func squircle(sidex, sidey, sidez, a float64) shape {
 	// r := math.Min(sidex, sidey) / 2
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		normX := x / (sidex / 2)
 		normY := y / (sidey / 2)
 
@@ -321,21 +325,21 @@ func square(side float64) shape {
 
 // All cells with x-coordinate between a and b
 func xRange(a, b float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return x >= a && x < b
 	})
 }
 
 // All cells with y-coordinate between a and b
 func yRange(a, b float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return y >= a && y < b
 	})
 }
 
 // All cells with z-coordinate between a and b
 func zRange(a, b float64) shape {
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return z >= a && z < b
 	})
 }
@@ -366,7 +370,7 @@ func cell(ix, iy, iz int) shape {
 	x2 := pos[X] + c[X]/2
 	y2 := pos[Y] + c[Y]/2
 	z2 := pos[Z] + c[Z]/2
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		return x > x1 && x < x2 &&
 			y > y1 && y < y2 &&
 			z > z1 && z < z2
@@ -377,7 +381,7 @@ func universe() shape {
 	return universeInner
 }
 
-var universeInner = newShape(func(x, y, z float64) bool {
+var universeInner = newSampledShape(func(x, y, z float64) bool {
 	return true
 })
 
@@ -415,7 +419,7 @@ func imageShape(fname string) shape {
 	N := GetMesh().Size()
 	nx, ny := float64(N[X]), float64(N[Y])
 	w, h := float64(width), float64(height)
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		ix := int((w/nx)*(x/cx) + 0.5*w)
 		iy := int((h/ny)*(y/cy) + 0.5*h)
 		if ix < 0 || ix >= width || iy < 0 || iy >= height {
@@ -427,7 +431,7 @@ func imageShape(fname string) shape {
 
 func grainRoughness(grainsize, zmin, zmax float64, seed int) shape {
 	t := newTesselation(grainsize, 0, 256, int64(seed))
-	return newShape(func(x, y, z float64) bool {
+	return newSampledShape(func(x, y, z float64) bool {
 		if z <= zmin {
 			return true
 		}
