@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"math"
 	"sync"
+	"sync/atomic"
 
 	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/data"
@@ -22,6 +22,7 @@ var (
 
 	demagBoundaryWarnOnce sync.Once
 	demagBoundaryCache    demagBoundaryPlanCache
+	demagBoundaryRevision uint64
 )
 
 func init() {
@@ -52,10 +53,11 @@ type demagBoundaryPlanCache struct {
 }
 
 type demagBoundaryConfig struct {
-	mesh   [3]int
-	halo   int
-	radius int
-	refine int
+	mesh     [3]int
+	halo     int
+	radius   int
+	refine   int
+	revision uint64
 }
 
 const demagBoundaryEps = 1e-4
@@ -63,6 +65,7 @@ const demagBoundaryEps = 1e-4
 func invalidateDemagBoundaryPlan() {
 	demagBoundaryCache.mu.Lock()
 	defer demagBoundaryCache.mu.Unlock()
+	atomic.AddUint64(&demagBoundaryRevision, 1)
 	freeDemagBoundaryPlanGPU(&demagBoundaryCache.plan)
 	demagBoundaryCache.valid = false
 	demagBoundaryCache.plan = demagBoundaryPlan{}
@@ -129,10 +132,11 @@ func currentDemagBoundaryConfig() demagBoundaryConfig {
 		refine = 1
 	}
 	return demagBoundaryConfig{
-		mesh:   Geometry.Mesh().Size(),
-		halo:   halo,
-		radius: radius,
-		refine: refine,
+		mesh:     Geometry.Mesh().Size(),
+		halo:     halo,
+		radius:   radius,
+		refine:   refine,
+		revision: atomic.LoadUint64(&demagBoundaryRevision),
 	}
 }
 
@@ -156,12 +160,17 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	maskValues := hostMask.Host()[0]
 	n := Geometry.Mesh().Size()
 	pbc := Geometry.Mesh().PBC()
+	cell := Geometry.Mesh().CellSize()
 	base := make([]bool, len(maskValues))
 	active := make([]bool, len(maskValues))
-	offsets := make([]data.Vector, len(maskValues))
 	plan := demagBoundaryPlan{
 		mask:    hostMask,
 		stencil: buildDemagStencil(cfg.radius),
+	}
+
+	if !Geometry.usesCutCell() || Geometry.shape.voxelizer == nil {
+		plan.maskGPU = cuda.GPUCopy(hostMask)
+		return plan
 	}
 
 	for idx, phi := range geomValues {
@@ -211,6 +220,28 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 		return plan
 	}
 
+	if pbc[X] != 0 || pbc[Y] != 0 || pbc[Z] != 0 {
+		log.Log.Warn("DemagBoundaryCorr currently supports only non-periodic meshes; skipping local demag correction for PBC != 0")
+		plan.maskGPU = cuda.GPUCopy(hostMask)
+		return plan
+	}
+
+	coarseGrid := [3]int{1, 1, 1}
+	fineGrid := [3]int{cfg.refine, cfg.refine, cfg.refine}
+	for axis := 0; axis < 3; axis++ {
+		if n[axis] > 1 {
+			coarseGrid[axis] = cfg.radius + 1
+			fineGrid[axis] = (cfg.radius + 1) * cfg.refine
+		}
+	}
+	coarseKernel := newDemagKernelLookup(coarseGrid, cell)
+	fineCell := [3]float64{
+		cell[X] / float64(cfg.refine),
+		cell[Y] / float64(cfg.refine),
+		cell[Z] / float64(cfg.refine),
+	}
+	fineKernel := newDemagKernelLookup(fineGrid, fineCell)
+
 	support := make(map[int]struct{}, len(plan.targetIdx))
 	for _, idx := range plan.targetIdx {
 		support[idx] = struct{}{}
@@ -224,9 +255,10 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 		}
 	}
 
+	refinedCells := make(map[int]refinedCellWeights, len(support))
 	for idx := range support {
 		ix, iy, iz := demagLinearToCoord(idx, n)
-		offsets[idx] = demagCellCentroidOffset(ix, iy, iz, geomValues[idx], cfg.refine)
+		refinedCells[idx] = buildRefinedCellWeights(boundsFromIndex(ix, iy, iz), float64(geomValues[idx]), cfg.refine)
 	}
 
 	targetHost := make([]int32, len(plan.targetIdx))
@@ -236,27 +268,26 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 	}
 	tensorHost := data.NewSlice(1, [3]int{len(plan.targetIdx) * len(plan.stencil) * 6, 1, 1})
 	tensorValues := tensorHost.Host()[0]
-	cell := Geometry.Mesh().CellSize()
 
 	for t, targetIdx := range plan.targetIdx {
 		targetHost[t] = int32(targetIdx)
+		targetWeights := refinedCells[targetIdx]
+		if targetWeights.total <= demagBoundaryEps {
+			continue
+		}
 		tix, tiy, tiz := demagLinearToCoord(targetIdx, n)
-		targetOffset := offsets[targetIdx]
 
 		for s, delta := range plan.stencil {
 			sourceIdx, ok := demagWrappedIndex(n, pbc, tix+delta[X], tiy+delta[Y], tiz+delta[Z])
 			if !ok || !active[sourceIdx] {
 				continue
 			}
+			sourceWeights := refinedCells[sourceIdx]
+			if sourceWeights.total <= demagBoundaryEps {
+				continue
+			}
 			sourceHost[t*len(plan.stencil)+s] = int32(sourceIdx)
-			sourceOffset := offsets[sourceIdx]
-			coarseR := vector(
-				-float64(delta[X])*cell[X],
-				-float64(delta[Y])*cell[Y],
-				-float64(delta[Z])*cell[Z],
-			)
-			fineR := coarseR.Add(targetOffset).Sub(sourceOffset)
-			tensor := demagTensorDifference(fineR, coarseR, cell[X]*cell[Y]*cell[Z])
+			tensor := demagRefinedCorrectionTensor(targetWeights, sourceWeights, delta, cfg.refine, fineKernel, coarseKernel)
 			base := (t*len(plan.stencil) + s) * 6
 			for comp := 0; comp < 6; comp++ {
 				tensorValues[base+comp] = float32(tensor[comp])
@@ -274,16 +305,13 @@ func buildDemagBoundaryPlanHost() demagBoundaryPlan {
 }
 
 func buildDemagStencil(radius int) [][3]int {
-	if radius <= 0 {
+	if radius < 0 {
 		return nil
 	}
-	stencil := make([][3]int, 0, (2*radius+1)*(2*radius+1)*(2*radius+1)-1)
+	stencil := make([][3]int, 0, (2*radius+1)*(2*radius+1)*(2*radius+1))
 	for dz := -radius; dz <= radius; dz++ {
 		for dy := -radius; dy <= radius; dy++ {
 			for dx := -radius; dx <= radius; dx++ {
-				if dx == 0 && dy == 0 && dz == 0 {
-					continue
-				}
 				stencil = append(stencil, [3]int{dx, dy, dz})
 			}
 		}
@@ -331,7 +359,7 @@ func applyDemagBoundaryCorrection(dst, vol *data.Slice, ms cuda.MSlice) {
 	}
 	plan := getDemagBoundaryPlan()
 	demagBoundaryWarnOnce.Do(func() {
-		log.Log.Warn("DemagBoundaryCorr uses an experimental sparse GPU-side local demag boundary correction on the boundary shell. It precomputes a local correction tensor per shell target and applies it after the FFT demag field.")
+		log.Log.Warn("DemagBoundaryCorr uses an experimental sparse GPU-side local demag boundary correction on the boundary shell. It precomputes a refined local correction tensor (including self terms) per shell target and applies it after the FFT demag field.")
 		log.Log.Info("Demag boundary shell currently covers %d cells", len(plan.targetIdx))
 	})
 	if len(plan.targetIdx) == 0 || len(plan.stencil) == 0 {
@@ -368,62 +396,151 @@ func demagWrappedIndex(n, pbc [3]int, ix, iy, iz int) (int, bool) {
 	return data.Index(n, coords[X], coords[Y], coords[Z]), true
 }
 
-func demagCellCentroidOffset(ix, iy, iz int, phi float32, refine int) data.Vector {
-	if phi <= demagBoundaryEps || phi >= 1-demagBoundaryEps {
-		return data.Vector{}
-	}
-	if refine < 1 {
-		refine = 1
-	}
-	bounds := boundsFromIndex(ix, iy, iz)
-	center := index2Coord(ix, iy, iz)
-	var sum data.Vector
-	var count int
+type refinedSubcellWeight struct {
+	rx, ry, rz int
+	weight     float64
+}
 
-	for rz := 0; rz < refine; rz++ {
-		tz := (float64(rz) + 0.5) / float64(refine)
-		for ry := 0; ry < refine; ry++ {
-			ty := (float64(ry) + 0.5) / float64(refine)
-			for rx := 0; rx < refine; rx++ {
-				tx := (float64(rx) + 0.5) / float64(refine)
-				x, y, z := bounds.samplePoint(tx, ty, tz)
-				if Geometry.shape.contains(x, y, z) {
-					sum = sum.Add(vector(x-center[X], y-center[Y], z-center[Z]))
-					count++
+type refinedCellWeights struct {
+	total float64
+	subs  []refinedSubcellWeight
+}
+
+type demagKernelLookup struct {
+	size [3]int
+	xx   [][][]float32
+	xy   [][][]float32
+	xz   [][][]float32
+	yy   [][][]float32
+	yz   [][][]float32
+	zz   [][][]float32
+}
+
+func newDemagKernelLookup(grid [3]int, cellSize [3]float64) demagKernelLookup {
+	kernel := mag.DemagKernel(grid, [3]int{}, cellSize, DemagAccuracy, CacheDir, true)
+	return demagKernelLookup{
+		size: kernel[X][X].Size(),
+		xx:   kernel[X][X].Scalars(),
+		xy:   kernel[X][Y].Scalars(),
+		xz:   demagKernelScalars(kernel[X][Z]),
+		yy:   kernel[Y][Y].Scalars(),
+		yz:   demagKernelScalars(kernel[Y][Z]),
+		zz:   kernel[Z][Z].Scalars(),
+	}
+}
+
+func demagKernelScalars(s *data.Slice) [][][]float32 {
+	if s == nil {
+		return nil
+	}
+	return s.Scalars()
+}
+
+func demagKernelWrapOffset(offset, size int) int {
+	for offset < 0 {
+		offset += size
+	}
+	for offset >= size {
+		offset -= size
+	}
+	return offset
+}
+
+func (k demagKernelLookup) tensor(dx, dy, dz int) [6]float64 {
+	ix := demagKernelWrapOffset(dx, k.size[X])
+	iy := demagKernelWrapOffset(dy, k.size[Y])
+	iz := demagKernelWrapOffset(dz, k.size[Z])
+	var out [6]float64
+	out[0] = float64(k.xx[iz][iy][ix])
+	out[1] = float64(k.xy[iz][iy][ix])
+	if k.xz != nil {
+		out[2] = float64(k.xz[iz][iy][ix])
+	}
+	out[3] = float64(k.yy[iz][iy][ix])
+	if k.yz != nil {
+		out[4] = float64(k.yz[iz][iy][ix])
+	}
+	out[5] = float64(k.zz[iz][iy][ix])
+	return out
+}
+
+func splitBoundsAxis(min, max float64, idx, refine int) (float64, float64) {
+	span := (max - min) / float64(refine)
+	start := min + float64(idx)*span
+	return start, start + span
+}
+
+func subcellBounds(bounds cellBounds, rx, ry, rz, refine int) cellBounds {
+	xMin, xMax := splitBoundsAxis(bounds.xMin, bounds.xMax, rx, refine)
+	yMin, yMax := splitBoundsAxis(bounds.yMin, bounds.yMax, ry, refine)
+	zMin, zMax := splitBoundsAxis(bounds.zMin, bounds.zMax, rz, refine)
+	return cellBounds{xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax, zMin: zMin, zMax: zMax}
+}
+
+func buildRefinedCellWeights(bounds cellBounds, coarsePhi float64, refine int) refinedCellWeights {
+	if coarsePhi <= demagBoundaryEps || refine < 1 {
+		return refinedCellWeights{}
+	}
+
+	count := refine * refine * refine
+	weights := refinedCellWeights{
+		subs: make([]refinedSubcellWeight, 0, count),
+	}
+
+	if coarsePhi >= 1-demagBoundaryEps {
+		for rz := 0; rz < refine; rz++ {
+			for ry := 0; ry < refine; ry++ {
+				for rx := 0; rx < refine; rx++ {
+					weights.subs = append(weights.subs, refinedSubcellWeight{rx: rx, ry: ry, rz: rz, weight: 1})
 				}
 			}
 		}
+		weights.total = float64(len(weights.subs))
+		return weights
 	}
-	if count == 0 {
-		return data.Vector{}
+
+	for rz := 0; rz < refine; rz++ {
+		for ry := 0; ry < refine; ry++ {
+			for rx := 0; rx < refine; rx++ {
+				subBounds := subcellBounds(bounds, rx, ry, rz, refine)
+				phi := float64(Geometry.shape.voxelizer.cellMetrics(subBounds).VolumeFraction)
+				if phi <= demagBoundaryEps {
+					continue
+				}
+				if phi > 1-demagBoundaryEps {
+					phi = 1
+				}
+				weights.subs = append(weights.subs, refinedSubcellWeight{rx: rx, ry: ry, rz: rz, weight: phi})
+				weights.total += phi
+			}
+		}
 	}
-	return sum.Div(float64(count))
+
+	return weights
 }
 
-func demagTensorDifference(fineR, coarseR data.Vector, cellVolume float64) [6]float64 {
-	fine := demagTensorFromR(fineR, cellVolume)
-	coarse := demagTensorFromR(coarseR, cellVolume)
+func demagAddScaledTensor(dst *[6]float64, src [6]float64, scale float64) {
+	for i := 0; i < 6; i++ {
+		dst[i] += scale * src[i]
+	}
+}
+
+func demagRefinedCorrectionTensor(target, source refinedCellWeights, delta [3]int, refine int, fineKernel, coarseKernel demagKernelLookup) [6]float64 {
+	var fine [6]float64
+	for _, tSub := range target.subs {
+		wt := tSub.weight / target.total
+		for _, sSub := range source.subs {
+			ws := sSub.weight / source.total
+			dx := delta[X]*refine + (tSub.rx - sSub.rx)
+			dy := delta[Y]*refine + (tSub.ry - sSub.ry)
+			dz := delta[Z]*refine + (tSub.rz - sSub.rz)
+			demagAddScaledTensor(&fine, fineKernel.tensor(dx, dy, dz), wt*ws)
+		}
+	}
+
+	coarse := coarseKernel.tensor(delta[X], delta[Y], delta[Z])
 	for i := 0; i < 6; i++ {
 		fine[i] -= coarse[i]
 	}
 	return fine
-}
-
-func demagTensorFromR(r data.Vector, cellVolume float64) [6]float64 {
-	r2 := r.Dot(r)
-	if r2 < 1e-30 {
-		return [6]float64{}
-	}
-	rLen := math.Sqrt(r2)
-	r3 := r2 * rLen
-	r5 := r3 * r2
-	prefactor := (mag.Mu0 / (4 * math.Pi)) * cellVolume
-
-	xx := prefactor * ((3*r[X]*r[X])/r5 - 1/r3)
-	xy := prefactor * ((3 * r[X] * r[Y]) / r5)
-	xz := prefactor * ((3 * r[X] * r[Z]) / r5)
-	yy := prefactor * ((3*r[Y]*r[Y])/r5 - 1/r3)
-	yz := prefactor * ((3 * r[Y] * r[Z]) / r5)
-	zz := prefactor * ((3*r[Z]*r[Z])/r5 - 1/r3)
-	return [6]float64{xx, xy, xz, yy, yz, zz}
 }

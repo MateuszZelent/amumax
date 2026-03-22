@@ -27,11 +27,11 @@ func init() {
 
 	declVar("EnableDemag", &EnableDemag, "Enables/disables demag (default=true)")
 	declVar("DemagAccuracy", &DemagAccuracy, "Controls accuracy of demag kernel")
-	declVar("DemagBoundaryCorr", &DemagBoundaryCorr, "Enables experimental sparse local demag boundary correction on the boundary shell. Current v1 implementation applies a GPU-side precomputed tensor correction after the FFT demag field.")
+	declVar("DemagBoundaryCorr", &DemagBoundaryCorr, "Enables experimental sparse local demag boundary correction on the boundary shell. Current v1 implementation applies a GPU-side precomputed refined-subgrid tensor correction after the FFT demag field.")
 	declVar("DemagBoundaryRadius", &DemagBoundaryRadius, "Neighborhood radius used by the experimental local demag boundary correction stencil.")
-	declVar("DemagBoundaryRefine", &DemagBoundaryRefine, "Refinement factor used to estimate material centroids inside boundary-shell cells for experimental demag boundary correction.")
+	declVar("DemagBoundaryRefine", &DemagBoundaryRefine, "Refinement factor used for local subgrid demag boundary correction precomputation inside boundary-shell cells.")
 	declVar("DemagBoundaryHalo", &DemagBoundaryHalo, "Halo size used to dilate the demag boundary shell around partial/cut cells.")
-	declVar("DemagBoundaryTol", &DemagBoundaryTol, "Tolerance reserved for future higher-order local demag boundary correction precomputation.")
+	declVar("DemagBoundaryTol", &DemagBoundaryTol, "Reserved tolerance parameter for future higher-order local demag boundary correction precomputation.")
 
 	declVar("step", &NSteps, "Total number of time steps taken")
 	declVar("MinDt", &MinDt, "Minimum time step the solver can take (s)")

@@ -757,6 +757,7 @@ func (g *geom) shift(dx int) {
 	if g == nil || g.Buffer == nil || g.Buffer.IsNil() {
 		return
 	}
+	invalidateDemagBoundaryPlan()
 	if g.HasLinks() {
 		g.setGeom(g.shape)
 		return
@@ -794,6 +795,7 @@ func (g *geom) shiftY(dy int) {
 	if g == nil || g.Buffer == nil || g.Buffer.IsNil() {
 		return
 	}
+	invalidateDemagBoundaryPlan()
 	if g.HasLinks() {
 		g.setGeom(g.shape)
 		return
