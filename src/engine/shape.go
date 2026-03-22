@@ -92,6 +92,41 @@ func sinWaveguide2(length, width, height, period, centerAmp, phase, z0 float64) 
 	}
 }
 
+// archWaveguide creates a waveguide whose centerline follows a half-sine arch.
+// The waveguide propagates along x from -length/2 to +length/2.
+// The centerline rises as z(x) = z0 + archHeight * sin(π * (x + length/2) / length),
+// creating a single smooth arch: z0 at both ends, z0+archHeight at the center.
+//
+//	length:     total waveguide extent along x
+//	width:      extent in y
+//	height:     thickness of the strip in z (measured vertically)
+//	archHeight: peak rise of the arch centerline above z0
+//	z0:         vertical offset of the arch endpoints
+func archWaveguide(length, width, height, archHeight, z0 float64) shape {
+	switch {
+	case length <= 0:
+		log.Log.ErrAndExit("ArchWaveguide: length must be > 0, got %g", length)
+	case width <= 0:
+		log.Log.ErrAndExit("ArchWaveguide: width must be > 0, got %g", width)
+	case height <= 0:
+		log.Log.ErrAndExit("ArchWaveguide: height must be > 0, got %g", height)
+	}
+
+	halfL := length / 2
+	halfW := width / 2
+	halfH := height / 2
+
+	return func(x, y, z float64) bool {
+		if x < -halfL || x > halfL || y < -halfW || y > halfW {
+			return false
+		}
+		// half-sine: 0 at x=-halfL, peaks at x=0, back to 0 at x=+halfL
+		t := (x + halfL) / length // t ∈ [0,1]
+		zCenter := z0 + archHeight*math.Sin(math.Pi*t)
+		return z >= zCenter-halfH && z <= zCenter+halfH
+	}
+}
+
 // ellipsoid with given diameters
 func ellipsoid(diamx, diamy, diamz float64) shape {
 	return func(x, y, z float64) bool {

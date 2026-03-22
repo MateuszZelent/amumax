@@ -39,3 +39,19 @@ ext_autoabsorbingboundary(18, "x-", 0.8, 3)
 
 expect("legacy left positive", sign(cropx(SpongeAlpha, 0, 16).average()[0]), 1, 0)
 expect("legacy right zero", cropx(SpongeAlpha, 240, 256).average()[0], 0.0, tol)
+
+ext_clearabsorbingboundary()
+ext_autoabsorbingboundaryadvancedwithheff(6, 18, "x-", "MSSW", 0.8, 30, 40, 0, 4e5, 2e5, 0.8e-3)
+
+avgHeff := SpongeAlpha.average()
+leftHeff := cropx(SpongeAlpha, 0, 16).average()[0]
+rampHeff := cropx(SpongeAlpha, 16, 32).average()[0]
+
+expect("explicit heff avg positive", sign(avgHeff), 1, 0)
+
+ext_clearabsorbingboundary()
+ext_autoabsorbingboundaryadvancedfromregion0withheff(6, 18, "x-", "MSSW", 0.8, 30, 40, 0, 4e5)
+
+expect("region0 heff avg", SpongeAlpha.average(), avgHeff, tol)
+expect("region0 heff left", cropx(SpongeAlpha, 0, 16).average()[0], leftHeff, tol)
+expect("region0 heff ramp", cropx(SpongeAlpha, 16, 32).average()[0], rampHeff, tol)

@@ -51,6 +51,7 @@ type abcDesignResult struct {
 	TotalWidth   float64
 	RampWidth    float64
 	PlateauWidth float64
+	ThetaDeg     float64
 	LambdaMinN   float64
 	LambdaMaxN   float64
 	KMinN        float64
@@ -60,6 +61,18 @@ type abcDesignResult struct {
 	Heff         float64
 	FMRGHz       float64
 	Note         string
+}
+
+type abcHeffEstimate struct {
+	BExtMag   float64
+	HExt      float64
+	HAnis     float64
+	Heuristic float64
+	Projected float64
+	Used      float64
+	MAvgNorm  float64
+	Source    string
+	Note      string
 }
 
 // spongeAlphaMSlice returns an MSlice for SpongeAlpha.
@@ -116,12 +129,45 @@ func init() {
 
          Notes:
          - Reads Msat, Aex, Alpha and |B_ext| from region 0.
+         - Estimates H_eff from the projected region-0 effective field when the
+           current region-0 state is sufficiently aligned; otherwise falls back to
+           H_ext + H_K.
+         - The projected estimate is skipped when the region-0 temperature is non-zero
+           and the engine is not relaxing, to avoid contamination by thermal field noise.
+         - The projected H_eff estimate is intended for a relaxed or otherwise
+           fairly uniform region-0 state.
          - ku1Jm3 is converted to an effective easy-axis field 2Ku1/(mu0*Ms).
          - dmiJm2 is an optional interfacial DMI correction used as a linear k-shift.
-         - thetaDeg is the propagation angle with respect to the boundary normal.
+         - For single-axis designs, thetaDeg is the propagation angle with respect to
+           the active boundary normal.
+         - If both x and y boundaries are designed in one call, thetaDeg is interpreted
+           as the global in-plane propagation angle measured from +x. The x sides use
+           theta=thetaDeg and the y sides use theta=90-thetaDeg.
+         - FV/DV currently uses an approximate forward-volume model and should be
+           treated as experimental.
          - DV is treated as an alias of FV. DE is treated as an alias of MSSW.
          - The algorithm designs ramp width from the adiabatic condition and plateau width
            from the integrated attenuation target.`)
+
+	DeclFunc("ext_AutoAbsorbingBoundaryAdvancedWithHeff", AutoAbsorbingBoundaryAdvancedWithHeff,
+		`Physics-based automatic ABC design with explicit H_eff override.
+         Args:
+           fMinGHz, fMaxGHz,
+           direction,
+           mode("BV","FV","DV","MSSW","DE"),
+           maxAlpha,
+           targetRLdB,
+           targetEdgeAmpdB,
+           thetaDeg,
+           heffApm,
+           ku1Jm3,
+           dmiJm2.
+
+         Notes:
+         - Uses the same algorithm as ext_AutoAbsorbingBoundaryAdvanced.
+         - Bypasses the automatic H_eff estimate and uses heffApm directly.
+         - heffApm may be any finite value, including zero or negative values.
+         - Uses the same thetaDeg interpretation rules as ext_AutoAbsorbingBoundaryAdvanced.`)
 
 	DeclFunc("ext_AutoAbsorbingBoundaryAdvancedFromRegion0", AutoAbsorbingBoundaryAdvancedFromRegion0,
 		`Physics-based automatic ABC design using region-0 material parameters directly.
@@ -137,7 +183,27 @@ func init() {
          Notes:
          - Reads Msat, Aex, Alpha, |B_ext|, Ku1 and Dind from region 0.
          - Uses the same design algorithm as ext_AutoAbsorbingBoundaryAdvanced.
+         - Uses the same thetaDeg interpretation rules as ext_AutoAbsorbingBoundaryAdvanced.
          - DV is treated as an alias of FV. DE is treated as an alias of MSSW.`)
+
+	DeclFunc("ext_AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff", AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff,
+		`Physics-based automatic ABC design using region-0 material parameters plus
+         an explicit H_eff override.
+         Args:
+           fMinGHz, fMaxGHz,
+           direction,
+           mode("BV","FV","DV","MSSW","DE"),
+           maxAlpha,
+           targetRLdB,
+           targetEdgeAmpdB,
+           thetaDeg,
+           heffApm.
+
+         Notes:
+         - Reads Msat, Aex, Alpha, |B_ext|, Ku1 and Dind from region 0.
+         - Uses the same design algorithm as ext_AutoAbsorbingBoundaryAdvancedWithHeff.
+         - heffApm may be any finite value, including zero or negative values.
+         - Uses the same thetaDeg interpretation rules as ext_AutoAbsorbingBoundaryAdvanced.`)
 }
 
 // --- Profiles ---
@@ -249,6 +315,21 @@ func maxProfileSlope(name string, param float64) float64 {
 	}
 }
 
+func appendABCNote(note, extra string) string {
+	extra = strings.TrimSpace(extra)
+	if extra == "" {
+		return strings.TrimSpace(note)
+	}
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return extra
+	}
+	if strings.Contains(note, extra) {
+		return note
+	}
+	return note + "; " + extra
+}
+
 func parseBoundarySpec(direction string) abcSideSpec {
 	raw := strings.ToLower(strings.TrimSpace(direction))
 	raw = strings.ReplaceAll(raw, " ", "")
@@ -321,6 +402,10 @@ func normalizeSideWidths(total, ramp *abcSideWidths, spec abcSideSpec, worldX, w
 	total.XPlus = normalizeSingleWidth(total.XPlus, ramp.XPlus, cellX)
 	total.YMinus = normalizeSingleWidth(total.YMinus, ramp.YMinus, cellY)
 	total.YPlus = normalizeSingleWidth(total.YPlus, ramp.YPlus, cellY)
+	ramp.XMinus = normalizeRampWidth(ramp.XMinus, cellX)
+	ramp.XPlus = normalizeRampWidth(ramp.XPlus, cellX)
+	ramp.YMinus = normalizeRampWidth(ramp.YMinus, cellY)
+	ramp.YPlus = normalizeRampWidth(ramp.YPlus, cellY)
 
 	if ramp.XMinus > total.XMinus {
 		ramp.XMinus = total.XMinus
@@ -348,6 +433,13 @@ func normalizeSingleWidth(totalWidth, rampWidth, cellSize float64) float64 {
 		minCells = 2
 	}
 	return roundUpToCells(totalWidth, cellSize, minCells)
+}
+
+func normalizeRampWidth(rampWidth, cellSize float64) float64 {
+	if rampWidth <= 0 {
+		return 0
+	}
+	return roundUpToCells(rampWidth, cellSize, 2)
 }
 
 func clampAxisWidths(wNeg, wPos, rampNeg, rampPos *float64, worldSize float64, bothSides bool) {
@@ -565,9 +657,10 @@ func AutoAbsorbingBoundary(maxFreqGHz float64, direction string, maxAlpha float6
 //     P_A ≈ (H1+H2)/(2*sqrt(H1*H2)),
 //     Sg  = ω P_A / (|v_g,n| k_n²),
 //     Sa  = |v_g,n| / (ω P_A).
-//  3. Worst-case small-k matching gives the ramp width:
-//     L_grad >= α_max * max|p'| * Sg* / |Γ_target|,
-//     with |Γ_target| = 10^(-RL/20).
+//  3. Worst-case small-k matching gives a characteristic ramp scale:
+//     L_grad ~ C_RL * α_max * max|p'| * Sg*,
+//     where C_RL = 1 + RL/10 is a conservative engineering factor.
+//     Also enforce L_grad >= 2 λ_n,min.
 //  4. Integrated attenuation gives the plateau width:
 //     α_max ( <p> L_grad + L_plateau ) >= Sa* ln(10) * A_dB / 20.
 func AutoAbsorbingBoundaryAdvanced(
@@ -575,20 +668,55 @@ func AutoAbsorbingBoundaryAdvanced(
 	direction, mode string,
 	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, ku1Jm3, dmiJm2 float64,
 ) {
+	autoAbsorbingBoundaryAdvanced(
+		fMinGHz, fMaxGHz,
+		direction, mode,
+		maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg,
+		ku1Jm3, dmiJm2,
+		0, false,
+		"ext_AutoAbsorbingBoundaryAdvanced",
+	)
+}
+
+func AutoAbsorbingBoundaryAdvancedWithHeff(
+	fMinGHz, fMaxGHz float64,
+	direction, mode string,
+	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, heffApm, ku1Jm3, dmiJm2 float64,
+) {
+	if math.IsNaN(heffApm) || math.IsInf(heffApm, 0) {
+		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvancedWithHeff: heffApm must be finite")
+	}
+	autoAbsorbingBoundaryAdvanced(
+		fMinGHz, fMaxGHz,
+		direction, mode,
+		maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg,
+		ku1Jm3, dmiJm2,
+		heffApm, true,
+		"ext_AutoAbsorbingBoundaryAdvancedWithHeff",
+	)
+}
+
+func autoAbsorbingBoundaryAdvanced(
+	fMinGHz, fMaxGHz float64,
+	direction, mode string,
+	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, ku1Jm3, dmiJm2, heffApm float64,
+	useExplicitHeff bool,
+	callerName string,
+) {
 	ms := Msat.GetRegion(0)
 	aex := Aex.GetRegion(0)
 	alpha0 := Alpha.GetRegion(0)
 	if ms == 0 {
-		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: Msat is zero. Set material parameters first.")
+		log.Log.ErrAndExit("%s: Msat is zero. Set material parameters first.", callerName)
 	}
 	if aex == 0 {
-		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: Aex is zero. Set material parameters first.")
+		log.Log.ErrAndExit("%s: Aex is zero. Set material parameters first.", callerName)
 	}
 	if maxAlpha <= 0 {
-		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: maxAlpha must be > 0")
+		log.Log.ErrAndExit("%s: maxAlpha must be > 0", callerName)
 	}
 	if fMaxGHz <= 0 {
-		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: fMaxGHz must be > 0")
+		log.Log.ErrAndExit("%s: fMaxGHz must be > 0", callerName)
 	}
 	if fMinGHz < 0 {
 		fMinGHz = 0
@@ -605,64 +733,90 @@ func AutoAbsorbingBoundaryAdvanced(
 
 	spec := parseBoundarySpec(direction)
 	if !spec.any() {
-		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: invalid direction %q", direction)
+		log.Log.ErrAndExit("%s: invalid direction %q", callerName, direction)
 	}
 
 	mode = normalizeDispersionMode(mode)
-	bExt := BExt.perRegion.GetRegion(0)
-	bMag := math.Sqrt(bExt[0]*bExt[0] + bExt[1]*bExt[1] + bExt[2]*bExt[2])
-	hExt := bMag / mu0ABC
-	hAni := 0.0
-	if ku1Jm3 != 0 {
-		hAni = 2 * ku1Jm3 / (mu0ABC * ms)
+	var heffEstimate abcHeffEstimate
+	if useExplicitHeff {
+		heffEstimate = explicitAutoABCHeffEstimate(ms, ku1Jm3, heffApm)
+	} else {
+		heffEstimate = estimateAutoABCHeff(ms, ku1Jm3)
 	}
-	heff := hExt + hAni
+	if math.IsNaN(heffEstimate.Used) || math.IsInf(heffEstimate.Used, 0) {
+		log.Log.ErrAndExit("%s: H_eff estimate is invalid (%.3e A/m). Relax the state first or use an explicit heffApm override.", callerName, heffEstimate.Used)
+	}
+	if heffEstimate.Used <= 0 {
+		heffEstimate.Note = appendABCNote(heffEstimate.Note,
+			"H_eff used is non-positive; proceeding because the simplified dispersion can still admit finite-k propagation, but low-k coverage may require manual validation")
+	}
 	d := float64(GetMesh().Size()[Z]) * GetMesh().CellSize()[Z]
+	xThetaDeg, yThetaDeg, mixedAxisAngles := resolveAutoABCAxisAngles(spec, thetaDeg)
 
 	var total abcSideWidths
 	var ramp abcSideWidths
+	var xMinusRes, xPlusRes, yMinusRes, yPlusRes abcDesignResult
 
 	if spec.XMinus {
-		res := designAutoABCSide(GetMesh().WorldSize()[X], GetMesh().CellSize()[X], d, ms, aex, heff, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, -1)
+		res := designAutoABCSide(GetMesh().WorldSize()[X], GetMesh().CellSize()[X], d, ms, aex, heffEstimate.Used, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, xThetaDeg, dmiJm2, -1, spec.XMinus && spec.XPlus)
 		if !res.Valid {
-			log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: x- design failed")
+			log.Log.ErrAndExit("%s: x- design failed", callerName)
 		}
+		xMinusRes = res
 		total.XMinus, ramp.XMinus = res.TotalWidth, res.RampWidth
-		logABCSideDesign("x-", res)
 	}
 	if spec.XPlus {
-		res := designAutoABCSide(GetMesh().WorldSize()[X], GetMesh().CellSize()[X], d, ms, aex, heff, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, +1)
+		res := designAutoABCSide(GetMesh().WorldSize()[X], GetMesh().CellSize()[X], d, ms, aex, heffEstimate.Used, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, xThetaDeg, dmiJm2, +1, spec.XMinus && spec.XPlus)
 		if !res.Valid {
-			log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: x+ design failed")
+			log.Log.ErrAndExit("%s: x+ design failed", callerName)
 		}
+		xPlusRes = res
 		total.XPlus, ramp.XPlus = res.TotalWidth, res.RampWidth
-		logABCSideDesign("x+", res)
 	}
 	if spec.YMinus {
-		res := designAutoABCSide(GetMesh().WorldSize()[Y], GetMesh().CellSize()[Y], d, ms, aex, heff, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, -1)
+		res := designAutoABCSide(GetMesh().WorldSize()[Y], GetMesh().CellSize()[Y], d, ms, aex, heffEstimate.Used, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, yThetaDeg, dmiJm2, -1, spec.YMinus && spec.YPlus)
 		if !res.Valid {
-			log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: y- design failed")
+			log.Log.ErrAndExit("%s: y- design failed", callerName)
 		}
+		yMinusRes = res
 		total.YMinus, ramp.YMinus = res.TotalWidth, res.RampWidth
-		logABCSideDesign("y-", res)
 	}
 	if spec.YPlus {
-		res := designAutoABCSide(GetMesh().WorldSize()[Y], GetMesh().CellSize()[Y], d, ms, aex, heff, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, +1)
+		res := designAutoABCSide(GetMesh().WorldSize()[Y], GetMesh().CellSize()[Y], d, ms, aex, heffEstimate.Used, fMinGHz, fMaxGHz, mode, maxAlpha, targetRLdB, targetEdgeAmpdB, yThetaDeg, dmiJm2, +1, spec.YMinus && spec.YPlus)
 		if !res.Valid {
-			log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvanced: y+ design failed")
+			log.Log.ErrAndExit("%s: y+ design failed", callerName)
 		}
+		yPlusRes = res
 		total.YPlus, ramp.YPlus = res.TotalWidth, res.RampWidth
-		logABCSideDesign("y+", res)
 	}
 
+	if mode == "fv" {
+		log.Log.Warn("ABC advanced auto: FV/DV uses an approximate forward-volume model. Treat it as experimental and validate against RL or |Γ| benchmarks.")
+	}
 	log.Log.Info("┌─ ABC Physics-Based Auto-Configuration ────")
+	logABCSideDesign("x-", xMinusRes)
+	logABCSideDesign("x+", xPlusRes)
+	logABCSideDesign("y-", yMinusRes)
+	logABCSideDesign("y+", yPlusRes)
 	log.Log.Info("│ Material: Msat = %.3e A/m, Aex = %.3e J/m, α = %.4f", ms, aex, alpha0)
-	log.Log.Info("│ |B_ext| = %.4f T  → H_ext = %.3e A/m", bMag, hExt)
-	log.Log.Info("│ Ku1 input = %.3e J/m^3 → H_K ≈ %.3e A/m", ku1Jm3, hAni)
-	log.Log.Info("│ H_eff used = %.3e A/m", heff)
-	log.Log.Info("│ Thickness = %.2f nm, mode = %s, theta = %.2f deg, DMI = %.3e J/m^2", d*1e9, strings.ToUpper(mode), thetaDeg, dmiJm2)
+	log.Log.Info("│ |B_ext| = %.4f T  → H_ext = %.3e A/m", heffEstimate.BExtMag, heffEstimate.HExt)
+	log.Log.Info("│ Ku1 input = %.3e J/m^3 → H_K ≈ %.3e A/m", ku1Jm3, heffEstimate.HAnis)
+	if isFinitePositive(heffEstimate.Projected) {
+		log.Log.Info("│ Projected H_eff from region-0 state = %.3e A/m (|<m>_r0| = %.3f)", heffEstimate.Projected, heffEstimate.MAvgNorm)
+	}
+	log.Log.Info("│ H_eff used = %.3e A/m (%s)", heffEstimate.Used, heffEstimate.Source)
+	log.Log.Info("│ Thickness = %.2f nm, mode = %s, DMI = %.3e J/m^2", d*1e9, strings.ToUpper(mode), dmiJm2)
+	if mixedAxisAngles {
+		log.Log.Info("│ thetaDeg input = %.2f deg interpreted as a global in-plane angle from +x", thetaDeg)
+		log.Log.Info("│ Resolved wall-normal angles: thetaX = %.2f deg, thetaY = %.2f deg", xThetaDeg, yThetaDeg)
+	} else {
+		log.Log.Info("│ theta = %.2f deg relative to the active boundary normal", thetaDeg)
+	}
 	log.Log.Info("│ Band = [%.3f, %.3f] GHz, target RL = %.1f dB, target edge amplitude = %.1f dB", fMinGHz, fMaxGHz, targetRLdB, targetEdgeAmpdB)
 	log.Log.Info("│ Profile = smootherstep, maxAlpha = %.3f", maxAlpha)
+	if heffEstimate.Note != "" {
+		log.Log.Warn("ABC advanced auto: %s", heffEstimate.Note)
+	}
 	log.Log.Info("└────────────────────────────────────────────")
 
 	applyAbsorbingBoundary(spec, total, ramp, maxAlpha, "smootherstep", 0)
@@ -673,12 +827,33 @@ func AutoAbsorbingBoundaryAdvancedFromRegion0(
 	direction, mode string,
 	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg float64,
 ) {
-	AutoAbsorbingBoundaryAdvanced(
+	autoAbsorbingBoundaryAdvanced(
 		fMinGHz, fMaxGHz,
 		direction, mode,
 		maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg,
 		Ku1.GetRegion(0),
 		Dind.GetRegion(0),
+		0, false,
+		"ext_AutoAbsorbingBoundaryAdvancedFromRegion0",
+	)
+}
+
+func AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff(
+	fMinGHz, fMaxGHz float64,
+	direction, mode string,
+	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, heffApm float64,
+) {
+	if math.IsNaN(heffApm) || math.IsInf(heffApm, 0) {
+		log.Log.ErrAndExit("ext_AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff: heffApm must be finite")
+	}
+	autoAbsorbingBoundaryAdvanced(
+		fMinGHz, fMaxGHz,
+		direction, mode,
+		maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg,
+		Ku1.GetRegion(0),
+		Dind.GetRegion(0),
+		heffApm, true,
+		"ext_AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff",
 	)
 }
 
@@ -686,11 +861,76 @@ func logABCSideDesign(name string, res abcDesignResult) {
 	if !res.Valid {
 		return
 	}
-	log.Log.Info("│ %s: λn[min,max] = [%.2f, %.2f] nm, Lramp = %.2f nm, Lplateau = %.2f nm, Ltotal = %.2f nm",
-		name, res.LambdaMinN*1e9, res.LambdaMaxN*1e9, res.RampWidth*1e9, res.PlateauWidth*1e9, res.TotalWidth*1e9)
+	log.Log.Info("│ %s: theta = %.2f deg, λn[min,max] = [%.2f, %.2f] nm, Lramp = %.2f nm, Lplateau = %.2f nm, Ltotal = %.2f nm",
+		name, res.ThetaDeg, res.LambdaMinN*1e9, res.LambdaMaxN*1e9, res.RampWidth*1e9, res.PlateauWidth*1e9, res.TotalWidth*1e9)
 	if res.Note != "" {
 		log.Log.Info("│ %s: note: %s", name, res.Note)
 	}
+}
+
+func baseAutoABCHeffEstimate(ms, ku1Jm3 float64) abcHeffEstimate {
+	estimate := abcHeffEstimate{
+		Source: "heuristic H_ext + H_K",
+	}
+
+	bExt := BExt.perRegion.GetRegion(0)
+	estimate.BExtMag = math.Sqrt(bExt[0]*bExt[0] + bExt[1]*bExt[1] + bExt[2]*bExt[2])
+	estimate.HExt = estimate.BExtMag / mu0ABC
+	if ku1Jm3 != 0 {
+		estimate.HAnis = 2 * ku1Jm3 / (mu0ABC * ms)
+	}
+	estimate.Heuristic = estimate.HExt + estimate.HAnis
+	estimate.Used = estimate.Heuristic
+	return estimate
+}
+
+func explicitAutoABCHeffEstimate(ms, ku1Jm3, heffApm float64) abcHeffEstimate {
+	estimate := baseAutoABCHeffEstimate(ms, ku1Jm3)
+	estimate.Used = heffApm
+	estimate.Source = "explicit heffApm input"
+	return estimate
+}
+
+func canUseProjectedAutoABCHeff() (bool, string) {
+	if !relaxing {
+		tempR0 := Temp.GetRegion(0)
+		if math.Abs(tempR0) > 0 {
+			return false, "projected H_eff was skipped because region-0 temperature is non-zero while not relaxing, so B_eff may include BTherm"
+		}
+	}
+	return true, ""
+}
+
+func estimateAutoABCHeff(ms, ku1Jm3 float64) abcHeffEstimate {
+	estimate := baseAutoABCHeffEstimate(ms, ku1Jm3)
+
+	mAvg := NormMag.Region(0).Average()
+	estimate.MAvgNorm = mAvg.Len()
+	if estimate.MAvgNorm < 0.85 {
+		estimate.Note = "|<m>_r0| < 0.85, so projected H_eff was skipped and H_ext + H_K was used"
+		return estimate
+	}
+
+	allowed, why := canUseProjectedAutoABCHeff()
+	if !allowed {
+		estimate.Note = appendABCNote(estimate.Note, why)
+		return estimate
+	}
+
+	mHat := mAvg.Div(estimate.MAvgNorm)
+	bEffAvg := BEff.Region(0).Average()
+	estimate.Projected = math.Abs(bEffAvg.Dot(mHat)) / mu0ABC
+	if isFinitePositive(estimate.Projected) {
+		estimate.Used = estimate.Projected
+		estimate.Source = "projected region-0 <B_eff>·m"
+		if estimate.MAvgNorm < 0.95 {
+			estimate.Note = "region-0 |<m>| is below 0.95, so the projected H_eff estimate may be state-dependent"
+		}
+		return estimate
+	}
+
+	estimate.Note = "projected H_eff estimate was invalid, so H_ext + H_K was used"
+	return estimate
 }
 
 func normalizeDispersionMode(mode string) string {
@@ -707,19 +947,29 @@ func normalizeDispersionMode(mode string) string {
 	}
 }
 
+func resolveAutoABCAxisAngles(spec abcSideSpec, thetaDeg float64) (xThetaDeg, yThetaDeg float64, mixedAxis bool) {
+	xActive := spec.XMinus || spec.XPlus
+	yActive := spec.YMinus || spec.YPlus
+	if xActive && yActive {
+		return thetaDeg, 90 - thetaDeg, true
+	}
+	return thetaDeg, thetaDeg, false
+}
+
 func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz float64, mode string,
-	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, sideSign float64,
+	maxAlpha, targetRLdB, targetEdgeAmpdB, thetaDeg, dmiJm2, sideSign float64, sharedAxis bool,
 ) abcDesignResult {
-	result := abcDesignResult{Heff: heff}
+	result := abcDesignResult{Heff: heff, ThetaDeg: thetaDeg}
 	if worldSize <= 0 || cellSize <= 0 || d <= 0 || ms <= 0 || aex <= 0 {
 		return result
 	}
 
+	const minNormalGroupVelocity = 1e-3
 	absCos := math.Abs(math.Cos(thetaDeg * math.Pi / 180))
 	note := ""
 	if absCos < 0.05 {
 		absCos = 0.05
-		note = "thetaDeg close to grazing incidence; |cos(theta)| clamped to 0.05"
+		note = appendABCNote(note, "thetaDeg close to grazing incidence; |cos(theta)| clamped to 0.05")
 	}
 
 	params := abcDispersionParams{
@@ -738,7 +988,6 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 	kMinSearch := 1e2
 	kMaxSearch := 0.8 * math.Pi / cellSize
 	kDomainMinNormal := 2 * math.Pi / worldSize
-	gammaTarget := math.Pow(10, -targetRLdB/20)
 	avgP := averageProfileWeight("smootherstep", 0)
 	slopeMax := maxProfileSlope("smootherstep", 0)
 
@@ -748,14 +997,18 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 	saWorst := 0.0
 	used := 0
 
-	const nFreq = 33
+	const nFreq = 96
 	for i := 0; i < nFreq; i++ {
-		frac := 0.0
+		u := 0.0
 		if nFreq > 1 {
-			frac = float64(i) / float64(nFreq-1)
+			u = float64(i) / float64(nFreq-1)
 		}
+		frac := u * u
 		fGHz := fMinGHz + frac*(fMaxGHz-fMinGHz)
 		omegaTarget := 2 * math.Pi * fGHz * 1e9
+		if omegaTarget <= 0 {
+			continue
+		}
 		roots := findDispersionRoots(omegaTarget, params, kMinSearch, kMaxSearch)
 		for _, k := range roots {
 			st := abcDispersion(k, params)
@@ -763,7 +1016,7 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 				continue
 			}
 			vg := abcGroupVelocity(k, params)
-			if vg == 0 {
+			if math.IsNaN(vg) || math.IsInf(vg, 0) {
 				continue
 			}
 			pa := abcEllipticityFactor(st.H1, st.H2)
@@ -772,8 +1025,12 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 				kn = kDomainMinNormal
 			}
 			vgn := math.Abs(vg * absCos)
-			if vgn < 1 {
-				vgn = 1
+			if !isFinitePositive(vgn) {
+				continue
+			}
+			if vgn < minNormalGroupVelocity {
+				note = appendABCNote(note, "very small normal group velocity encountered; slow-mode branch may require manual validation")
+				vgn = minNormalGroupVelocity
 			}
 
 			sg := (omegaTarget * pa) / (vgn * kn * kn)
@@ -798,7 +1055,12 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 		return result
 	}
 
-	lRamp := maxAlpha * slopeMax * sgWorst / gammaTarget
+	lambdaMinN := 2 * math.Pi / kMaxNormal
+	rlScale := 1.0 + targetRLdB/10.0
+	lRamp := rlScale * maxAlpha * slopeMax * sgWorst
+	if isFinitePositive(lambdaMinN) {
+		lRamp = math.Max(lRamp, 2*lambdaMinN)
+	}
 	requiredAlphaIntegral := saWorst * targetEdgeAmpdB * math.Ln10 / 20.0
 	lPlateau := requiredAlphaIntegral/maxAlpha - avgP*lRamp
 	if lPlateau < 0 {
@@ -811,9 +1073,15 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 	}
 	lTotal := lRamp + lPlateau
 
-	maxAllowed := 0.49 * worldSize
+	maxAllowed := 0.95 * worldSize
+	limitLabel := "95%"
+	if sharedAxis {
+		maxAllowed = 0.49 * worldSize
+		limitLabel = "49%"
+	}
 	if lTotal > maxAllowed {
-		note = strings.TrimSpace(note + "; total width clamped to 49% of the axis length")
+		limitNote := "total width clamped to " + limitLabel + " of the axis length"
+		note = appendABCNote(note, limitNote)
 		lTotal = maxAllowed
 		if lRamp > lTotal {
 			lRamp = lTotal
@@ -830,7 +1098,7 @@ func designAutoABCSide(worldSize, cellSize, d, ms, aex, heff, fMinGHz, fMaxGHz f
 	result.KMinN = kMinNormal
 	result.KMaxN = kMaxNormal
 	result.LambdaMaxN = 2 * math.Pi / kMinNormal
-	result.LambdaMinN = 2 * math.Pi / kMaxNormal
+	result.LambdaMinN = lambdaMinN
 	result.SGWorst = sgWorst
 	result.SAWorst = saWorst
 	result.Note = note

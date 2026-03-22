@@ -662,7 +662,7 @@ ext_AutoAbsorbingBoundaryAdvanced(
 ```
 
 This is the production-oriented ABC mode. It designs:
-- the **ramp width** from an adiabatic matching condition
+- the **ramp width** from a conservative adiabatic matching scale
 - the **plateau width** from the total attenuation required before the boundary
 
 It reads from **region 0**:
@@ -675,6 +675,8 @@ and uses the explicit inputs:
 - `ku1Jm3` for the anisotropy correction
 - `dmiJm2` for the interfacial DMI correction
 
+For `H_eff`, the function first tries to estimate a state-aware value from the projected region-0 average effective field, `|<B_eff> · \hat m_0| / μ0`. This is intended for a relaxed or otherwise fairly uniform region 0. If the region-0 average magnetization is too weak to define a reliable direction, it falls back to the simpler `H_ext + H_K` estimate.
+
 | Argument           | Type    | Description |
 |--------------------|---------|-------------|
 | `fMinGHz`          | `float` | Lower frequency bound of the target band |
@@ -684,13 +686,18 @@ and uses the explicit inputs:
 | `maxAlpha`         | `float` | Maximum extra damping in the sponge |
 | `targetRLdB`       | `float` | Target reflection level in dB for ramp design |
 | `targetEdgeAmpdB`  | `float` | Target amplitude drop in dB before the hard boundary |
-| `thetaDeg`         | `float` | Propagation angle relative to the boundary normal |
+| `thetaDeg`         | `float` | For single-axis designs: propagation angle relative to the active boundary normal. For mixed `x/y` designs: global in-plane propagation angle measured from `+x` |
 | `ku1Jm3`           | `float` | Uniaxial anisotropy constant used for `H_K ≈ 2Ku1/(μ0Ms)` |
 | `dmiJm2`           | `float` | Interfacial DMI strength used as a linear `k`-shift |
 
 **Mode aliases:**
 - `DV` is treated as `FV`
 - `DE` is treated as `MSSW`
+- `FV/DV` is currently an approximate mode and should be benchmarked before relying on it as a general-purpose physical model
+
+**Angle handling:**
+- If you design only `x` sides or only `y` sides, `thetaDeg` keeps the legacy meaning: angle to that wall normal.
+- If you design `x` and `y` sides in one call, `thetaDeg` is resolved per axis as `thetaX = thetaDeg` and `thetaY = 90 - thetaDeg`.
 
 **Recommended example:**
 
@@ -718,12 +725,15 @@ The function logs per-side diagnostics and a summary, for example:
 
 ```
 ┌─ ABC Physics-Based Auto-Configuration ────
-│ x-: λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
-│ x+: λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
+│ x-: theta = 0.00 deg, λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
+│ x+: theta = 0.00 deg, λn[min,max] = [180.12, 42.36] nm, Lramp = 120.00 nm, Lplateau = 80.00 nm, Ltotal = 200.00 nm
 │ Material: Msat = 8.000e+05 A/m, Aex = 1.300e-11 J/m, α = 0.0100
 │ |B_ext| = 0.1500 T  → H_ext = 1.194e+05 A/m
 │ Ku1 input = 2.000e+05 J/m^3 → H_K ≈ 3.979e+05 A/m
-│ H_eff used = 5.173e+05 A/m
+│ Projected H_eff from region-0 state = 4.810e+05 A/m (|<m>_r0| = 0.998)
+│ H_eff used = 4.810e+05 A/m (projected region-0 <B_eff>·m)
+│ Thickness = 2.00 nm, mode = MSSW, DMI = 8.000e-04 J/m^2
+│ theta = 0.00 deg relative to the active boundary normal
 │ Profile = smootherstep, maxAlpha = 0.800
 └────────────────────────────────────────────
 ```
@@ -746,7 +756,7 @@ This is a convenience wrapper around `ext_AutoAbsorbingBoundaryAdvanced(...)`. I
 - `Ku1`
 - `Dind`
 
-Use this if your script already stores those values in the engine and you want a fully zero-input advanced ABC setup.
+Use this if your script already stores those values in the engine and you want a fully zero-input advanced ABC setup. The same `thetaDeg` interpretation rules apply here as in `ext_AutoAbsorbingBoundaryAdvanced(...)`.
 
 ```go
 Ku1 = 2e5
@@ -763,6 +773,42 @@ ext_AutoAbsorbingBoundaryAdvancedFromRegion0(
 )
 ```
 
+#### 7. Advanced Auto with Explicit `H_eff`
+
+If you already know the effective field you want the dispersion model to use, you can bypass the automatic estimate:
+
+```go
+ext_AutoAbsorbingBoundaryAdvancedWithHeff(
+    fMinGHz, fMaxGHz,
+    direction,
+    mode,
+    maxAlpha,
+    targetRLdB,
+    targetEdgeAmpdB,
+    thetaDeg,
+    heffApm,
+    ku1Jm3,
+    dmiJm2,
+)
+```
+
+There is also a region-0 convenience wrapper:
+
+```go
+ext_AutoAbsorbingBoundaryAdvancedFromRegion0WithHeff(
+    fMinGHz, fMaxGHz,
+    direction,
+    mode,
+    maxAlpha,
+    targetRLdB,
+    targetEdgeAmpdB,
+    thetaDeg,
+    heffApm,
+)
+```
+
+Use these variants when you have already extracted a benchmarked or relaxed-state `H_eff` and want the ABC design to follow it exactly. These functions bypass the automatic `H_eff` estimate instead of just overriding its final value.
+
 #### Practical Recommendations
 
 | Parameter      | Typical value | Notes |
@@ -773,6 +819,8 @@ ext_AutoAbsorbingBoundaryAdvancedFromRegion0(
 | `targetRLdB`       | `30`               | Sensible default for advanced auto |
 | `targetEdgeAmpdB`  | `40`               | Good default amplitude decay target |
 | `nWavelengths`     | `3 – 5`            | Still a reasonable range for legacy auto |
+| `mode`             | `"BV"` / `"MSSW"`  | Safest current physics-based choices; `FV/DV` remains approximate |
+| `heffApm` override | when available     | Prefer explicit `H_eff` if you already extracted it from a relaxed or benchmarked state |
 
 > **Tip:** Use `ext_AutoAbsorbingBoundaryAdvanced...` when you know the propagating frequency band and want better matching than the legacy shortest-wavelength heuristic. Use `ext_SetAbsorbingBoundaryAdvanced(...)` when you already know the geometry and want direct control over ramp and plateau lengths.
 
