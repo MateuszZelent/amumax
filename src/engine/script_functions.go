@@ -124,6 +124,8 @@ func init() {
 	DeclFunc("Expect", expect, "Used for automated tests: checks if a value is close enough to the expected value")
 	DeclFunc("ExpectV", expectV, "Used for automated tests: checks if a vector is close enough to the expected value")
 	DeclFunc("Fprintln", fprintln, "Print to file")
+	DeclFunc("SaveGuideDiagnostics", saveGuideDiagnostics, "Write guide diagnostics CSV files using the default 'guide' prefix.")
+	DeclFunc("SaveGuideDiagnosticsAs", saveGuideDiagnosticsAs, "Write guide diagnostics CSV files using a custom filename prefix.")
 	DeclFunc("Sign", sign, "Signum function")
 	DeclFunc("Vector", vector, "Constructs a vector with given components")
 	DeclFunc("Print", myprint, "Print to standard output")

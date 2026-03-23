@@ -316,39 +316,48 @@ func (g *geom) setGeom(s shape) {
 	if g.FaceBuffer == nil || g.FaceBuffer.IsNil() || g.FaceBuffer.Size() != g.Mesh().Size() {
 		g.FaceBuffer = cuda.NewSlice(6, g.Mesh().Size())
 	}
-	useCutCell := geomUsesCutCell(s)
-	if !useCutCell {
-		g.ClearLinks()
-	}
-
 	var host *data.Slice
 	empty := true
-
-	if useCutCell {
-		var hostFaces *data.Slice
-		var cutCells int
-		var minPositive float32
-		var belowFloor int
-		host, hostFaces, empty, cutCells, minPositive, belowFloor = g.setGeomCutCellHost(s)
-		data.Copy(g.Buffer, host)
-		data.Copy(g.FaceBuffer, hostFaces)
-		g.rebuildLinks(hostFaces)
-		if cutCells > 0 {
-			log.Log.Info("Cut-cell geometry: %d partial cells, minimum positive phi=%g", cutCells, minPositive)
-		}
-		if belowFloor > 0 {
-			log.Log.Warn("Cut-cell geometry: %d cells have phi < GeomPhiFloor=%g; exchange and DMI normalization will be clamped for stability", belowFloor, GeomPhiFloor)
-		}
+	initialized := false
+	if projectedHost, ok := g.setGeomGuideProjected(s); ok {
+		host = projectedHost
+		initialized = true
 	} else {
-		host, empty = g.setGeomLegacyHost(s)
-		data.Copy(g.Buffer, host)
-		g.rebuildFaceBuffer()
+		useCutCell := geomUsesCutCell(s)
+		if !useCutCell {
+			g.ClearLinks()
+		}
+
+		if useCutCell {
+			var hostFaces *data.Slice
+			var cutCells int
+			var minPositive float32
+			var belowFloor int
+			host, hostFaces, empty, cutCells, minPositive, belowFloor = g.setGeomCutCellHost(s)
+			data.Copy(g.Buffer, host)
+			data.Copy(g.FaceBuffer, hostFaces)
+			g.rebuildLinks(hostFaces)
+			if cutCells > 0 {
+				log.Log.Info("Cut-cell geometry: %d partial cells, minimum positive phi=%g", cutCells, minPositive)
+			}
+			if belowFloor > 0 {
+				log.Log.Warn("Cut-cell geometry: %d cells have phi < GeomPhiFloor=%g; exchange and DMI normalization will be clamped for stability", belowFloor, GeomPhiFloor)
+			}
+		} else {
+			host, empty = g.setGeomLegacyHost(s)
+			data.Copy(g.Buffer, host)
+			g.rebuildFaceBuffer()
+		}
+
+		if empty {
+			log.Log.ErrAndExit("SetGeom: geometry completely empty")
+		}
+		initialized = true
 	}
 
-	if empty {
-		log.Log.ErrAndExit("SetGeom: geometry completely empty")
+	if !initialized {
+		log.Log.ErrAndExit("SetGeom: geometry initialization failed")
 	}
-
 	// M inside geom but previously outside needs to be re-inited
 	needupload := false
 	geomlist := host.Host()[0]

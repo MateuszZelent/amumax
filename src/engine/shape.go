@@ -14,6 +14,7 @@ import (
 type shape struct {
 	insideFn  func(x, y, z float64) bool
 	voxelizer shapeVoxelizer
+	guide     guideGeometry
 }
 
 func newShape(inside func(x, y, z float64) bool) shape {
@@ -26,6 +27,16 @@ func newSampledShape(inside func(x, y, z float64) bool) shape {
 
 func newVoxelizedShape(inside func(x, y, z float64) bool, voxelizer shapeVoxelizer) shape {
 	return shape{insideFn: inside, voxelizer: voxelizer}
+}
+
+func newGuideShape(inside func(x, y, z float64) bool, voxelizer shapeVoxelizer, guide guideGeometry) shape {
+	if inside == nil {
+		return newShape(nil)
+	}
+	if voxelizer == nil {
+		voxelizer = sampledShapeVoxelizer{inside: inside}
+	}
+	return shape{insideFn: inside, voxelizer: voxelizer, guide: guide}
 }
 
 func (s shape) isNil() bool { return s.insideFn == nil }
@@ -141,7 +152,8 @@ func sinWaveguideNormal(length, width, height, period, centerAmp, phase, z0 floa
 		return -centerAmp * k * k * math.Sin(k*x+phase)
 	}
 
-	return normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
+	base := normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
+	return newGuideShape(base.insideFn, base.voxelizer, newSinGuideGeometry(length, width, height, period, centerAmp, phase, z0))
 }
 
 // archWaveguideNormal creates a half-sine arch waveguide with thickness measured orthogonally
@@ -170,7 +182,8 @@ func archWaveguideNormal(length, width, height, archHeight, z0 float64) shape {
 		return -archHeight * (math.Pi / length) * (math.Pi / length) * math.Sin(math.Pi*t)
 	}
 
-	return normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
+	base := normalThicknessWaveguide(length, width, height, centerZFn, dCenterZFn, ddCenterZFn)
+	return newGuideShape(base.insideFn, base.voxelizer, newArchGuideGeometry(length, width, height, archHeight, z0))
 }
 
 // ellipsoid with given diameters
@@ -449,9 +462,13 @@ func (s shape) Transl(dx, dy, dz float64) shape {
 	if voxelizer != nil {
 		voxelizer = translatedShapeVoxelizer{base: voxelizer, dx: dx, dy: dy, dz: dz}
 	}
-	return newDerivedShape(func(x, y, z float64) bool {
+	var guide guideGeometry
+	if s.guide != nil {
+		guide = translatedGuideGeometry{base: s.guide, dx: dx, dy: dy, dz: dz}
+	}
+	return newGuideShape(func(x, y, z float64) bool {
 		return s.contains(x-dx, y-dy, z-dz)
-	}, voxelizer)
+	}, voxelizer, guide)
 }
 
 // Repeat Infinitely repeats the shape with given period in x, y, z.

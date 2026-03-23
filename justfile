@@ -1,31 +1,31 @@
 repo_dir := justfile_directory()
+podman := "podman --cgroup-manager=cgroupfs"
+go_cache_env := "-e GOPATH=/tmp/go -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go/pkg/mod"
 
 run-dev:
-	sudo podman run -it --rm -p 35367:35367 -v {{repo_dir}}:/src \
+	{{podman}} run -it --rm {{go_cache_env}} -p 35367:35367 -v {{repo_dir}}:/src \
 	--device=nvidia.com/gpu=all \
 	matmoa/amumax:build bash
 
 image:
-	sudo podman build -t matmoa/amumax:build {{repo_dir}}
+	{{podman}} build -t matmoa/amumax:build {{repo_dir}}
 
 build-cuda: 
-	sudo podman run --rm -v {{repo_dir}}:/src matmoa/amumax:build sh src/cuda/build_cuda.sh
+	{{podman}} run --rm {{go_cache_env}} -v {{repo_dir}}:/src matmoa/amumax:build sh src/cuda/build_cuda.sh
 
 copy-pcss:
 	scp -r ./build/amumax pcss:grant_398/scratch/bin/amumax_versions/amumax$(date -I)
 	ssh pcss "cd ~/grant_398/scratch/bin && ln -sf amumax_versions/amumax$(date -I) amumax"
 
 build-frontend: 
-	cd frontend && npm run build && rm -rf ../src/api/static && mv dist ../src/api/static
-	# rm -rf api/static
-	# sudo podman run --rm \
-	# 	-v .:/src \
-	# 	-w /src/frontend \
-	# 	--entrypoint /bin/sh \
-	# 	docker.io/node:18.20.4-alpine3.20 -c 'npm install && npm run build && rm -rf ../src/api/static && mv dist ../src/api/static'
+	{{podman}} run --rm \
+		-v {{repo_dir}}:/src \
+		-w /src/frontend \
+		docker.io/node:18.20.4-alpine3.20 \
+		sh -lc 'npm run build && rm -rf /src/src/api/static && mv dist /src/src/api/static'
 
 build:
-	sudo podman run --rm -v {{repo_dir}}:/src matmoa/amumax:build
+	{{podman}} run --rm {{go_cache_env}} -v {{repo_dir}}:/src matmoa/amumax:build bash -lc 'if [ -d build ]; then if touch build/.codex-write-test 2>/dev/null; then rm -f build/.codex-write-test && rm -rf build; else mv build build.stale.$(date +%s); fi; fi && mkdir -p build && go build -v -ldflags "-X github.com/MathieuMoalic/amumax/src/version.VERSION=$(date -u +%Y.%m.%d)" -o build/amumax'
 
 update-flake-gh-hash VERSION:
 	#!/usr/bin/env sh
@@ -37,7 +37,10 @@ update-flake-gh-hash VERSION:
 	sed -i "s/hash = pkgs.lib.fakeHash;/hash = \"$escaped_hash\";/" flake.nix
 
 test:
-	go test ./src/...
+	{{podman}} run --rm {{go_cache_env}} -v {{repo_dir}}:/src matmoa/amumax:build bash -lc 'packages=$(go list ./src/... | grep -Ev "^github.com/MathieuMoalic/amumax/src/cuda($|/)"); go test $packages'
+
+test-cuda:
+	{{podman}} run --rm {{go_cache_env}} --device=nvidia.com/gpu=all -v {{repo_dir}}:/src matmoa/amumax:build go test ./src/cuda/...
 	
 release: 
 	#!/usr/bin/env sh
