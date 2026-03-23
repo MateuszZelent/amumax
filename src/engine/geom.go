@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strings"
@@ -22,6 +23,9 @@ func init() {
 	GeomLinkX = newScalarField("geom_link_x", "", "Shared x-interface fraction used by cut-cell exchange between a cell and its +x neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkX) })
 	GeomLinkY = newScalarField("geom_link_y", "", "Shared y-interface fraction used by cut-cell exchange between a cell and its +y neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkY) })
 	GeomLinkZ = newScalarField("geom_link_z", "", "Shared z-interface fraction used by cut-cell exchange between a cell and its +z neighbor (0..1)", func(dst *data.Slice) { setGeomLink(dst, Geometry.LinkZ) })
+	GeomNx = newScalarField("geom_nx", "", "Approximate x-component of local boundary normal estimated from cut-cell face fractions", func(dst *data.Slice) { setGeomNormalComponent(dst, X) })
+	GeomNy = newScalarField("geom_ny", "", "Approximate y-component of local boundary normal estimated from cut-cell face fractions", func(dst *data.Slice) { setGeomNormalComponent(dst, Y) })
+	GeomNz = newScalarField("geom_nz", "", "Approximate z-component of local boundary normal estimated from cut-cell face fractions", func(dst *data.Slice) { setGeomNormalComponent(dst, Z) })
 	GeomFaceX = newScalarField("geom_face_x", "", "Average x-face fill fraction (0..1)", setGeomFaceX)
 	GeomFaceY = newScalarField("geom_face_y", "", "Average y-face fill fraction (0..1)", setGeomFaceY)
 	GeomFaceZ = newScalarField("geom_face_z", "", "Average z-face fill fraction (0..1)", setGeomFaceZ)
@@ -42,6 +46,9 @@ var (
 	GeomLinkX      ScalarField
 	GeomLinkY      ScalarField
 	GeomLinkZ      ScalarField
+	GeomNx         ScalarField
+	GeomNy         ScalarField
+	GeomNz         ScalarField
 	GeomFaceX      ScalarField
 	GeomFaceY      ScalarField
 	GeomFaceZ      ScalarField
@@ -196,6 +203,47 @@ func setGeomLink(dst *data.Slice, link *cuda.Bytes) {
 	for i, value := range values {
 		dstValues[i] = float32(value) / 255
 	}
+	data.Copy(dst, hostDst)
+}
+
+func setGeomNormalComponent(dst *data.Slice, axis int) {
+	faces, recycle := Geometry.FaceSlice()
+	if recycle {
+		defer cuda.Recycle(faces)
+	}
+
+	hostFaces := faces.HostCopy()
+	values := hostFaces.Host()
+	hostDst := data.NewSlice(1, dst.Size())
+	dstValues := hostDst.Host()[0]
+
+	fxm := values[0]
+	fxp := values[1]
+	fym := values[2]
+	fyp := values[3]
+	fzm := values[4]
+	fzp := values[5]
+
+	for i := range dstValues {
+		nx := float64(fxp[i] - fxm[i])
+		ny := float64(fyp[i] - fym[i])
+		nz := float64(fzp[i] - fzm[i])
+		norm := nx*nx + ny*ny + nz*nz
+		if norm <= 1e-24 {
+			dstValues[i] = 0
+			continue
+		}
+		invNorm := float32(1 / math.Sqrt(norm))
+		switch axis {
+		case X:
+			dstValues[i] = float32(nx) * invNorm
+		case Y:
+			dstValues[i] = float32(ny) * invNorm
+		default:
+			dstValues[i] = float32(nz) * invNorm
+		}
+	}
+
 	data.Copy(dst, hostDst)
 }
 

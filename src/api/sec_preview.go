@@ -83,7 +83,7 @@ func initPreviewAPI(e *echo.Group, ws *WebSocketManager) *PreviewState {
 		XChosenSize:          engine.Mesh.Nx,
 		YChosenSize:          engine.Mesh.Ny,
 		ws:                   ws,
-		globalQuantities:     []string{"B_demag", "B_ext", "B_eff", "B_oersted", "Edens_demag", "Edens_ext", "Edens_eff", "geom", "geom_phi", "geom_fx", "geom_fy", "geom_fz", "geom_link_x", "geom_link_y", "geom_link_z", "geom_thickness_z", "geom_face_x", "geom_face_y", "geom_face_z", "demag_boundary_shell", "SpongeAlpha"},
+		globalQuantities:     []string{"B_demag", "B_ext", "B_eff", "B_oersted", "Edens_demag", "Edens_ext", "Edens_eff", "geom", "geom_phi", "geom_fx", "geom_fy", "geom_fz", "geom_link_x", "geom_link_y", "geom_link_z", "geom_nx", "geom_ny", "geom_nz", "geom_thickness_z", "geom_face_x", "geom_face_y", "geom_face_z", "demag_boundary_shell", "SpongeAlpha"},
 	}
 	previewState.addPossibleDownscaleSizes()
 	previewState.AppliedXChosenSize = previewState.XChosenSize
