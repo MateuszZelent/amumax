@@ -27,28 +27,59 @@ jobs:
           rm -rf ../src/api/static
           mv dist ../src/api/static
 
-      - name: Build binary in Docker (CUDA 12.4)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up CUDA build environment (libcufft.so.12 + libcurand.so.10)
         run: |
-          docker build -t amumax-build .
+          # Add NVIDIA apt repo for CUDA headers and driver stubs
+          curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb
+          sudo dpkg -i cuda-keyring.deb && rm cuda-keyring.deb
+          sudo apt-get update -qq
+          # Install: CUDA headers + libcuda.so stub + curand dev
+          # NOT installing libcufft-dev from apt — it ships libcufft.so.11 (CUDA 12.4)
+          sudo apt-get install -y --no-install-recommends \
+            cuda-cudart-dev-12-4 \
+            libcurand-dev-12-4
+
+          # Install libcufft 12.x from NVIDIA CDN — SONAME: libcufft.so.12
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz | \
+            tar -xJf - -C /tmp
+          sudo cp /tmp/libcufft-linux-x86_64-12.1.0.31-archive/lib/libcufft.so.12.1.0.31 \
+                   /usr/local/cuda-12.4/lib64/
+          sudo ln -sf libcufft.so.12.1.0.31 /usr/local/cuda-12.4/lib64/libcufft.so.12
+          sudo ln -sf libcufft.so.12        /usr/local/cuda-12.4/lib64/libcufft.so
+          sudo ldconfig
+          rm -rf /tmp/libcufft*
+
+      - name: Build binary
+        env:
+          CGO_CFLAGS: "-I/usr/local/cuda-12.4/include"
+          CGO_LDFLAGS: "-L/usr/local/cuda-12.4/lib64 -L/usr/local/cuda-12.4/lib64/stubs -lcufft -lcuda -lcurand -Wl,-rpath -Wl,$ORIGIN"
+          CGO_CFLAGS_ALLOW: "(-fno-schedule-insns|-malign-double|-ffast-math)"
+        run: |
           mkdir -p build
-          docker run --rm -v "$PWD:/src" amumax-build
-          chmod +x build/amumax
+          go build -v \
+            -ldflags "-X github.com/MathieuMoalic/amumax/src/version.VERSION=$(date -u +'%Y.%m.%d')" \
+            -o build/amumax
+          echo "=== Binary SONAME check ==="
+          ldd build/amumax | grep -E 'cufft|curand|cuda' || true
           cp build/amumax ./amumax
+          chmod +x ./amumax
 
-      - name: Download CUDA 12 libraries
+      - name: Prepare release CUDA libraries
         run: |
-          # libcufft.so.12 — matches SONAME from CUDA 12.4 build
-          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz -o libcufft.tar.xz
-          tar -xJf libcufft.tar.xz
-          cp -L libcufft-linux-x86_64-12.1.0.31-archive/lib/libcufft.so.12 ./libcufft.so.12
+          # libcufft.so.12 — from the CDN install above
+          cp /usr/local/cuda-12.4/lib64/libcufft.so.12.1.0.31 ./libcufft.so.12
 
-          # libcurand.so.10
-          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.4.1.34-archive.tar.xz -o libcurand.tar.xz
-          tar -xJf libcurand.tar.xz
-          cp -L libcurand-linux-x86_64-10.4.1.34-archive/lib/libcurand.so.10 ./libcurand.so.10
-
-          rm -rf libcufft-linux-x86_64-12.1.0.31-archive libcurand-linux-x86_64-10.4.1.34-archive
-          rm libcufft.tar.xz libcurand.tar.xz
+          # libcurand.so.10 — CDN archive only ships the versioned file, rename it
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.4.1.34-archive.tar.xz | \
+            tar -xJf - -C /tmp
+          cp /tmp/libcurand-linux-x86_64-10.4.1.34-archive/lib/libcurand.so.10.4.1.34 ./libcurand.so.10
+          rm -rf /tmp/libcurand*
 
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
