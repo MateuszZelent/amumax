@@ -48,6 +48,8 @@ jobs:
           # Install libcufft 12.x from NVIDIA CDN — SONAME: libcufft.so.12
           curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz | \
             tar -xJf - -C /tmp
+          # Copy headers (cufft.h etc.) — NOT installing from apt to avoid .so.11
+          sudo cp -r /tmp/libcufft-linux-x86_64-12.1.0.31-archive/include/. /usr/local/cuda-12.4/include/
           sudo cp /tmp/libcufft-linux-x86_64-12.1.0.31-archive/lib/libcufft.so.12.1.0.31 \
                    /usr/local/cuda-12.4/lib64/
           sudo ln -sf libcufft.so.12.1.0.31 /usr/local/cuda-12.4/lib64/libcufft.so.12
