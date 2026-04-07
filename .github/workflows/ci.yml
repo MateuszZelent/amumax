@@ -35,32 +35,41 @@ jobs:
 
       - name: Set up CUDA build environment (libcufft.so.12 + libcurand.so.10)
         run: |
-          # Add NVIDIA apt repo for CUDA headers and driver stubs
-          curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o cuda-keyring.deb
-          sudo dpkg -i cuda-keyring.deb && rm cuda-keyring.deb
-          sudo apt-get update -qq
-          # Install: CUDA headers + libcuda.so stub + curand dev
-          # NOT installing libcufft-dev from apt — it ships libcufft.so.11 (CUDA 12.4)
-          sudo apt-get install -y --no-install-recommends \
-            cuda-cudart-dev-12-4 \
-            libcurand-dev-12-4
+          mkdir -p /opt/cuda/include /opt/cuda/lib
 
-          # Install libcufft 12.x from NVIDIA CDN — SONAME: libcufft.so.12
-          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz | \
-            tar -xJf - -C /tmp
-          # Copy headers (cufft.h etc.) — NOT installing from apt to avoid .so.11
-          sudo cp -r /tmp/libcufft-linux-x86_64-12.1.0.31-archive/include/. /usr/local/cuda-12.4/include/
-          sudo cp /tmp/libcufft-linux-x86_64-12.1.0.31-archive/lib/libcufft.so.12.1.0.31 \
-                   /usr/local/cuda-12.4/lib64/
-          sudo ln -sf libcufft.so.12.1.0.31 /usr/local/cuda-12.4/lib64/libcufft.so.12
-          sudo ln -sf libcufft.so.12        /usr/local/cuda-12.4/lib64/libcufft.so
-          sudo ldconfig
+          # cuda_cudart 12.4.99: provides cuda.h (driver API), cuda_runtime.h,
+          #   and lib/stubs/libcuda.so for linking -lcuda
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/linux-x86_64/cuda_cudart-linux-x86_64-12.4.99-archive.tar.xz \
+            | tar -xJf - -C /tmp
+          cp -r /tmp/cuda_cudart-linux-x86_64-12.4.99-archive/include/. /opt/cuda/include/
+          cp    /tmp/cuda_cudart-linux-x86_64-12.4.99-archive/lib/stubs/libcuda.so /opt/cuda/lib/
+          rm -rf /tmp/cuda_cudart*
+
+          # libcufft 12.1.0.31 → SONAME: libcufft.so.12
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz \
+            | tar -xJf - -C /tmp
+          cp -r /tmp/libcufft-linux-x86_64-12.1.0.31-archive/include/. /opt/cuda/include/
+          cp    /tmp/libcufft-linux-x86_64-12.1.0.31-archive/lib/libcufft.so.12.1.0.31 /opt/cuda/lib/
+          ln -sf libcufft.so.12.1.0.31 /opt/cuda/lib/libcufft.so.12
+          ln -sf libcufft.so.12        /opt/cuda/lib/libcufft.so
           rm -rf /tmp/libcufft*
+
+          # libcurand 10.4.1.34 → SONAME: libcurand.so.10
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.4.1.34-archive.tar.xz \
+            | tar -xJf - -C /tmp
+          cp -r /tmp/libcurand-linux-x86_64-10.4.1.34-archive/include/. /opt/cuda/include/
+          cp    /tmp/libcurand-linux-x86_64-10.4.1.34-archive/lib/libcurand.so.10.4.1.34 /opt/cuda/lib/
+          ln -sf libcurand.so.10.4.1.34 /opt/cuda/lib/libcurand.so.10
+          ln -sf libcurand.so.10        /opt/cuda/lib/libcurand.so
+          rm -rf /tmp/libcurand*
+
+          echo "=== /opt/cuda/lib ==="
+          ls /opt/cuda/lib/
 
       - name: Build binary
         env:
-          CGO_CFLAGS: "-I/usr/local/cuda-12.4/include"
-          CGO_LDFLAGS: "-L/usr/local/cuda-12.4/lib64 -L/usr/local/cuda-12.4/lib64/stubs -lcufft -lcuda -lcurand -Wl,-rpath -Wl,$ORIGIN"
+          CGO_CFLAGS: "-I/opt/cuda/include"
+          CGO_LDFLAGS: "-L/opt/cuda/lib -lcufft -lcuda -lcurand -Wl,-rpath -Wl,$ORIGIN"
           CGO_CFLAGS_ALLOW: "(-fno-schedule-insns|-malign-double|-ffast-math)"
         run: |
           mkdir -p build
@@ -75,13 +84,10 @@ jobs:
       - name: Prepare release CUDA libraries
         run: |
           # libcufft.so.12 — from the CDN install above
-          cp /usr/local/cuda-12.4/lib64/libcufft.so.12.1.0.31 ./libcufft.so.12
+          cp /opt/cuda/lib/libcufft.so.12.1.0.31 ./libcufft.so.12
 
           # libcurand.so.10 — CDN archive only ships the versioned file, rename it
-          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/libcurand-linux-x86_64-10.4.1.34-archive.tar.xz | \
-            tar -xJf - -C /tmp
-          cp /tmp/libcurand-linux-x86_64-10.4.1.34-archive/lib/libcurand.so.10.4.1.34 ./libcurand.so.10
-          rm -rf /tmp/libcurand*
+          cp /opt/cuda/lib/libcurand.so.10.4.1.34 ./libcurand.so.10
 
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
