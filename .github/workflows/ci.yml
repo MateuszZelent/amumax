@@ -45,6 +45,13 @@ jobs:
           cp    /tmp/cuda_cudart-linux-x86_64-12.4.99-archive/lib/stubs/libcuda.so /opt/cuda/lib/
           rm -rf /tmp/cuda_cudart*
 
+          # cuda_nvcc 12.4.99: provides crt/ subdirectory (host_config.h, host_defines.h, etc.)
+          #   required transitively by cuda_runtime.h and vector_types.h
+          curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/linux-x86_64/cuda_nvcc-linux-x86_64-12.4.99-archive.tar.xz \
+            | tar -xJf - -C /tmp
+          cp -r /tmp/cuda_nvcc-linux-x86_64-12.4.99-archive/include/. /opt/cuda/include/
+          rm -rf /tmp/cuda_nvcc*
+
           # libcufft 12.1.0.31 → SONAME: libcufft.so.12
           curl -fSL https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/libcufft-linux-x86_64-12.1.0.31-archive.tar.xz \
             | tar -xJf - -C /tmp
