@@ -25,20 +25,20 @@ Solvers and results are unchanged, but there are many quality-of-life improvemen
 
 #### Install Script
 
-Don't just run any script from the internet. [Read it](https://raw.githubusercontent.com/MathieuMoalic/amumax/main/install.sh), check what it does, and then you can run this command to install amumax:
+Don't just run any script from the internet. [Read it](https://raw.githubusercontent.com/MateuszZelent/amumax/main/install.sh), check what it does, and then you can run this command to install amumax:
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/MathieuMoalic/amumax/main/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/MateuszZelent/amumax/main/install.sh)"
 ```
 
 #### Manually
 
 Download [cufft](https://developer.download.nvidia.com/compute/cuda/redist/libcufft/linux-x86_64/) and [curand](https://developer.download.nvidia.com/compute/cuda/redist/libcurand/linux-x86_64/), unpack, and add the shared objects to `$PATH`, or just install the full CUDA suite with your package manager.
 
-Download the latest [release](https://github.com/MathieuMoalic/amumax/releases/):
+Download the latest [release](https://github.com/MateuszZelent/amumax/releases/):
 
 ```bash
-curl -L https://github.com/mathieumoalic/amumax/releases/latest/download/amumax > amumax
+curl -L https://github.com/MateuszZelent/amumax/releases/latest/download/amumax > amumax
 chmod +x amumax
 ./amumax -v
 ```
@@ -860,7 +860,7 @@ nix run .#git
 ### Using `podman` or `docker`:
 
 ```bash
-git clone https://github.com/MathieuMoalic/amumax
+git clone https://github.com/MateuszZelent/amumax
 cd amumax
 podman run --rm -v $PWD:/src docker.io/oven/bun:1.1.27 bash -c "cd /src/frontend && bun run build && mv /src/frontend/dist /src/api/static"
 podman build -t matmoa/amumax:build .
@@ -875,7 +875,7 @@ The amumax binary and CUDA libraries are then found in `build`.
 You need to install `git`, `bun`, `go`, `cuda`. Then:
 
 ```bash
-git clone https://github.com/MathieuMoalic/amumax
+git clone https://github.com/MateuszZelent/amumax
 cd amumax
 cd frontend
 bun install
