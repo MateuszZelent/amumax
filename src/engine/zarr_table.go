@@ -10,7 +10,7 @@ import (
 	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
 	"github.com/MathieuMoalic/amumax/src/script"
-	"github.com/MathieuMoalic/amumax/src/zarr"
+	"github.com/MathieuMoalic/amumax/src/tabular"
 )
 
 func init() {
@@ -34,29 +34,37 @@ type tableStruct struct {
 	Step           int                  `json:"step"`
 	FlushInterval  time.Duration        `json:"flushInterval"`
 	Mu             sync.Mutex
+	flushMu        sync.Mutex
+	writer         *tabular.Writer
+	persisted      int
+	stopFlush      chan struct{}
+	flushDone      chan struct{}
+	stopOnce       sync.Once
 }
 
 type column struct {
-	Name   string
-	Unit   string
-	buffer []byte
-	io     fsutil.WriteCloseFlusher
+	Name string
+	Unit string
 }
 
 func (ts *tableStruct) WriteToBuffer() {
+	ts.Mu.Lock()
+	ts.Step++
+	step := ts.Step
+	quantities := append([]Quantity(nil), ts.quantities...)
+	ts.Mu.Unlock()
 	buf := []float64{}
-	buf = append(buf, float64(ts.Step))
+	buf = append(buf, float64(step))
 	// always save the current time
 	buf = append(buf, Time)
 	// for each quantity we append each component to the buffer
-	for _, q := range ts.quantities {
+	for _, q := range quantities {
 		buf = append(buf, AverageOf(q)...)
 	}
 	// size of buf should be same as size of []Ztable
 	ts.Mu.Lock() // Lock the mutex before modifying the map
 	defer ts.Mu.Unlock()
 	for i, b := range buf {
-		ts.Columns[i].buffer = append(ts.Columns[i].buffer, zarr.Float64ToBytes(b)...)
 		ts.Data[ts.Columns[i].Name] = append(ts.Data[ts.Columns[i].Name], b)
 	}
 }
@@ -68,16 +76,30 @@ func (ts *tableStruct) Flush() {
 		// We skip periodic flushes because HDF5 can't overwrite datasets.
 		return
 	}
-	for i := range ts.Columns {
-		_, err := ts.Columns[i].io.Write(ts.Columns[i].buffer)
-		log.Log.PanicIfError(err)
-		ts.Columns[i].buffer = []byte{}
-		// saving .zarray before the data might help resolve some unsync
-		// errors when the simulation is running and the user loads data
-		zarr.SaveFileTableZarray(OD()+"table/"+ts.Columns[i].Name, ts.Step)
-		err = ts.Columns[i].io.Flush()
-		log.Log.PanicIfError(err)
+	ts.flushMu.Lock()
+	defer ts.flushMu.Unlock()
+	ts.Mu.Lock()
+	if len(ts.Columns) == 0 || len(ts.Data[ts.Columns[0].Name]) <= ts.persisted {
+		ts.Mu.Unlock()
+		return
 	}
+	names := make([]string, len(ts.Columns))
+	units := make([]string, len(ts.Columns))
+	values := make([][]float64, len(ts.Columns))
+	for i, col := range ts.Columns {
+		names[i], units[i] = col.Name, col.Unit
+		values[i] = append([]float64(nil), ts.Data[col.Name][ts.persisted:]...)
+	}
+	ts.Mu.Unlock()
+	if ts.writer == nil {
+		writer, err := tabular.New(OD()+"table", names, units)
+		log.Log.PanicIfError(err)
+		ts.writer = writer
+	}
+	log.Log.PanicIfError(ts.writer.Append(values))
+	ts.Mu.Lock()
+	ts.persisted += len(values[0])
+	ts.Mu.Unlock()
 }
 
 // FlushFinalHDF5 writes all accumulated table data to HDF5 at shutdown.
@@ -103,8 +125,10 @@ func (ts *tableStruct) NeedSave() bool {
 }
 
 func (ts *tableStruct) Exists(q Quantity, name string) bool {
+	ts.Mu.Lock()
+	defer ts.Mu.Unlock()
 	suffixes := []string{"x", "y", "z"}
-	for _, i := range Table.Columns {
+	for _, i := range ts.Columns {
 		if q.NComp() == 1 {
 			if i.Name == name {
 				return true
@@ -121,42 +145,56 @@ func (ts *tableStruct) Exists(q Quantity, name string) bool {
 }
 
 func (ts *tableStruct) AddColumn(name, unit string) {
-	if StorageFormat != StorageFormatHDF5 {
-		// Zarr: create directory and file for this column
-		err := fsutil.Mkdir(OD() + "table/" + name)
-		log.Log.PanicIfError(err)
-		f, err := fsutil.Create(OD() + "table/" + name + "/0")
-		log.Log.PanicIfError(err)
-		ts.Columns = append(ts.Columns, column{Name: name, Unit: unit, buffer: []byte{}, io: f})
-	} else {
-		ts.Columns = append(ts.Columns, column{Name: name, Unit: unit, buffer: []byte{}})
-	}
+	ts.Mu.Lock()
+	defer ts.Mu.Unlock()
+	ts.Columns = append(ts.Columns, column{Name: name, Unit: unit})
 }
 
 func tableInit() {
 	if StorageFormat != StorageFormatHDF5 {
-		err := fsutil.Remove(OD() + "table")
-		log.Log.PanicIfError(err)
-		zarr.InitZgroup("table", OD())
+		log.Log.PanicIfError(fsutil.Mkdir(OD() + "table"))
+		log.Log.PanicIfError(fsutil.Put(OD()+"table/.zgroup", []byte(`{"zarr_format":2}`)))
 	}
 	Table.AddColumn("step", "")
 	Table.AddColumn("t", "s")
 	tableAdd(&NormMag)
-	go tablesAutoFlush()
+	Table.stopFlush, Table.flushDone = make(chan struct{}), make(chan struct{})
+	go tablesAutoFlush(Table.stopFlush, Table.flushDone)
 }
 
-func tablesAutoFlush() {
+func tablesAutoFlush(stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+	ticker := time.NewTicker(Table.FlushInterval)
+	defer ticker.Stop()
 	for {
-		Table.Flush()
-		time.Sleep(Table.FlushInterval)
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			func() {
+				defer captureOutputPanic()
+				Table.Flush()
+			}()
+			if outputError() != nil {
+				return
+			}
+		}
 	}
+}
+
+func (ts *tableStruct) stopAutoFlush() {
+	ts.stopOnce.Do(func() {
+		if ts.stopFlush != nil {
+			close(ts.stopFlush)
+			<-ts.flushDone
+		}
+	})
 }
 
 func tableSave() {
 	if len(Table.Columns) == 0 {
 		tableInit()
 	}
-	Table.Step += 1
 	Table.WriteToBuffer()
 }
 
@@ -168,6 +206,7 @@ func tableAddAs(q Quantity, name string) {
 	suffixes := []string{"x", "y", "z"}
 	if Table.Step != -1 {
 		log.Log.Warn("You cannot add a new quantity to the table after the simulation has started. Ignoring.")
+		return
 	}
 	if len(Table.Columns) == 0 {
 		tableInit()
@@ -177,7 +216,9 @@ func tableAddAs(q Quantity, name string) {
 		log.Log.Warn("%s is already in the table. Ignoring.", name)
 		return
 	}
+	Table.Mu.Lock()
 	Table.quantities = append(Table.quantities, q)
+	Table.Mu.Unlock()
 	if q.NComp() == 1 {
 		Table.AddColumn(name, unitOf(q))
 	} else {

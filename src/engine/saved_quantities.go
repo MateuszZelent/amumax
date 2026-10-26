@@ -1,11 +1,13 @@
 package engine
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/DataDog/zstd"
@@ -26,6 +28,14 @@ type savedQuantity struct {
 	chunks   chunks
 	rchunks  requestedChunking
 	nextTime float64 // Next time when autosave should trigger
+	output   *savedOutputState
+}
+
+// The asynchronous consumer is the sole owner of these fields. The pointer
+// remains stable when savedQuantities.Quantities is reallocated.
+type savedOutputState struct {
+	committed int
+	failed    error
 }
 
 // needSave returns true when it's time to save based on the period.
@@ -36,37 +46,37 @@ func (sq *savedQuantity) needSave() bool {
 	return Time >= sq.nextTime
 }
 
-// SaveAttrs updates the .zattrs file with the times data.
-func (sq *savedQuantity) SaveAttrs() {
-	if StorageFormat == StorageFormatHDF5 {
-		// HDF5: timestamps are buffered in sq.times and saved at CleanExit
-		return
-	}
-	u, err := json.Marshal(zarr.Zattrs{Buffer: sq.times})
-	log.Log.PanicIfError(err)
-	err = fsutil.Remove(OD() + sq.name + "/.zattrs")
-	log.Log.PanicIfError(err)
-	err = fsutil.Put(OD()+sq.name+"/.zattrs", u)
-	log.Log.PanicIfError(err)
-}
-
 // Save writes the data to disk and updates the times.
 func (sq *savedQuantity) Save() {
 	sq.times = append(sq.times, Time)
-	sq.SaveAttrs()
+	timestamp := Time
 	buffer := ValueOf(sq.q)
 	defer cuda.Recycle(buffer)
 	dataSlice := buffer.HostCopy()
 	tstep := len(sq.times) - 1
+	state := sq.output
+	name, unit, chunking := sq.name, unitOf(sq.q), sq.chunks
 	if StorageFormat == StorageFormatHDF5 {
 		queOutput(func() {
-			err := syncSaveHDF5(dataSlice, sq.name, tstep)
+			defer dataSlice.Free()
+			if state.failed != nil {
+				return
+			}
+			err := syncSaveHDF5(dataSlice, name, tstep)
+			state.failed = err
 			log.Log.PanicIfError(err)
+			state.committed++
 		})
 	} else {
 		queOutput(func() {
-			err := syncSave(dataSlice, sq.name, tstep, sq.chunks)
+			defer dataSlice.Free()
+			if state.failed != nil {
+				return
+			}
+			err := syncSave(dataSlice, name, tstep, chunking, timestamp, unit)
+			state.failed = err
 			log.Log.PanicIfError(err)
+			state.committed++
 		})
 	}
 }
@@ -98,10 +108,6 @@ func (sqs *savedQuantitiesType) savedQuandtityExists(name string) bool {
 
 func (sqs *savedQuantitiesType) createSavedQuantity(q Quantity, name string, rchunks requestedChunking, period float64) *savedQuantity {
 	// Create directory for this quantity (both Zarr and HDF5 use per-quantity folders)
-	if fsutil.Exists(OD() + name) {
-		err := fsutil.Remove(OD() + name)
-		log.Log.PanicIfError(err)
-	}
 	err := fsutil.Mkdir(OD() + name)
 	log.Log.PanicIfError(err)
 	newZArray := &savedQuantity{
@@ -112,6 +118,7 @@ func (sqs *savedQuantitiesType) createSavedQuantity(q Quantity, name string, rch
 		chunks:   newChunks(q, rchunks),
 		rchunks:  rchunks,
 		nextTime: Time,
+		output:   &savedOutputState{},
 	}
 	sqs.Quantities = append(sqs.Quantities, *newZArray)
 	return newZArray
@@ -201,18 +208,16 @@ func (sqs *savedQuantitiesType) saveAsChunk(q Quantity, name string, rchunks req
 }
 
 // syncSaveFast is a faster drop-in alternative to syncSave. It writes the exact same bytes.
-func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
+func syncSave(array *data.Slice, qname string, steps int, chunks chunks, timestamp float64, unit string) error {
 	data4 := array.Tensors()
 	size := array.Size()
 	ncomp := array.NComp()
 
-	zarr.SaveFileZarray(
-		fmt.Sprintf(OD()+"%s/.zarray", qname),
-		size,
-		ncomp,
-		steps+1,
-		chunks.z.len, chunks.y.len, chunks.x.len, chunks.c.len,
-	)
+	dir := OD() + qname
+	head, err := zarr.PrepareFrame(dir, size, ncomp, steps, chunks.z.len, chunks.y.len, chunks.x.len, chunks.c.len, qname, unit)
+	if err != nil {
+		return err
+	}
 	// Precompute sizes.
 	zLen, yLen, xLen, cLen := chunks.z.len, chunks.y.len, chunks.x.len, chunks.c.len
 	elemsPerChunk := zLen * yLen * xLen * cLen
@@ -231,9 +236,13 @@ func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
 	type job struct{ icx, icy, icz, icc int }
 	jobs := make(chan job, 2*runtime.GOMAXPROCS(0))
 	errs := make(chan error, 1)
+	cancelled := make(chan struct{})
+	var cancelOnce sync.Once
+	var recordsMu sync.Mutex
+	var records []zarr.ChunkRecord
 
 	// Small bounded pool.
-	totalJobs := zLen * yLen * xLen * cLen
+	totalJobs := chunks.z.nb * chunks.y.nb * chunks.x.nb * chunks.c.nb
 	workers := min(totalJobs, runtime.GOMAXPROCS(0))
 
 	var wg sync.WaitGroup
@@ -276,18 +285,25 @@ func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
 				case errs <- err:
 				default:
 				}
+				cancelOnce.Do(func() { close(cancelled) })
 				return
 			}
 
-			filename := fmt.Sprintf("%s%d.%d.%d.%d.%d", prefix, steps, j.icz, j.icy, j.icx, j.icc)
+			key := fmt.Sprintf("%d.%d.%d.%d.%d", steps, j.icz, j.icy, j.icx, j.icc)
+			filename := prefix + key
 			if err := fsutil.Put(filename, compressed); err != nil {
 				cmpPool.Put(&compressed)
 				select {
-				case errs <- err:
+				case errs <- fmt.Errorf("write chunk %s: %w", filename, err):
 				default:
 				}
+				cancelOnce.Do(func() { close(cancelled) })
 				return
 			}
+			digest := sha256.Sum256(compressed)
+			recordsMu.Lock()
+			records = append(records, zarr.ChunkRecord{Key: key, Size: len(compressed), SHA256: hex.EncodeToString(digest[:])})
+			recordsMu.Unlock()
 			cmpPool.Put(&compressed)
 		}
 	}
@@ -296,11 +312,16 @@ func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
 	for range workers {
 		go worker()
 	}
+dispatch:
 	for icx := 0; icx < chunks.x.nb; icx++ {
 		for icy := 0; icy < chunks.y.nb; icy++ {
 			for icz := 0; icz < chunks.z.nb; icz++ {
 				for icc := 0; icc < chunks.c.nb; icc++ {
-					jobs <- job{icx, icy, icz, icc}
+					select {
+					case jobs <- job{icx, icy, icz, icc}:
+					case <-cancelled:
+						break dispatch
+					}
 				}
 			}
 		}
@@ -312,7 +333,8 @@ func syncSave(array *data.Slice, qname string, steps int, chunks chunks) error {
 	case err := <-errs:
 		return err
 	default:
-		return nil
+		sort.Slice(records, func(i, j int) bool { return records[i].Key < records[j].Key })
+		return zarr.CommitFrame(dir, head, timestamp, records)
 	}
 }
 
@@ -334,8 +356,8 @@ func SaveAllTimestampsHDF5() {
 		return
 	}
 	for _, sq := range savedQuantities.Quantities {
-		if len(sq.times) > 0 {
-			err := amuhdf5.GlobalWriter.SaveTimestamps(sq.name, sq.times)
+		if sq.output != nil && sq.output.committed > 0 {
+			err := amuhdf5.GlobalWriter.SaveTimestamps(sq.name, sq.times[:sq.output.committed])
 			if err != nil {
 				log.Log.Err("HDF5 save timestamps %s: %v", sq.name, err)
 			}

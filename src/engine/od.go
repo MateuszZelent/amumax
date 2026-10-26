@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/MathieuMoalic/amumax/src/cuda"
 	"github.com/MathieuMoalic/amumax/src/fsutil"
 	amuhdf5 "github.com/MathieuMoalic/amumax/src/hdf5"
 	"github.com/MathieuMoalic/amumax/src/log"
@@ -13,8 +14,11 @@ import (
 )
 
 var (
-	outputdir string // Output directory
-	InputFile string
+	outputdir       string // Output directory
+	InputFile       string
+	outputLock      string
+	outputLockOwner []byte
+	outputOwned     bool
 
 	CacheDir       string
 	SkipExists     bool
@@ -53,16 +57,33 @@ func InitIO(mx3Path, od, cachedir string, skipexists, forceclean, hideprogressba
 	if strings.HasPrefix(outputdir, "http://") {
 		fsutil.SetWD(outputdir + "/../")
 	}
+	if fsutil.IsDir(od) && SkipExists {
+		log.Log.Warn("Directory `%s` exists, skipping `%s` because of --skip-exist flag.", od, mx3Path)
+		os.Exit(0)
+	}
+	var lockErr error
+	outputLock, lockErr = fsutil.AcquireOutputLock(od)
+	log.Log.PanicIfError(lockErr)
+	outputLockOwner, lockErr = fsutil.Read(outputLock + "/owner.json")
+	log.Log.PanicIfError(lockErr)
+	initialized := false
+	defer func() {
+		if !initialized && outputLock != "" {
+			_ = fsutil.ReleaseOutputLock(outputLock, outputLockOwner)
+			outputLock = ""
+		}
+	}()
 	if fsutil.IsDir(od) {
-		// if directory exists and --skip-exist flag is set, skip the directory
-		if SkipExists {
-			log.Log.Warn("Directory `%s` exists, skipping `%s` because of --skip-exist flag.", od, mx3Path)
-			os.Exit(0)
-			// if directory exists and --force-clean flag is set, remove the directory
-		} else if ForceClean {
+		if ForceClean {
 			log.Log.Warn("Cleaning `%s`", od)
 			log.Log.PanicIfError(fsutil.Remove(od))
 			log.Log.PanicIfError(fsutil.Mkdir(od))
+		} else {
+			entries, err := os.ReadDir(od)
+			log.Log.PanicIfError(err)
+			if len(entries) != 0 {
+				panic("output directory is not empty; choose a new directory or explicitly use --force-clean")
+			}
 		}
 	} else {
 		log.Log.PanicIfError(fsutil.Mkdir(od))
@@ -72,4 +93,8 @@ func InitIO(mx3Path, od, cachedir string, skipexists, forceclean, hideprogressba
 	} else {
 		zarr.InitZgroup("", OD())
 	}
+	EngineState.Metadata.SetInputPath(InputFile)
+	EngineState.Metadata.Init(OD(), StartTime, cuda.GPUInfoOld)
+	initialized = true
+	outputOwned = true
 }

@@ -33,6 +33,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Test Zarr persistence and interruption handling
+        run: |
+          go test -race ./src/fsutil ./src/zarr ./src/tabular
+          go test src/engine/termination.go src/engine/termination_regression_test.go
+
       - name: Set up CUDA build environment (libcufft.so.12 + libcurand.so.10)
         run: |
           mkdir -p /opt/cuda/include /opt/cuda/lib

@@ -23,14 +23,5 @@ func InitZgroup(name string, od string) {
 	} else {
 		path = od + name + "/.zgroup"
 	}
-	zgroup, err := fsutil.Create(path)
-	log.Log.PanicIfError(err)
-	defer func() {
-		cerr := zgroup.Close()
-		if cerr != nil {
-			log.Log.Err("Error closing zgroup file: %v", cerr)
-		}
-	}()
-	_, err = zgroup.Write([]byte("{\"zarr_format\": 2}"))
-	log.Log.PanicIfError(err)
+	log.Log.PanicIfError(fsutil.Put(path, []byte("{\"zarr_format\": 2}")))
 }

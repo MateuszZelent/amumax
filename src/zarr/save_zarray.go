@@ -40,18 +40,7 @@ func SaveFileZarray(path string, size [3]int, ncomp int, step int, cz int, cy in
 	z.Chunks = [5]int{1, cz, cy, cx, cc}
 	z.Shape = [5]int{step, size[2], size[1], size[0], ncomp}
 
-	f, err := fsutil.Create(path)
+	b, err := json.MarshalIndent(z, "", "\t")
 	log.Log.PanicIfError(err)
-	defer func() {
-		cerr := f.Close()
-		if cerr != nil {
-			log.Log.Err("Error closing zarray file: %v", cerr)
-		}
-	}()
-	enc := json.NewEncoder(f)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "\t")
-	log.Log.PanicIfError(enc.Encode(z))
-	err = f.Flush()
-	log.Log.PanicIfError(err)
+	log.Log.PanicIfError(fsutil.Put(path, b))
 }

@@ -13,6 +13,8 @@ var (
 
 // Periodically called by run loop to save everything that's needed at this time.
 func saveIfNeeded() {
+	CheckTermination()
+	checkOutputError()
 	for q, a := range output {
 		if a.needSave() {
 			a.save(q)

@@ -73,6 +73,7 @@ type lValue interface {
 // EvalFile evaluate code, exit on error (behavior for input files)
 func EvalFile(code *script.BlockStmt) {
 	for i := range code.Children {
+		CheckTermination()
 		formatted := rmln(script.Format(code.Node[i]))
 		log.Log.Command(formatted)
 		exp := code.Children[i]
@@ -89,6 +90,7 @@ func EvalFile(code *script.BlockStmt) {
 			}
 		}
 	}
+	CheckTermination()
 }
 
 func isMeshExpression(exp script.Expr) bool {

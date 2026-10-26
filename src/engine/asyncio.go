@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -12,8 +14,12 @@ import (
 // See save.go, autosave.go
 
 var (
-	saveQue chan func() // passes save requests to runSaver for asyc IO
-	queLen  atom        // # tasks in queue
+	saveQue       chan func() // passes save requests to runSaver for asyc IO
+	queLen        atom        // # tasks in queue
+	outputFailure struct {
+		sync.Mutex
+		err error
+	}
 )
 
 func init() {
@@ -33,6 +39,7 @@ func (a *atom) Load() int32 {
 }
 
 func queOutput(f func()) {
+	checkOutputError()
 	if cuda.Synchronous {
 		timer.Start("io")
 	}
@@ -46,24 +53,48 @@ func queOutput(f func()) {
 // Continuously executes tasks the from SaveQue channel.
 func runSaver() {
 	for f := range saveQue {
-		f()
-		queLen.Add(-1)
+		func() {
+			defer queLen.Add(-1)
+			defer captureOutputPanic()
+			f()
+		}()
+	}
+}
+
+func captureOutputPanic() {
+	if value := recover(); value != nil {
+		outputFailure.Lock()
+		if outputFailure.err == nil {
+			outputFailure.err = fmt.Errorf("asynchronous output: %v", value)
+		}
+		outputFailure.Unlock()
+	}
+}
+
+func outputError() error {
+	outputFailure.Lock()
+	defer outputFailure.Unlock()
+	return outputFailure.err
+}
+
+func checkOutputError() {
+	if err := outputError(); err != nil {
+		panic(err)
 	}
 }
 
 // Finalizer function called upon program exit.
 // Waits until all asynchronous output has been saved.
 func drainOutput() {
+	waitOutput()
+	checkOutputError()
+}
+
+func waitOutput() {
 	if saveQue == nil {
 		return
 	}
 	for queLen.Load() > 0 {
-		select {
-		default:
-			time.Sleep(1 * time.Millisecond) // other goroutine has the last job, wait for it to finish
-		case f := <-saveQue:
-			f()
-			queLen.Add(-1)
-		}
+		time.Sleep(time.Millisecond)
 	}
 }

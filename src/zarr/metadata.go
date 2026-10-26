@@ -1,8 +1,13 @@
 package zarr
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"time"
 
@@ -22,12 +27,44 @@ func (m *Metadata) Init(currentDir string, startTime time.Time, gpuInfo string) 
 	if m.Fields == nil {
 		m.Fields = make(map[string]any)
 	}
+	if _, ok := m.Fields["run_id"]; !ok {
+		var id [16]byte
+		_, err := rand.Read(id[:])
+		log.Log.PanicIfError(err)
+		m.Fields["run_id"] = hex.EncodeToString(id[:])
+		m.Fields["field_commit_schema"] = 1
+		m.Fields["command_line"] = append([]string(nil), os.Args...)
+		if executable, err := os.Executable(); err == nil {
+			m.Fields["executable"] = executable
+			if file, err := os.Open(executable); err == nil {
+				hash := sha256.New()
+				if _, err := io.Copy(hash, file); err == nil {
+					m.Fields["binary_sha256"] = fmt.Sprintf("%x", hash.Sum(nil))
+				}
+				_ = file.Close()
+			}
+		}
+	}
 	m.Add("start_time", startTime.Format(time.UnixDate))
 	m.Add("gpu", gpuInfo)
 	m.Path = currentDir + ".zattrs"
 	m.startTime = startTime
 	m.Save()
 	m.lastSave = time.Now()
+}
+
+func (m *Metadata) SetInputPath(path string) {
+	if m.Fields == nil {
+		m.Fields = make(map[string]any)
+	}
+	m.Fields["input_file"] = path
+	if file, err := os.Open(path); err == nil {
+		hash := sha256.New()
+		if _, err := io.Copy(hash, file); err == nil {
+			m.Fields["input_sha256"] = fmt.Sprintf("%x", hash.Sum(nil))
+		}
+		_ = file.Close()
+	}
 }
 
 func (m *Metadata) Add(key string, val any) {
@@ -77,18 +114,9 @@ func (m *Metadata) NeedSave() bool {
 
 func (m *Metadata) Save() {
 	if m.Path != "" {
-		zattrs, err := fsutil.Create(m.Path)
-		log.Log.PanicIfError(err)
-		defer func() {
-			cerr := zattrs.Close()
-			if cerr != nil {
-				log.Log.Err("Error closing zattrs file: %v", cerr)
-			}
-		}()
 		jsonMeta, err := json.MarshalIndent(m.Fields, "", "\t")
 		log.Log.PanicIfError(err)
-		_, err = zattrs.Write([]byte(jsonMeta))
-		log.Log.PanicIfError(err)
+		log.Log.PanicIfError(fsutil.Put(m.Path, jsonMeta))
 	}
 }
 

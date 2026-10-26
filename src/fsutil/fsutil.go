@@ -3,11 +3,17 @@ package fsutil
 
 import (
 	"bufio"
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var wd = "" // Working directory set by SetWD
@@ -30,6 +36,44 @@ func SetWD(dir string) {
 func Mkdir(p string) error {
 	p = addWorkDir(p)
 	return os.Mkdir(p, DirPerm)
+}
+
+// AcquireOutputLock claims the common solver lock using one atomic mkdir.
+// A lock left by a killed writer must be investigated and removed explicitly.
+func AcquireOutputLock(output string) (string, error) {
+	lock := strings.TrimRight(output, "/") + ".zarr-owner"
+	var token [16]byte
+	if _, err := rand.Read(token[:]); err != nil {
+		return "", err
+	}
+	host, _ := os.Hostname()
+	owner, err := json.Marshal(map[string]any{
+		"token": hex.EncodeToString(token[:]), "pid": os.Getpid(), "host": host,
+		"started_utc": time.Now().UTC().Format(time.RFC3339Nano), "output": output,
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := Mkdir(lock); err != nil {
+		return "", fmt.Errorf("cannot claim output lock %s: %w", lock, err)
+	}
+	if err := Put(filepath.Join(lock, "owner.json"), owner); err != nil {
+		_ = Remove(lock)
+		return "", err
+	}
+	return lock, nil
+}
+
+// ReleaseOutputLock refuses to remove a lock whose owner record changed.
+func ReleaseOutputLock(lock string, owner []byte) error {
+	current, err := Read(filepath.Join(lock, "owner.json"))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(current, owner) {
+		return fmt.Errorf("output lock ownership changed: %s", lock)
+	}
+	return Remove(lock)
 }
 
 // Touch creates an empty file at the specified path.
@@ -55,6 +99,19 @@ func Remove(p string) error {
 func Read(p string) ([]byte, error) {
 	p = addWorkDir(p)
 	return os.ReadFile(p)
+}
+
+// ReadDir lists names without suppressing permission and storage errors.
+func ReadDir(p string) ([]string, error) {
+	entries, err := os.ReadDir(addWorkDir(p))
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name()
+	}
+	return names, nil
 }
 
 // Exists checks if the file or directory at the path exists.
@@ -104,14 +161,47 @@ func Append(p string, data []byte) (retErr error) {
 	return nil
 }
 
-// Put creates a file at the path and writes data to it.
+// Put atomically replaces a file after persisting its contents. It does not
+// truncate the previous version when the new write fails or the process dies.
 func Put(p string, data []byte) error {
 	p = addWorkDir(p)
-	err := os.MkdirAll(filepath.Dir(p), DirPerm)
+	dir := filepath.Dir(p)
+	if err := os.MkdirAll(dir, DirPerm); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".amumax-write-*")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, data, FilePerm)
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	mode := os.FileMode(FilePerm)
+	if info, statErr := os.Stat(p); statErr == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(statErr) {
+		return errors.Join(statErr, f.Close())
+	}
+	if err := f.Chmod(mode); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	n, err := f.Write(data)
+	if err == nil && n != len(data) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return errors.Join(err, f.Close())
+	}
+	if err := errors.Join(f.Sync(), f.Close()); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, p); err != nil {
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	return errors.Join(d.Sync(), d.Close())
 }
 
 // Create opens a file for writing, truncating it if it exists.

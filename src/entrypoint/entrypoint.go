@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -50,7 +52,36 @@ func Entrypoint(cmd *cobra.Command, args []string, flags *flags.Flags) {
 		engine.StorageFormat = engine.StorageFormatHDF5
 	}
 
-	defer engine.CleanExit() // flushes pending output, if any
+	signals := make(chan os.Signal, 1)
+	done := make(chan struct{})
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		select {
+		case received := <-signals:
+			engine.RequestTermination(received)
+		case <-done:
+		}
+	}()
+	defer func() {
+		signal.Stop(signals)
+		close(done)
+	}()
+	defer func() {
+		value := recover()
+		if value != nil {
+			if _, interrupted := engine.TerminationExitCode(value); !interrupted {
+				engine.RecordRunFailure()
+			}
+		}
+		engine.CleanExit()
+		if value != nil {
+			if code, ok := engine.TerminationExitCode(value); ok {
+				os.Exit(code)
+			}
+			panic(value)
+		}
+	}()
+	engine.CheckTermination()
 
 	if flags.Vet {
 		engine.Vet()

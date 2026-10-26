@@ -166,6 +166,7 @@ func run(seconds float64) {
 	ProgressBar := progressbar.NewProgressBar(start, stop, "🧲", HideProgresBar)
 
 	for (Time < stop) && !Pause {
+		CheckTermination()
 		select {
 		default:
 			ProgressBar.Update(Time)
@@ -199,6 +200,7 @@ func runWhile(condition func() bool) {
 func runWhileInner(condition func() bool, output bool) {
 	saveIfNeeded() // allow t=0 output
 	for condition() && !Pause {
+		CheckTermination()
 		select {
 		default:
 			step(output)
@@ -212,9 +214,12 @@ func runWhileInner(condition func() bool, output bool) {
 // RunInteractive Runs indefinitely
 func RunInteractive() {
 	for {
-		f := <-Inject
-		f()
-		time.Sleep(100 * time.Millisecond)
+		CheckTermination()
+		select {
+		case f := <-Inject:
+			f()
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 }
 
