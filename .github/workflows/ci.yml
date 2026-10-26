@@ -17,15 +17,26 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - name: Build frontend
         run: |
           cd frontend
-          npm install
+          npm install --global --ignore-scripts npm@12.2.1
+          npm ci --ignore-scripts
+          npm audit --audit-level=low
+          npm run check
+          npm run test:unit
           npm run build
           rm -rf ../src/api/static
-          mv dist ../src/api/static
+          cp -R dist ../src/api/static
+
+      - name: Test frontend in Chromium
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium --only-shell
+          npm run test:production
+          npx playwright test tests/preview3d.spec.ts --project=chromium
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -85,13 +96,18 @@ jobs:
           CGO_CFLAGS_ALLOW: "(-fno-schedule-insns|-malign-double|-ffast-math)"
         run: |
           mkdir -p build
+          version="$(date -u +'%Y.%m.%d')"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then version="$GITHUB_REF_NAME"; fi
           go build -v \
-            -ldflags "-X github.com/MathieuMoalic/amumax/src/version.VERSION=$(date -u +'%Y.%m.%d')" \
+            -ldflags "-X github.com/MathieuMoalic/amumax/src/version.VERSION=$version" \
             -o build/amumax
           echo "=== Binary SONAME check ==="
           ldd build/amumax | grep -E 'cufft|curand|cuda' || true
           cp build/amumax ./amumax
           chmod +x ./amumax
+
+      - name: Audit built binary
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -mode=binary build/amumax
 
       - name: Prepare release CUDA libraries
         run: |

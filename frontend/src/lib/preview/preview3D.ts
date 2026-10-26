@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { previewState } from '$api/incoming/preview';
 import { meshState } from '$api/incoming/mesh';
 import * as THREE from 'three';
